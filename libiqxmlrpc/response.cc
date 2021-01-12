@@ -50,7 +50,8 @@ dump_response( const Response& response )
 //
 
 Response::Response( Value* v ):
-  value_(v)
+  value_(v),
+  fault_code_(0)
 {
 }
 

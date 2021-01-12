@@ -37,7 +37,7 @@ private:
     NONE,
     MEMBER,
     NAME_READ,
-    VALUE_READ,
+    VALUE_READ
   };
 
   virtual void

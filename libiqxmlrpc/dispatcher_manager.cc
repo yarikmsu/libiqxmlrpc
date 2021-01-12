@@ -92,6 +92,8 @@ public:
   Default_method_dispatcher* default_disp;
 
   Impl():
+    // cppcheck-suppress noCopyConstructor
+    // cppcheck-suppress noOperatorEq
     default_disp(new Default_method_dispatcher)
   {
     dispatchers.push_back(default_disp);

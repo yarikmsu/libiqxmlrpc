@@ -59,7 +59,7 @@ public:
   }
 };
 
-BOOST_GLOBAL_FIXTURE( ClientFixture );
+BOOST_GLOBAL_FIXTURE( ClientFixture )
 
 // Stress test thread function
 void do_call(Client_base* client)

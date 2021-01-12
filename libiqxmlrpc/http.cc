@@ -107,11 +107,14 @@ void Header::parse(const std::string& s)
 
   for (Tokens::iterator i = lines.begin(); i != lines.end(); ++i) {
     boost::iterator_range<std::string::iterator> j = boost::find_first(*i, ":");
+    // cppcheck-suppress mismatchingContainerExpression
     if (j.begin() == i->end())
       throw Malformed_packet("option line does not contain a colon symbol");
 
     std::string opt_name, opt_value;
+    // cppcheck-suppress mismatchingContainerExpression
     std::copy(i->begin(), j.begin(), std::back_inserter(opt_name));
+    // cppcheck-suppress mismatchingContainerExpression
     std::copy(j.end(), i->end(), std::back_inserter(opt_value));
 
     boost::trim(opt_name);
@@ -443,7 +446,9 @@ bool Packet_reader::read_header( const std::string& s )
     return false;
 
   std::string tmp;
+  // cppcheck-suppress mismatchingContainerExpression
   std::copy(header_cache.begin(), i.begin(), std::back_inserter(tmp));
+  // cppcheck-suppress mismatchingContainerExpression
   std::copy(i.end(), header_cache.end(), std::back_inserter(content_cache));
   header_cache = tmp;
   return true;

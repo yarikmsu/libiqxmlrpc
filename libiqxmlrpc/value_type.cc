@@ -509,9 +509,8 @@ void Binary_data::apply_visitor(Value_type_visitor& v) const
 
 
 // ----------------------------------------------------------------------------
-Date_time::Date_time( const struct tm* t )
+Date_time::Date_time( const struct tm* t ): tm_(*t)
 {
-  tm_ = *t;
 }
 
 

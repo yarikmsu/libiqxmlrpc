@@ -42,7 +42,7 @@ std::string get_host_name()
 #if defined(__sun) || defined(sun)
 #define IQXMLRPC_GETHOSTBYNAME(_h) \
   IQXMLRPC_GETHOSTBYNAME_PREP \
-  hent = ::gethostbyname_r( _h), &hent_local, buf, sizeof(buf), &local_h_errno ); \
+  hent = ::gethostbyname_r( _h, &hent_local, buf, sizeof(buf), &local_h_errno ); \
   IQXMLRPC_GETHOSTBYNAME_POST
 #endif
 

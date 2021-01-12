@@ -187,6 +187,7 @@ struct Ctx::Impl {
   bool require_client_cert;
 
   Impl():
+    ctx(NULL),
     server_verifier(0),
     client_verifier(0),
     require_client_cert(false)

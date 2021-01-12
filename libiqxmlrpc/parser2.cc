@@ -126,7 +126,10 @@ public:
 
     ParseStep():
       done(false),
-      is_empty(false)
+      element_begin(false),
+      element_end(false),
+      is_empty(false),
+      is_text(false)
     {
     }
 
@@ -271,7 +274,8 @@ Parser::context() const
 
 StateMachine::StateMachine(const Parser& p, int start_state):
   parser_(p),
-  curr_(start_state)
+  curr_(start_state),
+  trans_(NULL)
 {
 }
 

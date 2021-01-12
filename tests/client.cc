@@ -40,7 +40,7 @@ public:
   }
 };
 
-BOOST_GLOBAL_FIXTURE( ClientFixture );
+BOOST_GLOBAL_FIXTURE( ClientFixture )
 
 BOOST_AUTO_TEST_CASE( introspection_test )
 {

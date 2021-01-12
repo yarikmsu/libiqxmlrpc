@@ -47,9 +47,8 @@ XmlBuilder::Node::set_textdata(const std::string& data)
 // XmlBuilder
 //
 
-XmlBuilder::XmlBuilder()
+XmlBuilder::XmlBuilder(): buf(xmlBufferCreate())
 {
-  buf = xmlBufferCreate();
   throwBuildError(writer = xmlNewTextWriterMemory(buf, 0), (xmlTextWriter*)0);
   throwBuildError(xmlTextWriterStartDocument(writer, NULL, "UTF-8", NULL), -1);
 }
