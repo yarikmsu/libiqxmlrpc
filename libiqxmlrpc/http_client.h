@@ -4,6 +4,8 @@
 #ifndef _libiqxmlrpc_http_client_h_
 #define _libiqxmlrpc_http_client_h_
 
+#include <memory>
+
 #include "client.h"
 #include "client_conn.h"
 #include "connector.h"
@@ -19,7 +21,7 @@ class LIBIQXMLRPC_API Http_client_connection:
   public iqxmlrpc::Client_connection,
   public iqnet::Connection
 {
-  std::auto_ptr<iqnet::Reactor_base> reactor;
+  std::unique_ptr<iqnet::Reactor_base> reactor;
   std::string out_str;
   http::Packet* resp_packet;
 

@@ -39,7 +39,7 @@ public:
 
 // Global configuration
 Stress_test_opts test_config;
-Client_base* test_client = 0;
+Client_base* test_client = nullptr;
 
 class ClientFixture {
 public:
@@ -84,7 +84,7 @@ void do_call(Client_base* client)
 void do_test()
 {
   try {
-    std::auto_ptr<Client_base> client(test_config.create_instance());
+    std::unique_ptr<Client_base> client(test_config.create_instance());
     for (int i = 0; i < test_config.calls_per_thread(); ++i) {
       do_call(client.get());
     }
