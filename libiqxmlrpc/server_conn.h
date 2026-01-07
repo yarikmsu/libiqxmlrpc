@@ -71,7 +71,7 @@ class Server_conn_factory: public iqnet::Serial_conn_factory<Transport>
 
 public:
   Server_conn_factory():
-    server(0), reactor(0) {}
+    server(nullptr), reactor(nullptr) {}
 
   void post_init( Server* s, iqnet::Reactor_base* r )
   {

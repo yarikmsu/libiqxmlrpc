@@ -1,7 +1,6 @@
 #include <signal.h>
 #include <memory>
 #include <iostream>
-#include <boost/utility.hpp>
 #include <boost/test/test_tools.hpp>
 #include <boost/test/unit_test.hpp>
 #include "libiqxmlrpc/libiqxmlrpc.h"
@@ -83,12 +82,15 @@ public:
   }
 };
 
-class Test_server: boost::noncopyable {
-  std::auto_ptr<Executor_factory_base> ef_;
-  std::auto_ptr<Server> impl_;
+class Test_server {
+  std::unique_ptr<Executor_factory_base> ef_;
+  std::unique_ptr<Server> impl_;
   PermissiveAuthPlugin auth_plugin_;
 
 public:
+  Test_server(const Test_server&) = delete;
+  Test_server& operator=(const Test_server&) = delete;
+
   Test_server(const Test_server_config&);
 
   Server& impl() { return *impl_.get(); }
@@ -96,11 +98,11 @@ public:
   void work();
 };
 
-Test_server* test_server = 0;
+Test_server* test_server = nullptr;
 
 Test_server::Test_server(const Test_server_config& conf):
-  ef_(0),
-  impl_(0)
+  ef_(nullptr),
+  impl_(nullptr)
 {
   if (conf.numthreads > 1)
   {

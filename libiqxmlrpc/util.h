@@ -6,8 +6,6 @@
 
 #include "lock.h"
 
-#include <boost/utility.hpp>
-
 #include <functional>
 #include <memory>
 
@@ -66,11 +64,14 @@ public:
 
 //! Provides serialized access to some bool value
 template <class Lock>
-class LockedBool: boost::noncopyable {
+class LockedBool {
   bool val;
   Lock lock;
 
 public:
+  LockedBool(const LockedBool&) = delete;
+  LockedBool& operator=(const LockedBool&) = delete;
+
   LockedBool(bool default_):
     val(default_) {}
 

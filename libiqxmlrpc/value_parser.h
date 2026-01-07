@@ -4,6 +4,8 @@
 #ifndef _iqxmlrpc_value_parser_h_
 #define _iqxmlrpc_value_parser_h_
 
+#include <memory>
+
 #include "parser2.h"
 #include "value.h"
 
@@ -20,7 +22,7 @@ public:
   }
 
 protected:
-  std::auto_ptr<Value_type> retval;
+  std::unique_ptr<Value_type> retval;
 };
 
 class ValueBuilder: public ValueBuilderBase {

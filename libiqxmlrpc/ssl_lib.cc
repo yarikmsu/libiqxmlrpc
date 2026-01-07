@@ -31,8 +31,11 @@ namespace ssl {
 // Mutli-threading support stuff
 //
 
-class LockContainer: boost::noncopyable {
+class LockContainer {
 public:
+  LockContainer(const LockContainer&) = delete;
+  LockContainer& operator=(const LockContainer&) = delete;
+
   LockContainer():
     size(CRYPTO_num_locks()),
     locks(new boost::mutex[size])
@@ -81,7 +84,7 @@ LockContainer::~LockContainer()
   delete[] locks;
 }
 
-Ctx* ctx = 0;
+Ctx* ctx = nullptr;
 boost::once_flag ssl_init;
 int iqxmlrpc_ssl_data_idx = 0;
 

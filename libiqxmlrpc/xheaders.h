@@ -26,8 +26,8 @@ public:
 };
 
 inline std::ostream& operator<<(std::ostream& os, const XHeaders& xheaders) {
-  for(XHeaders::const_iterator it = xheaders.begin(); it!= xheaders.end(); ++it) {
-    os << " " << it->first << "[" << it->second << "]";
+  for (const auto& header : xheaders) {
+    os << " " << header.first << "[" << header.second << "]";
   }
   return os;
 }
