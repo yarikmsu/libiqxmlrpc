@@ -15,7 +15,7 @@ typedef boost::mutex::scoped_lock scoped_lock;
 
 Executor::Executor( Method* m, Server* s, Server_connection* cb ):
   method(m),
-  interceptors(0),
+  interceptors(nullptr),
   server(s),
   conn(cb)
 {
@@ -43,7 +43,7 @@ void Executor::interrupt_server()
 void Serial_executor::execute( const Param_list& params )
 {
   try {
-    std::auto_ptr<Value> result(new Value(0));
+    std::unique_ptr<Value> result(new Value(0));
     method->process_execution( interceptors, params, *result.get() );
     schedule_response( Response(result.release()) );
   }
@@ -211,7 +211,7 @@ void Pool_executor::execute( const Param_list& params_ )
 void Pool_executor::process_actual_execution()
 {
   try {
-    std::auto_ptr<Value> result(new Value(0));
+    std::unique_ptr<Value> result(new Value(0));
     method->process_execution( interceptors, params, *result.get() );
     schedule_response( Response(result.release()) );
   }

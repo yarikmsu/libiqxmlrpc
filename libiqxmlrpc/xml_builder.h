@@ -6,14 +6,16 @@
 
 #include "api_export.h"
 
-#include <boost/utility.hpp>
 #include <string>
 #include <libxml/xmlwriter.h>
 
 namespace iqxmlrpc {
 
-class XmlBuilder: boost::noncopyable {
+class XmlBuilder {
 public:
+  XmlBuilder(const XmlBuilder&) = delete;
+  XmlBuilder& operator=(const XmlBuilder&) = delete;
+
   class Node {
   public:
     Node(XmlBuilder&, const char* name);

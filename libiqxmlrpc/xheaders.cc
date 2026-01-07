@@ -6,11 +6,11 @@ namespace iqxmlrpc
 {
 XHeaders& XHeaders::operator=(const std::map<std::string, std::string>& v) {
   xheaders_.clear();
-  for (XHeaders::const_iterator it = v.begin(); it != v.end(); ++it) {
-    if (validate(it->first)) {
-      std::string key(it->first);
+  for (const auto& entry : v) {
+    if (validate(entry.first)) {
+      std::string key(entry.first);
       boost::to_lower(key);
-      xheaders_[key] = it->second;
+      xheaders_[key] = entry.second;
     }
   }
   return *this;

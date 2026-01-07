@@ -1,6 +1,8 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
+#include <memory>
+
 #include "server_conn.h"
 #include "auth_plugin.h"
 #include "http_errors.h"
@@ -10,7 +12,7 @@ using namespace iqxmlrpc;
 
 Server_connection::Server_connection( const iqnet::Inet_addr& a ):
   peer_addr(a),
-  server(0),
+  server(nullptr),
   keep_alive(false),
   read_buf_(65536, '\0')
 {
@@ -50,7 +52,7 @@ http::Packet* Server_connection::read_request( const std::string& s )
 
 void Server_connection::schedule_response( http::Packet* pkt )
 {
-  std::auto_ptr<http::Packet> p(pkt);
+  std::unique_ptr<http::Packet> p(pkt);
   p->set_keep_alive( keep_alive );
   response = p->dump();
   do_schedule_response();

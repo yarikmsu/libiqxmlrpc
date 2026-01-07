@@ -105,14 +105,14 @@ void Header::parse(const std::string& s)
     lines.pop_front();
   }
 
-  for (Tokens::iterator i = lines.begin(); i != lines.end(); ++i) {
-    boost::iterator_range<std::string::iterator> j = boost::find_first(*i, ":");
-    if (j.begin() == i->end())
+  for (auto& line : lines) {
+    boost::iterator_range<std::string::iterator> j = boost::find_first(line, ":");
+    if (j.begin() == line.end())
       throw Malformed_packet("option line does not contain a colon symbol");
 
     std::string opt_name, opt_value;
-    std::copy(i->begin(), j.begin(), std::back_inserter(opt_name));
-    std::copy(j.end(), i->end(), std::back_inserter(opt_value));
+    std::copy(line.begin(), j.begin(), std::back_inserter(opt_name));
+    std::copy(j.end(), line.end(), std::back_inserter(opt_value));
 
     boost::trim(opt_name);
     boost::trim(opt_value);
@@ -153,7 +153,7 @@ void Header::set_option_checked(const std::string& name, const std::string& valu
   std::pair<Validators::const_iterator, Validators::const_iterator> v =
     validators_.equal_range(name);
 
-  for (Validators::const_iterator i = v.first; i != v.second; ++i)
+  for (auto i = v.first; i != v.second; ++i)
   {
     if (i->second.level <= ver_level_)
       i->second.fn(value);
@@ -189,8 +189,8 @@ std::string Header::dump() const
 {
   std::string retval = dump_head();
 
-  for (Options::const_iterator i = options_.begin(); i != options_.end(); ++i) {
-    retval += i->first + ": " + i->second + names::crlf;
+  for (const auto& opt : options_) {
+    retval += opt.first + ": " + opt.second + names::crlf;
   }
 
   retval += names::crlf;
@@ -286,8 +286,8 @@ void Header::get_xheaders(iqxmlrpc::XHeaders& xheaders) const
 
 void Header::set_xheaders(const iqxmlrpc::XHeaders& xheaders)
 {
-  for( iqxmlrpc::XHeaders::const_iterator it = xheaders.begin(); it!=xheaders.end(); ++it ) {
-    set_option(it->first, it->second);
+  for (const auto& header : xheaders) {
+    set_option(header.first, header.second);
   }
 }
 
@@ -312,7 +312,7 @@ void Request_header::get_authinfo(std::string& user, std::string& pw) const
   if (v[0] != "basic")
     throw Unauthorized();
 
-  boost::scoped_ptr<Binary_data> bin_authinfo( Binary_data::from_base64(v[1]) );
+  std::unique_ptr<Binary_data> bin_authinfo( Binary_data::from_base64(v[1]) );
   std::string data = bin_authinfo->get_data();
 
   size_t colon_it = data.find_first_of(":");
@@ -324,7 +324,7 @@ void Request_header::get_authinfo(std::string& user, std::string& pw) const
 void Request_header::set_authinfo(const std::string& u, const std::string& p)
 {
   std::string h = u + ":" + p;
-  boost::scoped_ptr<Binary_data> bin_authinfo( Binary_data::from_data(h) );
+  std::unique_ptr<Binary_data> bin_authinfo( Binary_data::from_data(h) );
   set_option( names::authorization, "Basic " + bin_authinfo->get_base64() );
 }
 
