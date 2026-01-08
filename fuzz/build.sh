@@ -2,31 +2,56 @@
 # OSS-Fuzz build script for libiqxmlrpc
 # Copyright (C) 2024 libiqxmlrpc contributors
 
-# Build libiqxmlrpc with fuzzing instrumentation
+# Build libxml2 as static library
+cd $SRC
+if [ ! -d libxml2 ]; then
+    git clone --depth 1 https://gitlab.gnome.org/GNOME/libxml2.git
+fi
+cd libxml2
+mkdir -p build && cd build
+cmake .. \
+    -DCMAKE_C_COMPILER=$CC \
+    -DCMAKE_C_FLAGS="$CFLAGS" \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DLIBXML2_WITH_PYTHON=OFF \
+    -DLIBXML2_WITH_LZMA=OFF \
+    -DLIBXML2_WITH_ZLIB=OFF \
+    -DLIBXML2_WITH_ICU=OFF
+make -j$(nproc)
+LIBXML2_DIR="$SRC/libxml2"
+LIBXML2_LIB="$LIBXML2_DIR/build/libxml2.a"
+LIBXML2_INCLUDE_SRC="$LIBXML2_DIR/include"
+LIBXML2_INCLUDE_BUILD="$LIBXML2_DIR/build"
+
+# Build libiqxmlrpc with fuzzing instrumentation as static library
+cd $SRC/libiqxmlrpc
 mkdir -p build
 cd build
 cmake .. \
     -DCMAKE_C_COMPILER=$CC \
     -DCMAKE_CXX_COMPILER=$CXX \
     -DCMAKE_C_FLAGS="$CFLAGS" \
-    -DCMAKE_CXX_FLAGS="$CXXFLAGS -DBOOST_TIMER_ENABLE_DEPRECATED" \
-    -DCMAKE_EXE_LINKER_FLAGS="$LIB_FUZZING_ENGINE" \
-    -DCMAKE_SHARED_LINKER_FLAGS="$LIB_FUZZING_ENGINE" \
-    -Dbuild_tests=OFF
+    -DCMAKE_CXX_FLAGS="$CXXFLAGS -std=c++11 -DBOOST_TIMER_ENABLE_DEPRECATED -I$LIBXML2_INCLUDE_SRC -I$LIBXML2_INCLUDE_BUILD" \
+    -DBUILD_SHARED_LIBS=OFF \
+    -Dbuild_tests=OFF \
+    -DLIBXML2_INCLUDE_DIR="$LIBXML2_INCLUDE_SRC;$LIBXML2_INCLUDE_BUILD" \
+    -DLIBXML2_LIBRARY="$LIBXML2_LIB"
 
 make -j$(nproc)
 cd ..
 
-# Build fuzz targets
+# Build fuzz targets with static linking
 for fuzzer in fuzz/fuzz_*.cc; do
     name=$(basename "$fuzzer" .cc)
-    $CXX $CXXFLAGS -DBOOST_TIMER_ENABLE_DEPRECATED \
-        -I. \
+    $CXX $CXXFLAGS -std=c++11 -DBOOST_TIMER_ENABLE_DEPRECATED \
+        -I. -I"$LIBXML2_INCLUDE_SRC" -I"$LIBXML2_INCLUDE_BUILD" \
         "$fuzzer" \
         -o "$OUT/$name" \
         build/libiqxmlrpc/libiqxmlrpc.a \
+        "$LIBXML2_LIB" \
         $LIB_FUZZING_ENGINE \
-        -lxml2 -lboost_date_time -lboost_thread -lpthread
+        -Wl,-Bstatic -lboost_date_time -lboost_thread -lboost_system \
+        -Wl,-Bdynamic -lpthread
 done
 
 # Copy seed corpus
