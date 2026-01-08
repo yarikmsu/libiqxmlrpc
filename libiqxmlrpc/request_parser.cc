@@ -54,7 +54,7 @@ RequestBuilder::get()
   if (!method_name_)
     throw XML_RPC_violation("No method name specified");
 
-  return new Request(method_name_.get(), params_);
+  return new Request(*method_name_, params_);
 }
 
 } // namespace iqxmlrpc

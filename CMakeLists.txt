@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.10)
 project(Libiqxmlrpc)
 set(Libiqxmlrpc_VERSION 0.13.6)
 
+# Require C++17 standard for entire project
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 add_subdirectory(libiqxmlrpc)
 
 option(build_tests "Build tests?" OFF)
