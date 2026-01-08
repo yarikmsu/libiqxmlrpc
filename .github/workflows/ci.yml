@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ubuntu-24.04
+            runner: ubuntu-24.04
+            container: ""
+            install: sudo apt-get update && sudo apt-get install -y libboost-dev libboost-date-time-dev libboost-thread-dev libboost-test-dev libboost-program-options-dev libxml2-dev libssl-dev
+          - name: ubi8
+            runner: ubuntu-latest
+            container: redhat/ubi8
+            install: dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm && dnf install -y gcc-c++ cmake make boost169-devel libxml2-devel openssl-devel && ln -s /usr/include/boost169/boost /usr/include/boost && ln -s /usr/lib64/boost169/* /usr/lib64/
+          - name: macos
+            runner: macos-latest
+            container: ""
+            install: brew install boost libxml2 openssl
+
+    steps:
+    - name: Install dependencies
+      run: ${{ matrix.install }}
+
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Configure
+      run: |
+        mkdir build && cd build
+        cmake -Dbuild_tests=ON -DCMAKE_CXX_FLAGS="-DBOOST_TIMER_ENABLE_DEPRECATED" ..
+
+    - name: Build
+      run: cmake --build build
+
+    - name: Test
+      run: ctest --test-dir build --output-on-failure
