@@ -317,6 +317,16 @@ void Struct::insert( const std::string& f, const Value& val )
 }
 
 
+void Struct::erase( const std::string& key )
+{
+  iterator i = values.find(key);
+  if (i != values.end()) {
+    delete i->second;
+    values.erase(i);
+  }
+}
+
+
 // ----------------------------------------------------------------------------
 const char Binary_data::base64_alpha[64] = {
   'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
