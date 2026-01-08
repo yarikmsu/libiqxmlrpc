@@ -1,9 +1,11 @@
 #define BOOST_TEST_MODULE value_types_extended_test
 #include <memory>
 #include <ctime>
+#include <sstream>
 #include <boost/test/test_tools.hpp>
 #include <boost/test/unit_test.hpp>
 #include "libiqxmlrpc/value.h"
+#include "libiqxmlrpc/value_type_visitor.h"
 
 using namespace boost::unit_test;
 using namespace iqxmlrpc;
@@ -484,6 +486,291 @@ BOOST_AUTO_TEST_CASE(tm_operator_conversion)
     BOOST_CHECK_EQUAL(t_out.tm_year, t_in.tm_year);
     BOOST_CHECK_EQUAL(t_out.tm_mon, t_in.tm_mon);
     BOOST_CHECK_EQUAL(t_out.tm_mday, t_in.tm_mday);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(print_value_visitor_tests)
+
+BOOST_AUTO_TEST_CASE(print_nil)
+{
+    std::ostringstream oss;
+    Print_value_visitor visitor(oss);
+    Value v = Nil();
+    v.apply_visitor(visitor);
+    BOOST_CHECK_EQUAL(oss.str(), "NIL");
+}
+
+BOOST_AUTO_TEST_CASE(print_int)
+{
+    std::ostringstream oss;
+    Print_value_visitor visitor(oss);
+    Value v = 42;
+    v.apply_visitor(visitor);
+    BOOST_CHECK_EQUAL(oss.str(), "42");
+}
+
+BOOST_AUTO_TEST_CASE(print_int64)
+{
+    std::ostringstream oss;
+    Print_value_visitor visitor(oss);
+    Value v = static_cast<int64_t>(5000000000LL);
+    v.apply_visitor(visitor);
+    BOOST_CHECK_EQUAL(oss.str(), "5000000000");
+}
+
+BOOST_AUTO_TEST_CASE(print_double)
+{
+    std::ostringstream oss;
+    Print_value_visitor visitor(oss);
+    Value v = 3.14;
+    v.apply_visitor(visitor);
+    BOOST_CHECK(oss.str().find("3.14") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(print_bool_true)
+{
+    std::ostringstream oss;
+    Print_value_visitor visitor(oss);
+    Value v = true;
+    v.apply_visitor(visitor);
+    BOOST_CHECK_EQUAL(oss.str(), "1");
+}
+
+BOOST_AUTO_TEST_CASE(print_bool_false)
+{
+    std::ostringstream oss;
+    Print_value_visitor visitor(oss);
+    Value v = false;
+    v.apply_visitor(visitor);
+    BOOST_CHECK_EQUAL(oss.str(), "0");
+}
+
+BOOST_AUTO_TEST_CASE(print_string)
+{
+    std::ostringstream oss;
+    Print_value_visitor visitor(oss);
+    Value v = "hello";
+    v.apply_visitor(visitor);
+    BOOST_CHECK_EQUAL(oss.str(), "'hello'");
+}
+
+BOOST_AUTO_TEST_CASE(print_struct)
+{
+    std::ostringstream oss;
+    Print_value_visitor visitor(oss);
+    Struct s;
+    s.insert("key", Value(42));
+    Value v = s;
+    v.apply_visitor(visitor);
+    std::string result = oss.str();
+    BOOST_CHECK(result.find("{") != std::string::npos);
+    BOOST_CHECK(result.find("'key'") != std::string::npos);
+    BOOST_CHECK(result.find("42") != std::string::npos);
+    BOOST_CHECK(result.find("}") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(print_array)
+{
+    std::ostringstream oss;
+    Print_value_visitor visitor(oss);
+    Array a;
+    a.push_back(Value(1));
+    a.push_back(Value(2));
+    Value v = a;
+    v.apply_visitor(visitor);
+    std::string result = oss.str();
+    BOOST_CHECK(result.find("[") != std::string::npos);
+    BOOST_CHECK(result.find("1") != std::string::npos);
+    BOOST_CHECK(result.find("2") != std::string::npos);
+    BOOST_CHECK(result.find("]") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(print_binary)
+{
+    std::ostringstream oss;
+    Print_value_visitor visitor(oss);
+    std::unique_ptr<Binary_data> bin(Binary_data::from_data("test"));
+    Value v(*bin);
+    v.apply_visitor(visitor);
+    BOOST_CHECK_EQUAL(oss.str(), "RAWDATA");
+}
+
+BOOST_AUTO_TEST_CASE(print_datetime)
+{
+    std::ostringstream oss;
+    Print_value_visitor visitor(oss);
+    Date_time dt(std::string("20231225T12:30:45"));
+    Value v(dt);
+    v.apply_visitor(visitor);
+    BOOST_CHECK(oss.str().find("20231225T12:30:45") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(value_options_tests)
+
+BOOST_AUTO_TEST_CASE(omit_string_tag_default_false)
+{
+    // Default should be false
+    BOOST_CHECK(!Value::omit_string_tag_in_responses());
+}
+
+BOOST_AUTO_TEST_CASE(omit_string_tag_set_and_get)
+{
+    // Save original value
+    bool original = Value::omit_string_tag_in_responses();
+
+    Value::omit_string_tag_in_responses(true);
+    BOOST_CHECK(Value::omit_string_tag_in_responses());
+
+    Value::omit_string_tag_in_responses(false);
+    BOOST_CHECK(!Value::omit_string_tag_in_responses());
+
+    // Restore original value
+    Value::omit_string_tag_in_responses(original);
+}
+
+BOOST_AUTO_TEST_CASE(default_int_set_get_drop)
+{
+    // Initially should return null
+    BOOST_CHECK(Value::get_default_int() == nullptr);
+
+    // Set default
+    Value::set_default_int(42);
+    Int* def = Value::get_default_int();
+    BOOST_REQUIRE(def != nullptr);
+    BOOST_CHECK_EQUAL(def->value(), 42);
+    delete def;
+
+    // Drop default
+    Value::drop_default_int();
+    BOOST_CHECK(Value::get_default_int() == nullptr);
+}
+
+BOOST_AUTO_TEST_CASE(default_int64_set_get_drop)
+{
+    // Initially should return null
+    BOOST_CHECK(Value::get_default_int64() == nullptr);
+
+    // Set default
+    Value::set_default_int64(5000000000LL);
+    Int64* def = Value::get_default_int64();
+    BOOST_REQUIRE(def != nullptr);
+    BOOST_CHECK_EQUAL(def->value(), 5000000000LL);
+    delete def;
+
+    // Drop default
+    Value::drop_default_int64();
+    BOOST_CHECK(Value::get_default_int64() == nullptr);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(value_array_operations)
+
+BOOST_AUTO_TEST_CASE(array_mutable_access)
+{
+    Array a;
+    a.push_back(Value(1));
+    a.push_back(Value(2));
+    Value v = a;
+
+    // Non-const access
+    Array& arr_ref = v.the_array();
+    BOOST_CHECK_EQUAL(arr_ref.size(), 2u);
+
+    // Modify through mutable index operator
+    v[0] = Value(100);
+    BOOST_CHECK_EQUAL(v[0].get_int(), 100);
+}
+
+BOOST_AUTO_TEST_CASE(array_iterators)
+{
+    Array a;
+    a.push_back(Value(1));
+    a.push_back(Value(2));
+    a.push_back(Value(3));
+    Value v = a;
+
+    int sum = 0;
+    for (Array::const_iterator it = v.arr_begin(); it != v.arr_end(); ++it) {
+        sum += it->get_int();
+    }
+    BOOST_CHECK_EQUAL(sum, 6);
+}
+
+BOOST_AUTO_TEST_CASE(array_push_back_on_value)
+{
+    Array a;
+    Value v = a;
+    v.push_back(Value(42));
+    BOOST_CHECK_EQUAL(v.size(), 1u);
+    BOOST_CHECK_EQUAL(v[0].get_int(), 42);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(value_struct_operations)
+
+BOOST_AUTO_TEST_CASE(struct_mutable_access)
+{
+    Struct s;
+    s.insert("key", Value(1));
+    Value v = s;
+
+    // Non-const access
+    Struct& st_ref = v.the_struct();
+    BOOST_CHECK_EQUAL(st_ref.size(), 1u);
+
+    // Modify through mutable index operator
+    v["key"] = Value(100);
+    BOOST_CHECK_EQUAL(v["key"].get_int(), 100);
+}
+
+BOOST_AUTO_TEST_CASE(struct_has_field)
+{
+    Struct s;
+    s.insert("exists", Value(1));
+    Value v = s;
+
+    BOOST_CHECK(v.has_field("exists"));
+    BOOST_CHECK(!v.has_field("missing"));
+}
+
+BOOST_AUTO_TEST_CASE(struct_char_ptr_access)
+{
+    Struct s;
+    s.insert("key", Value(42));
+    Value v = s;
+
+    const char* key = "key";
+    BOOST_CHECK_EQUAL(v[key].get_int(), 42);
+
+    // Mutable access with char*
+    v[key] = Value(100);
+    BOOST_CHECK_EQUAL(v[key].get_int(), 100);
+}
+
+BOOST_AUTO_TEST_CASE(struct_insert_on_value)
+{
+    Struct s;
+    Value v = s;
+    v.insert("new_key", Value("new_value"));
+    BOOST_CHECK(v.has_field("new_key"));
+    BOOST_CHECK_EQUAL(v["new_key"].get_string(), "new_value");
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(value_free_functions)
+
+BOOST_AUTO_TEST_CASE(print_value_function)
+{
+    std::ostringstream oss;
+    Value v = 42;
+    print_value(v, oss);
+    BOOST_CHECK_EQUAL(oss.str(), "42");
 }
 
 BOOST_AUTO_TEST_SUITE_END()
