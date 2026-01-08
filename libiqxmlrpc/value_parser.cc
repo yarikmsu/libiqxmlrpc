@@ -206,7 +206,7 @@ ValueBuilder::do_visit_element_end(const std::string&)
 
   case INT64:
     if (default_int64.get()) {
-      retval.reset(new Int64(default_int64.release()->value()));
+      retval.reset(default_int64.release());
       break;
     }
     throw XML_RPC_violation(parser_.context());
