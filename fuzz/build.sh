@@ -2,7 +2,7 @@
 # OSS-Fuzz build script for libiqxmlrpc
 # Copyright (C) 2024 libiqxmlrpc contributors
 
-# Build libiqxmlrpc with fuzzing instrumentation
+# Build libiqxmlrpc with fuzzing instrumentation as static library
 mkdir -p build
 cd build
 cmake .. \
@@ -10,8 +10,7 @@ cmake .. \
     -DCMAKE_CXX_COMPILER=$CXX \
     -DCMAKE_C_FLAGS="$CFLAGS" \
     -DCMAKE_CXX_FLAGS="$CXXFLAGS -DBOOST_TIMER_ENABLE_DEPRECATED" \
-    -DCMAKE_EXE_LINKER_FLAGS="$LIB_FUZZING_ENGINE" \
-    -DCMAKE_SHARED_LINKER_FLAGS="$LIB_FUZZING_ENGINE" \
+    -DBUILD_SHARED_LIBS=OFF \
     -Dbuild_tests=OFF
 
 make -j$(nproc)
@@ -26,7 +25,7 @@ for fuzzer in fuzz/fuzz_*.cc; do
         -o "$OUT/$name" \
         build/libiqxmlrpc/libiqxmlrpc.a \
         $LIB_FUZZING_ENGINE \
-        -lxml2 -lboost_date_time -lboost_thread -lpthread
+        -lxml2 -lboost_date_time -lboost_thread -lboost_system -lpthread
 done
 
 # Copy seed corpus
