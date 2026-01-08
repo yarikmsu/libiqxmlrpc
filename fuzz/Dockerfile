@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN git clone --depth 1 https://github.com/libiqxmlrpc/libiqxmlrpc.git libiqxmlrpc
-WORKDIR libiqxmlrpc
+RUN git clone --depth 1 https://github.com/yarikmsu/libiqxmlrpc.git $SRC/libiqxmlrpc
+WORKDIR $SRC/libiqxmlrpc
 
 COPY build.sh $SRC/
