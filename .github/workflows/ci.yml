@@ -76,6 +76,45 @@ jobs:
         ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
         UBSAN_OPTIONS: print_stacktrace=1:abort_on_error=1
 
+  coverage:
+    name: coverage
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y libboost-dev libboost-date-time-dev libboost-thread-dev libboost-test-dev libboost-program-options-dev libxml2-dev libssl-dev lcov
+
+    - name: Configure
+      run: |
+        mkdir build && cd build
+        cmake -Dbuild_tests=ON \
+          -DCMAKE_C_FLAGS="--coverage" \
+          -DCMAKE_CXX_FLAGS="-DBOOST_TIMER_ENABLE_DEPRECATED --coverage" \
+          -DCMAKE_EXE_LINKER_FLAGS="--coverage" \
+          -DCMAKE_SHARED_LINKER_FLAGS="--coverage" \
+          ..
+
+    - name: Build
+      run: cmake --build build
+
+    - name: Test
+      run: ctest --test-dir build --output-on-failure
+
+    - name: Generate coverage report
+      run: |
+        find . -name "*.gcda" -o -name "*.gcno" | head -20 || true
+        lcov --capture --directory . --output-file coverage.info --ignore-errors empty,gcov
+        lcov --remove coverage.info '/usr/*' '*/tests/*' '*/boost/*' --output-file coverage.info --ignore-errors empty,unused || true
+        lcov --list coverage.info || true
+
+    - name: Upload to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        files: coverage.info
+        fail_ci_if_error: false
+
   cppcheck:
     name: cppcheck
     runs-on: ubuntu-latest
