@@ -9,6 +9,11 @@ if (build_tests)
 	add_subdirectory(tests)
 endif (build_tests)
 
+option(build_fuzzers "Build fuzz targets?" OFF)
+if (build_fuzzers)
+	add_subdirectory(fuzz)
+endif (build_fuzzers)
+
 option(build_docs "Build doxygen docs?" ON)
 if (build_docs)
 	add_subdirectory(doc)
