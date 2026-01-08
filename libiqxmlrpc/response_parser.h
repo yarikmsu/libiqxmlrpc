@@ -4,7 +4,7 @@
 #ifndef _iqxmlrpc_response_parser_h_
 #define _iqxmlrpc_response_parser_h_
 
-#include <boost/optional.hpp>
+#include <optional>
 #include "value.h"
 #include "parser2.h"
 #include "response.h"
@@ -29,9 +29,9 @@ private:
   parse_fault();
 
   StateMachine state_;
-  boost::optional<Value> ok_;
+  std::optional<Value> ok_;
   int fault_code_;
-  boost::optional<std::string> fault_str_;
+  std::optional<std::string> fault_str_;
 };
 
 } // namespace iqxmlrpc
