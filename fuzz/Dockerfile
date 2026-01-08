@@ -9,9 +9,13 @@ RUN apt-get update && apt-get install -y \
     libboost-thread-dev \
     libxml2-dev \
     libssl-dev \
+    pkg-config \
+    zlib1g-dev \
+    liblzma-dev \
+    libicu-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN git clone --depth 1 https://github.com/libiqxmlrpc/libiqxmlrpc.git libiqxmlrpc
-WORKDIR libiqxmlrpc
+RUN git clone --depth 1 https://github.com/yarikmsu/libiqxmlrpc.git $SRC/libiqxmlrpc
+WORKDIR $SRC/libiqxmlrpc
 
 COPY build.sh $SRC/
