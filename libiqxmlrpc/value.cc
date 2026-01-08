@@ -1,7 +1,7 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2014 Anton Dedov
 
-#include <boost/optional.hpp>
+#include <optional>
 #include <stdexcept>
 
 #include "value.h"
@@ -16,8 +16,8 @@ Value::Bad_cast::Bad_cast():
 
 
 namespace ValueOptions {
-  boost::optional<int> default_int;
-  boost::optional<int64_t> default_int64;
+  std::optional<int> default_int;
+  std::optional<int64_t> default_int64;
   bool omit_string_tag_in_responses = false;
 }
 

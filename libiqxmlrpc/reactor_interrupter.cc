@@ -6,7 +6,6 @@
 #include "lock.h"
 #include "socket.h"
 
-#include <boost/optional.hpp>
 #include <boost/thread/mutex.hpp>
 
 #include <memory>
