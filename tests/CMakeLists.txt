@@ -41,6 +41,8 @@ iqxmlrpc_test(http-test test_http.cc)
 iqxmlrpc_test(request-response-test test_request_response.cc)
 iqxmlrpc_test(inet-addr-test test_inet_addr.cc)
 iqxmlrpc_test(value-types-extended-test test_value_types_extended.cc)
+iqxmlrpc_test(method-dispatch-test test_method_dispatch.cc)
+iqxmlrpc_test(exceptions-test test_exceptions.cc)
 
 # Run tests automatically after build
 add_custom_target(check ALL
