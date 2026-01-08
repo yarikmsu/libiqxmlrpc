@@ -591,4 +591,230 @@ BOOST_AUTO_TEST_CASE(response_header_server_contains_version)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+BOOST_AUTO_TEST_SUITE(auth_edge_cases)
+
+BOOST_AUTO_TEST_CASE(auth_with_empty_password)
+{
+    Request_header hdr("/RPC2", "localhost", 8080);
+    hdr.set_authinfo("user", "");
+    BOOST_CHECK(hdr.has_authinfo());
+
+    std::string user, password;
+    hdr.get_authinfo(user, password);
+    BOOST_CHECK_EQUAL(user, "user");
+    BOOST_CHECK(password.empty());
+}
+
+BOOST_AUTO_TEST_CASE(auth_with_colon_in_password)
+{
+    Request_header hdr("/RPC2", "localhost", 8080);
+    hdr.set_authinfo("user", "pass:with:colons");
+    BOOST_CHECK(hdr.has_authinfo());
+
+    std::string user, password;
+    hdr.get_authinfo(user, password);
+    BOOST_CHECK_EQUAL(user, "user");
+    BOOST_CHECK_EQUAL(password, "pass:with:colons");
+}
+
+BOOST_AUTO_TEST_CASE(auth_with_special_chars)
+{
+    Request_header hdr("/RPC2", "localhost", 8080);
+    hdr.set_authinfo("user@domain.com", "p@ss!w0rd#$%");
+    BOOST_CHECK(hdr.has_authinfo());
+
+    std::string user, password;
+    hdr.get_authinfo(user, password);
+    BOOST_CHECK_EQUAL(user, "user@domain.com");
+    BOOST_CHECK_EQUAL(password, "p@ss!w0rd#$%");
+}
+
+BOOST_AUTO_TEST_CASE(auth_parse_invalid_scheme_throws)
+{
+    // Manually construct header with non-Basic auth scheme
+    std::string raw_header = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 0\r\nauthorization: Digest abc123";
+    Request_header hdr(HTTP_CHECK_WEAK, raw_header);
+    BOOST_CHECK(hdr.has_authinfo());
+
+    std::string user, password;
+    BOOST_CHECK_THROW(hdr.get_authinfo(user, password), Unauthorized);
+}
+
+BOOST_AUTO_TEST_CASE(auth_parse_malformed_single_part_throws)
+{
+    // Auth with only one part (no space between scheme and credentials)
+    std::string raw_header = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 0\r\nauthorization: BasicdXNlcjpwYXNz";
+    Request_header hdr(HTTP_CHECK_WEAK, raw_header);
+    BOOST_CHECK(hdr.has_authinfo());
+
+    std::string user, password;
+    BOOST_CHECK_THROW(hdr.get_authinfo(user, password), Unauthorized);
+}
+
+BOOST_AUTO_TEST_CASE(auth_parse_too_many_parts_throws)
+{
+    // Auth with too many space-separated parts
+    std::string raw_header = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 0\r\nauthorization: Basic abc def ghi";
+    Request_header hdr(HTTP_CHECK_WEAK, raw_header);
+    BOOST_CHECK(hdr.has_authinfo());
+
+    std::string user, password;
+    BOOST_CHECK_THROW(hdr.get_authinfo(user, password), Unauthorized);
+}
+
+BOOST_AUTO_TEST_CASE(auth_valid_parsed_basic)
+{
+    // Manually construct with properly encoded Basic auth (user:pass -> dXNlcjpwYXNz)
+    std::string raw_header = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 0\r\nauthorization: Basic dXNlcjpwYXNz";
+    Request_header hdr(HTTP_CHECK_WEAK, raw_header);
+    BOOST_CHECK(hdr.has_authinfo());
+
+    std::string user, password;
+    hdr.get_authinfo(user, password);
+    BOOST_CHECK_EQUAL(user, "user");
+    BOOST_CHECK_EQUAL(password, "pass");
+}
+
+BOOST_AUTO_TEST_CASE(auth_case_insensitive_basic)
+{
+    // "basic" lowercase should work
+    std::string raw_header = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 0\r\nauthorization: basic dXNlcjpwYXNz";
+    Request_header hdr(HTTP_CHECK_WEAK, raw_header);
+
+    std::string user, password;
+    hdr.get_authinfo(user, password);
+    BOOST_CHECK_EQUAL(user, "user");
+    BOOST_CHECK_EQUAL(password, "pass");
+}
+
+BOOST_AUTO_TEST_CASE(auth_uppercase_basic)
+{
+    // "BASIC" uppercase should work
+    std::string raw_header = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 0\r\nauthorization: BASIC dXNlcjpwYXNz";
+    Request_header hdr(HTTP_CHECK_WEAK, raw_header);
+
+    std::string user, password;
+    hdr.get_authinfo(user, password);
+    BOOST_CHECK_EQUAL(user, "user");
+    BOOST_CHECK_EQUAL(password, "pass");
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(packet_reader_size_checks)
+
+BOOST_AUTO_TEST_CASE(packet_reader_incremental_size_check)
+{
+    // Test cumulative size checking (total_sz path)
+    Packet_reader reader;
+    reader.set_max_size(50);  // Small limit
+
+    // First read under limit
+    std::unique_ptr<Packet> pkt(reader.read_response("HTTP/1.1 200 OK\r\n", false));
+    BOOST_CHECK(pkt == nullptr);
+
+    // Second read should push over limit
+    BOOST_CHECK_THROW(reader.read_response("content-length: 0\r\nsome-extra-long-header: value\r\n", false), Request_too_large);
+}
+
+BOOST_AUTO_TEST_CASE(packet_reader_content_length_check_after_header)
+{
+    Packet_reader reader;
+    reader.set_max_size(100);
+
+    // First, read header that declares large content-length
+    std::unique_ptr<Packet> pkt(reader.read_request("POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 150\r\n\r\n"));
+    BOOST_CHECK(pkt == nullptr);  // Header parsed, waiting for content
+
+    // Now try to read more data - this triggers the content-length + header check
+    BOOST_CHECK_THROW(reader.read_request("x"), Request_too_large);
+}
+
+BOOST_AUTO_TEST_CASE(packet_reader_clear_and_reuse)
+{
+    Packet_reader reader;
+
+    // Read a complete packet
+    std::string raw1 = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 4\r\n\r\ntest";
+    std::unique_ptr<Packet> pkt1(reader.read_request(raw1));
+    BOOST_REQUIRE(pkt1 != nullptr);
+
+    // Reader should auto-clear for next read
+    std::string raw2 = "POST /other HTTP/1.1\r\nhost: example.com\r\ncontent-length: 5\r\n\r\nhello";
+    std::unique_ptr<Packet> pkt2(reader.read_request(raw2));
+    BOOST_REQUIRE(pkt2 != nullptr);
+    BOOST_CHECK_EQUAL(pkt2->content(), "hello");
+}
+
+BOOST_AUTO_TEST_CASE(packet_reader_partial_content_completion)
+{
+    Packet_reader reader;
+
+    // Send header with content-length
+    std::unique_ptr<Packet> pkt(reader.read_response("HTTP/1.1 200 OK\r\ncontent-length: 10\r\n\r\npartial", false));
+    BOOST_CHECK(pkt == nullptr);  // Only 7 chars, need 10
+
+    // Complete the content
+    pkt.reset(reader.read_response("end", false));  // Now have "partialend" = 10 chars
+    BOOST_REQUIRE(pkt != nullptr);
+    BOOST_CHECK_EQUAL(pkt->content(), "partialend");  // Exactly 10 chars
+}
+
+BOOST_AUTO_TEST_CASE(packet_reader_excess_content_truncated)
+{
+    Packet_reader reader;
+
+    // Content exceeds declared content-length
+    std::string raw = "HTTP/1.1 200 OK\r\ncontent-length: 4\r\n\r\ntestextra";
+    std::unique_ptr<Packet> pkt(reader.read_response(raw, false));
+    BOOST_REQUIRE(pkt != nullptr);
+    BOOST_CHECK_EQUAL(pkt->content(), "test");  // Truncated to 4
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(response_header_parsing_edge_cases)
+
+BOOST_AUTO_TEST_CASE(response_parse_short_status_line_throws)
+{
+    std::string raw_header = "HTTP/1.1\r\ncontent-length: 0";
+    BOOST_CHECK_THROW(Response_header(HTTP_CHECK_WEAK, raw_header), Malformed_packet);
+}
+
+BOOST_AUTO_TEST_CASE(response_parse_whitespace_trimmed)
+{
+    std::string raw_header = "HTTP/1.1 200 OK\r\n  content-length  :  100  ";
+    Response_header hdr(HTTP_CHECK_WEAK, raw_header);
+    BOOST_CHECK_EQUAL(hdr.content_length(), 100u);
+}
+
+BOOST_AUTO_TEST_CASE(request_bad_method_put_throws)
+{
+    std::string raw_header = "PUT /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 0";
+    BOOST_CHECK_THROW(Request_header(HTTP_CHECK_WEAK, raw_header), Method_not_allowed);
+}
+
+BOOST_AUTO_TEST_CASE(request_bad_method_delete_throws)
+{
+    std::string raw_header = "DELETE /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 0";
+    BOOST_CHECK_THROW(Request_header(HTTP_CHECK_WEAK, raw_header), Method_not_allowed);
+}
+
+BOOST_AUTO_TEST_CASE(request_whitespace_only_method_line_throws)
+{
+    // Whitespace-only method line results in empty first token, treated as invalid method
+    std::string raw_header = "   \r\nhost: localhost\r\ncontent-length: 0";
+    BOOST_CHECK_THROW(Request_header(HTTP_CHECK_WEAK, raw_header), Method_not_allowed);
+}
+
+BOOST_AUTO_TEST_CASE(header_option_name_case_insensitive)
+{
+    std::string raw_header = "HTTP/1.1 200 OK\r\nContent-Length: 100\r\nCONNECTION: keep-alive";
+    Response_header hdr(HTTP_CHECK_WEAK, raw_header);
+    BOOST_CHECK_EQUAL(hdr.content_length(), 100u);
+    BOOST_CHECK(hdr.conn_keep_alive());
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
 // vim:ts=2:sw=2:et
