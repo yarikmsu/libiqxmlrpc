@@ -108,14 +108,14 @@ jobs:
         find . -name "*.gcda" | head -20
         echo ""
         echo "=== Capturing coverage ==="
-        lcov --capture --directory . --output-file coverage.info --ignore-errors empty,gcov
-        lcov --remove coverage.info '/usr/*' '*/tests/*' '*/boost/*' --output-file coverage.info --ignore-errors empty,unused
+        lcov --capture --directory . --output-file coverage.info --ignore-errors empty,gcov,mismatch
+        lcov --remove coverage.info '/usr/*' '*/tests/*' '*/boost/*' --output-file coverage.info --ignore-errors empty,unused,mismatch
         echo ""
         echo "=== Coverage Summary ==="
-        lcov --summary coverage.info
+        lcov --summary coverage.info --ignore-errors empty
         echo ""
         echo "=== Coverage by File ==="
-        lcov --list coverage.info
+        lcov --list coverage.info --ignore-errors empty
 
     - name: Upload to Codecov
       uses: codecov/codecov-action@v4
