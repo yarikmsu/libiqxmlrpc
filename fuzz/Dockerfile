@@ -10,6 +10,9 @@ RUN apt-get update && apt-get install -y \
     libxml2-dev \
     libssl-dev \
     pkg-config \
+    zlib1g-dev \
+    liblzma-dev \
+    libicu-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN git clone --depth 1 https://github.com/yarikmsu/libiqxmlrpc.git $SRC/libiqxmlrpc
