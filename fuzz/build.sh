@@ -20,7 +20,8 @@ cmake .. \
 make -j$(nproc)
 LIBXML2_DIR="$SRC/libxml2"
 LIBXML2_LIB="$LIBXML2_DIR/build/libxml2.a"
-LIBXML2_INCLUDE="$LIBXML2_DIR/include"
+LIBXML2_INCLUDE_SRC="$LIBXML2_DIR/include"
+LIBXML2_INCLUDE_BUILD="$LIBXML2_DIR/build"
 
 # Build libiqxmlrpc with fuzzing instrumentation as static library
 cd $SRC/libiqxmlrpc
@@ -30,10 +31,10 @@ cmake .. \
     -DCMAKE_C_COMPILER=$CC \
     -DCMAKE_CXX_COMPILER=$CXX \
     -DCMAKE_C_FLAGS="$CFLAGS" \
-    -DCMAKE_CXX_FLAGS="$CXXFLAGS -std=c++11 -DBOOST_TIMER_ENABLE_DEPRECATED -I$LIBXML2_INCLUDE" \
+    -DCMAKE_CXX_FLAGS="$CXXFLAGS -std=c++11 -DBOOST_TIMER_ENABLE_DEPRECATED -I$LIBXML2_INCLUDE_SRC -I$LIBXML2_INCLUDE_BUILD" \
     -DBUILD_SHARED_LIBS=OFF \
     -Dbuild_tests=OFF \
-    -DLIBXML2_INCLUDE_DIR="$LIBXML2_INCLUDE" \
+    -DLIBXML2_INCLUDE_DIR="$LIBXML2_INCLUDE_SRC;$LIBXML2_INCLUDE_BUILD" \
     -DLIBXML2_LIBRARY="$LIBXML2_LIB"
 
 make -j$(nproc)
@@ -43,7 +44,7 @@ cd ..
 for fuzzer in fuzz/fuzz_*.cc; do
     name=$(basename "$fuzzer" .cc)
     $CXX $CXXFLAGS -std=c++11 -DBOOST_TIMER_ENABLE_DEPRECATED \
-        -I. -I"$LIBXML2_INCLUDE" \
+        -I. -I"$LIBXML2_INCLUDE_SRC" -I"$LIBXML2_INCLUDE_BUILD" \
         "$fuzzer" \
         -o "$OUT/$name" \
         build/libiqxmlrpc/libiqxmlrpc.a \
