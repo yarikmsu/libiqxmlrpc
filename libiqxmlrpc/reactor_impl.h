@@ -21,8 +21,6 @@
   }
 #endif // HAVE_POLL
 
-#include <boost/utility.hpp>
-
 #include <assert.h>
 #include <map>
 #include <algorithm>
@@ -33,8 +31,11 @@ namespace iqnet
 //! The Reactor template class.
 //! Lock param can be either boost::mutex or iqnet::Null_lock.
 template <class Lock>
-class Reactor: public Reactor_base, boost::noncopyable {
+class Reactor: public Reactor_base {
 public:
+  Reactor(const Reactor&) = delete;
+  Reactor& operator=(const Reactor&) = delete;
+
   Reactor();
   ~Reactor() {}
 
@@ -100,7 +101,7 @@ iqnet::Event_handler* Reactor<Lock>::find_handler(Socket::Handler fd)
 {
   scoped_lock lk(lock);
   h_iterator i = handlers.find(fd);
-  return i == handlers.end() ? NULL : i->second;
+  return i == handlers.end() ? nullptr : i->second;
 }
 
 template <class Lock>

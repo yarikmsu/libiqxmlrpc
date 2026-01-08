@@ -20,11 +20,14 @@ namespace iqxmlrpc {
  *  register_method operation and optionally system one, which holds
  *  server's built-in methods
  */
-class LIBIQXMLRPC_API Method_dispatcher_manager: boost::noncopyable {
+class LIBIQXMLRPC_API Method_dispatcher_manager {
   class Impl;
   Impl* impl_;
 
 public:
+  Method_dispatcher_manager(const Method_dispatcher_manager&) = delete;
+  Method_dispatcher_manager& operator=(const Method_dispatcher_manager&) = delete;
+
   Method_dispatcher_manager();
   ~Method_dispatcher_manager();
 

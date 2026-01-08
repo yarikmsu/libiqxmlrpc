@@ -47,16 +47,16 @@ void Default_method_dispatcher::register_method
 Method* Default_method_dispatcher::do_create_method(const std::string& name)
 {
   if( fs.find(name) == fs.end() )
-    return NULL;
+    return nullptr;
 
   return fs[name]->create();
 }
 
 void Default_method_dispatcher::do_get_methods_list(Array& retval) const
 {
-  for(Factory_map::const_iterator i = fs.begin(); i != fs.end(); ++i)
+  for (const auto& entry : fs)
   {
-    retval.push_back(i->first);
+    retval.push_back(entry.first);
   }
 }
 
