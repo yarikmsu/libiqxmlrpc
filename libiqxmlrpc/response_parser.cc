@@ -76,10 +76,10 @@ Response
 ResponseBuilder::get()
 {
   if (ok_)
-    return Response(new Value(ok_.get()));
+    return Response(new Value(*ok_));
 
   if (fault_str_)
-    return Response(fault_code_, fault_str_.get());
+    return Response(fault_code_, *fault_str_);
 
   throw XML_RPC_violation("No valid response was found");
 }

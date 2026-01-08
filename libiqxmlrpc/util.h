@@ -13,10 +13,12 @@ namespace iqxmlrpc {
 namespace util {
 
 template <class M>
-class Select2nd:
-  public std::unary_function<typename M::value_type, typename M::mapped_type>
+class Select2nd
 {
 public:
+  using argument_type = typename M::value_type;
+  using result_type = typename M::mapped_type;
+
   typename M::mapped_type operator ()(typename M::value_type& i)
   {
     return i.second;
