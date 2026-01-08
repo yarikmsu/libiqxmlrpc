@@ -633,6 +633,115 @@ BOOST_AUTO_TEST_CASE(fault_with_negative_code)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+BOOST_AUTO_TEST_SUITE(server_mode_serialization)
+
+BOOST_AUTO_TEST_CASE(response_string_without_omit_tag)
+{
+    // Default: omit_string_tag_in_responses is false
+    bool original = Value::omit_string_tag_in_responses();
+    Value::omit_string_tag_in_responses(false);
+
+    Response resp(new Value("test string"));
+    std::string xml = dump_response(resp);
+
+    // Should have <string> tag
+    BOOST_CHECK(xml.find("<string>") != std::string::npos);
+    BOOST_CHECK(xml.find("</string>") != std::string::npos);
+
+    Value::omit_string_tag_in_responses(original);
+}
+
+BOOST_AUTO_TEST_CASE(response_string_with_omit_tag)
+{
+    // When omit_string_tag_in_responses is true, server responses omit <string> tag
+    bool original = Value::omit_string_tag_in_responses();
+    Value::omit_string_tag_in_responses(true);
+
+    Response resp(new Value("test string"));
+    std::string xml = dump_response(resp);
+
+    // Should NOT have <string> tag (just raw text in <value>)
+    BOOST_CHECK(xml.find("<string>") == std::string::npos);
+    BOOST_CHECK(xml.find("</string>") == std::string::npos);
+    // But should still have the string content within <value>
+    BOOST_CHECK(xml.find("test string") != std::string::npos);
+
+    Value::omit_string_tag_in_responses(original);
+}
+
+BOOST_AUTO_TEST_CASE(response_string_with_omit_tag_roundtrip)
+{
+    // Verify that strings without <string> tag can be parsed
+    bool original = Value::omit_string_tag_in_responses();
+    Value::omit_string_tag_in_responses(true);
+
+    Response resp(new Value("roundtrip test"));
+    std::string xml = dump_response(resp);
+    Response parsed = parse_response(xml);
+
+    BOOST_CHECK(!parsed.is_fault());
+    BOOST_CHECK(parsed.value().is_string());
+    BOOST_CHECK_EQUAL(parsed.value().get_string(), "roundtrip test");
+
+    Value::omit_string_tag_in_responses(original);
+}
+
+BOOST_AUTO_TEST_CASE(response_struct_with_string_omit_tag)
+{
+    // Struct members should also respect omit_string_tag in server mode
+    bool original = Value::omit_string_tag_in_responses();
+    Value::omit_string_tag_in_responses(true);
+
+    Struct s;
+    s.insert("key", Value("value"));
+    Response resp(new Value(s));
+    std::string xml = dump_response(resp);
+
+    // String values in struct should not have <string> tag
+    BOOST_CHECK(xml.find("<string>") == std::string::npos);
+    BOOST_CHECK(xml.find("value") != std::string::npos);
+
+    Value::omit_string_tag_in_responses(original);
+}
+
+BOOST_AUTO_TEST_CASE(response_array_with_string_omit_tag)
+{
+    // Array elements should also respect omit_string_tag in server mode
+    bool original = Value::omit_string_tag_in_responses();
+    Value::omit_string_tag_in_responses(true);
+
+    Array arr;
+    arr.push_back(Value("first"));
+    arr.push_back(Value("second"));
+    Response resp(new Value(arr));
+    std::string xml = dump_response(resp);
+
+    // String values in array should not have <string> tag
+    BOOST_CHECK(xml.find("<string>") == std::string::npos);
+    BOOST_CHECK(xml.find("first") != std::string::npos);
+    BOOST_CHECK(xml.find("second") != std::string::npos);
+
+    Value::omit_string_tag_in_responses(original);
+}
+
+BOOST_AUTO_TEST_CASE(response_fault_with_string_omit_tag)
+{
+    // Fault strings should also respect omit_string_tag
+    bool original = Value::omit_string_tag_in_responses();
+    Value::omit_string_tag_in_responses(true);
+
+    Response resp(500, "Server error message");
+    std::string xml = dump_response(resp);
+
+    // Fault string should not have <string> tag
+    BOOST_CHECK(xml.find("<string>") == std::string::npos);
+    BOOST_CHECK(xml.find("Server error message") != std::string::npos);
+
+    Value::omit_string_tag_in_responses(original);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
 BOOST_AUTO_TEST_SUITE(error_handling_tests)
 
 BOOST_AUTO_TEST_CASE(parse_malformed_xml_throws)
