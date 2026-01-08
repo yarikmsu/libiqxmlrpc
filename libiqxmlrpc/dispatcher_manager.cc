@@ -41,6 +41,10 @@ Default_method_dispatcher::~Default_method_dispatcher()
 void Default_method_dispatcher::register_method
   ( const std::string& name, Method_factory_base* fb )
 {
+  Factory_map::iterator it = fs.find(name);
+  if (it != fs.end()) {
+    delete it->second;
+  }
   fs[name] = fb;
 }
 
