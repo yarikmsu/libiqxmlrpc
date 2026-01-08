@@ -8,8 +8,8 @@
 #include "request.h"
 #include "response.h"
 
-#include <boost/optional.hpp>
 #include <memory>
+#include <optional>
 
 namespace iqxmlrpc {
 
@@ -114,7 +114,7 @@ private:
   iqnet::Connector<TRANSPORT> ctr;
 
   typedef typename TRANSPORT::Proxy_connection Proxy_connection;
-  boost::optional<iqnet::Connector<Proxy_connection> > proxy_ctr;
+  std::optional<iqnet::Connector<Proxy_connection>> proxy_ctr;
 };
 
 } // namespace iqxmlrpc
