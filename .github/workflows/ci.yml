@@ -104,16 +104,26 @@ jobs:
 
     - name: Generate coverage report
       run: |
-        find . -name "*.gcda" -o -name "*.gcno" | head -20 || true
-        lcov --capture --directory . --output-file coverage.info --ignore-errors empty,gcov,mismatch
-        lcov --remove coverage.info '/usr/*' '*/tests/*' '*/boost/*' --output-file coverage.info --ignore-errors empty,unused,mismatch || true
-        lcov --list coverage.info || true
+        echo "=== Coverage data files ==="
+        find . -name "*.gcda" | head -20
+        echo ""
+        echo "=== Capturing coverage ==="
+        lcov --capture --directory . --output-file coverage.info --ignore-errors empty,gcov
+        lcov --remove coverage.info '/usr/*' '*/tests/*' '*/boost/*' --output-file coverage.info --ignore-errors empty,unused
+        echo ""
+        echo "=== Coverage Summary ==="
+        lcov --summary coverage.info
+        echo ""
+        echo "=== Coverage by File ==="
+        lcov --list coverage.info
 
     - name: Upload to Codecov
       uses: codecov/codecov-action@v4
       with:
+        token: ${{ secrets.CODECOV_TOKEN }}
         files: coverage.info
         fail_ci_if_error: false
+        verbose: true
 
   cppcheck:
     name: cppcheck
