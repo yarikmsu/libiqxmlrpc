@@ -8,19 +8,42 @@ This directory contains fuzz targets for testing libiqxmlrpc with various fuzzin
 - **fuzz_response**: Tests XML-RPC response parsing (`parse_response`)
 - **fuzz_http**: Tests HTTP header parsing
 
-## Running Locally with libFuzzer
+## Running Locally
 
 ### Prerequisites
 
-- Clang with libFuzzer support
+- Clang with libFuzzer support (on Linux) or Homebrew LLVM (on macOS)
 - Boost libraries
 - libxml2
 - OpenSSL
 
-### Build and Run
+### Quick Test with Test Harness
+
+You can verify the fuzz targets work without libFuzzer using the test harness:
 
 ```bash
-# Build with fuzzing instrumentation
+# Build the library first
+mkdir build && cd build
+cmake .. -DCMAKE_CXX_FLAGS="-DBOOST_TIMER_ENABLE_DEPRECATED"
+make -j$(nproc)
+cd ..
+
+# Compile a fuzz target with test harness
+clang++ -std=c++11 -DBOOST_TIMER_ENABLE_DEPRECATED \
+    -I. \
+    fuzz/fuzz_request.cc fuzz/test_harness.cc \
+    -o test_fuzz_request \
+    -Lbuild/libiqxmlrpc -liqxmlrpc \
+    -lxml2 -lboost_date_time -lboost_thread -lpthread
+
+# Test with sample input
+echo '<?xml version="1.0"?><methodCall><methodName>test</methodName></methodCall>' | \
+    LD_LIBRARY_PATH=build/libiqxmlrpc ./test_fuzz_request
+```
+
+### Build with libFuzzer (Linux)
+
+```bash
 mkdir build-fuzz && cd build-fuzz
 cmake .. \
     -DCMAKE_C_COMPILER=clang \
@@ -33,6 +56,22 @@ make -j$(nproc)
 
 # Run a fuzzer
 ./fuzz/fuzz_request corpus_dir/
+```
+
+### Build with libFuzzer (macOS with Homebrew LLVM)
+
+```bash
+brew install llvm
+
+mkdir build-fuzz && cd build-fuzz
+cmake .. \
+    -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang \
+    -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++ \
+    -DCMAKE_CXX_FLAGS="-fsanitize=fuzzer-no-link,address -DBOOST_TIMER_ENABLE_DEPRECATED" \
+    -DLIB_FUZZING_ENGINE="-fsanitize=fuzzer" \
+    -Dbuild_fuzzers=ON
+
+make -j$(nproc)
 ```
 
 ### Creating a Seed Corpus
