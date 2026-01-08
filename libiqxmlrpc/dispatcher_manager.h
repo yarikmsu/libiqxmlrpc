@@ -6,8 +6,6 @@
 
 #include "method.h"
 
-#include <boost/noncopyable.hpp>
-
 namespace iqxmlrpc {
 
 #ifdef _MSC_VER

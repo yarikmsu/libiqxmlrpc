@@ -1,7 +1,7 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
-#include <boost/optional.hpp>
+#include <optional>
 #include "inet_addr.h"
 #include "net_except.h"
 
@@ -56,7 +56,7 @@ std::string get_host_name()
 typedef struct sockaddr_in SystemSockAddrIn;
 
 struct Inet_addr::Impl {
-  mutable boost::optional<SystemSockAddrIn> sa;
+  mutable std::optional<SystemSockAddrIn> sa;
   std::string host;
   int port;
 
@@ -122,7 +122,7 @@ Inet_addr::get_sockaddr() const
     impl_->init_sockaddr();
   }
 
-  return &impl_->sa.get();
+  return &(*impl_->sa);
 }
 
 const std::string&

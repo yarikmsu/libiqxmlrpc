@@ -8,10 +8,9 @@
 #include "inet_addr.h"
 #include "xheaders.h"
 
-#include <boost/function.hpp>
-#include <boost/shared_ptr.hpp>
-
+#include <functional>
 #include <map>
+#include <memory>
 #include <string>
 
 namespace iqxmlrpc {
@@ -69,7 +68,7 @@ protected:
   // Parser interface
   //
 
-  typedef boost::function<void (const std::string&)> Option_validator_fn;
+  typedef std::function<void (const std::string&)> Option_validator_fn;
 
   void register_validator(
     const std::string&,
@@ -149,7 +148,7 @@ private:
 //! HTTP packet: Header + Content.
 class LIBIQXMLRPC_API Packet {
 protected:
-  boost::shared_ptr<http::Header> header_;
+  std::shared_ptr<http::Header> header_;
   std::string content_;
 
 public:
