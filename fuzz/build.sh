@@ -16,7 +16,7 @@ cmake .. \
 make -j$(nproc)
 cd ..
 
-# Build fuzz targets
+# Build fuzz targets with static linking where possible
 for fuzzer in fuzz/fuzz_*.cc; do
     name=$(basename "$fuzzer" .cc)
     $CXX $CXXFLAGS -std=c++11 -DBOOST_TIMER_ENABLE_DEPRECATED \
@@ -25,8 +25,8 @@ for fuzzer in fuzz/fuzz_*.cc; do
         -o "$OUT/$name" \
         build/libiqxmlrpc/libiqxmlrpc.a \
         $LIB_FUZZING_ENGINE \
-        $(pkg-config --libs --static libxml-2.0) \
-        -lboost_date_time -lboost_thread -lboost_system -lpthread
+        -Wl,-Bstatic -lboost_date_time -lboost_thread -lboost_system \
+        -Wl,-Bdynamic -lxml2 -lpthread
 done
 
 # Copy seed corpus
