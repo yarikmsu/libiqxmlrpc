@@ -100,7 +100,16 @@ jobs:
       run: cmake --build build
 
     - name: Test
-      run: ctest --test-dir build --output-on-failure
+      run: ctest --test-dir build --output-on-failure --output-junit junit.xml
+
+    - name: Upload test results to Codecov
+      if: ${{ !cancelled() }}
+      uses: codecov/test-results-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: junit.xml
+        flags: unittests
+        verbose: true
 
     - name: Generate coverage report
       run: |

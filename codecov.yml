@@ -9,9 +9,28 @@ coverage:
         target: auto
 
 comment:
-  layout: "reach, diff, flags, files"
+  layout: "reach, diff, flags, files, tests"
   behavior: default
   require_changes: false
   require_base: false
   require_head: true
   hide_project_coverage: false
+
+flag_management:
+  default_rules:
+    carryforward: true
+    statuses:
+      - type: project
+        target: auto
+        threshold: 1%
+      - type: patch
+        target: auto
+
+flags:
+  unittests:
+    paths:
+      - libiqxmlrpc/
+    carryforward: true
+
+test_analytics:
+  enabled: true
