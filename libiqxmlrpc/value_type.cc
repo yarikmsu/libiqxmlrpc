@@ -110,7 +110,7 @@ void String::apply_visitor(Value_type_visitor& v) const
 
 // --------------------------------------------------------------------------
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
-class Array::Array_inserter: public std::unary_function<Value,void> {
+class Array::Array_inserter {
   Array::Val_vector* vv;
 
 public:
@@ -198,8 +198,7 @@ void Array::push_back( const Value& v )
 
 // --------------------------------------------------------------------------
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
-class Struct::Struct_inserter:
-  public std::unary_function<std::pair<std::string, Value*>,void>
+class Struct::Struct_inserter
 {
   Struct::Value_stor* vs;
 

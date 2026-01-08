@@ -1,8 +1,8 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
-#include <boost/optional.hpp>
 #include <memory>
+#include <optional>
 
 #include "server.h"
 #include "auth_plugin.h"
@@ -147,13 +147,13 @@ void Server::log_err_msg( const std::string& msg )
 
 namespace {
 
-boost::optional<std::string>
+std::optional<std::string>
 authenticate(const http::Packet& pkt, const Auth_Plugin_base* ap)
 {
   using namespace http;
 
   if (!ap)
-    return boost::optional<std::string>();
+    return std::nullopt;
 
   const Request_header& hdr =
     dynamic_cast<const Request_header&>(*pkt.header());
@@ -163,7 +163,7 @@ authenticate(const http::Packet& pkt, const Auth_Plugin_base* ap)
     if (!ap->authenticate_anonymous())
       throw Unauthorized();
 
-    return boost::optional<std::string>();
+    return std::nullopt;
   }
 
   std::string username, password;
@@ -179,13 +179,11 @@ authenticate(const http::Packet& pkt, const Auth_Plugin_base* ap)
 
 void Server::schedule_execute( http::Packet* pkt, Server_connection* conn )
 {
-  using boost::optional;
-
   Executor* executor = nullptr;
 
   try {
     std::unique_ptr<http::Packet> packet(pkt);
-    optional<std::string> authname = authenticate(*pkt, impl->auth_plugin);
+    std::optional<std::string> authname = authenticate(*pkt, impl->auth_plugin);
     std::unique_ptr<Request> req( parse_request(packet->content()) );
 
     Method::Data mdata = {
@@ -197,7 +195,7 @@ void Server::schedule_execute( http::Packet* pkt, Server_connection* conn )
     Method* meth = impl->disp_manager.create_method( mdata );
 
     if (authname)
-      meth->authname(authname.get());
+      meth->authname(*authname);
 
     pkt->header()->get_xheaders(meth->xheaders());
 

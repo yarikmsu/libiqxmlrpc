@@ -8,6 +8,7 @@
 #include "except.h"
 #include "util.h"
 
+#include <cstddef>
 #include <iterator>
 #include <map>
 #include <string>
@@ -158,9 +159,16 @@ public:
 
 
 //! Const interator for Array
-class LIBIQXMLRPC_API Array::const_iterator:
-  public std::iterator<std::bidirectional_iterator_tag, Value>
+class LIBIQXMLRPC_API Array::const_iterator
 {
+public:
+  using iterator_category = std::bidirectional_iterator_tag;
+  using value_type = Value;
+  using difference_type = std::ptrdiff_t;
+  using pointer = const Value*;
+  using reference = const Value&;
+
+private:
   Array::Val_vector::const_iterator i;
 
 public:
