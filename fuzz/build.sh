@@ -9,7 +9,7 @@ cmake .. \
     -DCMAKE_C_COMPILER=$CC \
     -DCMAKE_CXX_COMPILER=$CXX \
     -DCMAKE_C_FLAGS="$CFLAGS" \
-    -DCMAKE_CXX_FLAGS="$CXXFLAGS -DBOOST_TIMER_ENABLE_DEPRECATED" \
+    -DCMAKE_CXX_FLAGS="$CXXFLAGS -std=c++11 -DBOOST_TIMER_ENABLE_DEPRECATED" \
     -DBUILD_SHARED_LIBS=OFF \
     -Dbuild_tests=OFF
 
@@ -19,7 +19,7 @@ cd ..
 # Build fuzz targets
 for fuzzer in fuzz/fuzz_*.cc; do
     name=$(basename "$fuzzer" .cc)
-    $CXX $CXXFLAGS -DBOOST_TIMER_ENABLE_DEPRECATED \
+    $CXX $CXXFLAGS -std=c++11 -DBOOST_TIMER_ENABLE_DEPRECATED \
         -I. \
         "$fuzzer" \
         -o "$OUT/$name" \
