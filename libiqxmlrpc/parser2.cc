@@ -159,7 +159,7 @@ public:
     curr.done = true;
 
     if (code < 0) {
-      xmlErrorPtr err = xmlGetLastError();
+      const xmlError* err = xmlGetLastError();
       throw Parse_error(err ? err->message : "unknown parsing error");
     }
 

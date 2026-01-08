@@ -14,7 +14,7 @@ void
 throwBuildError(T res, T err_res)
 {
   if (res == err_res) {
-    xmlErrorPtr err = xmlGetLastError();
+    const xmlError* err = xmlGetLastError();
     throw XmlBuild_error(err ? err->message : "unknown error");
   }
 }
