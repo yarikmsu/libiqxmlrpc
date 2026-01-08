@@ -434,4 +434,357 @@ BOOST_AUTO_TEST_CASE(dump_nil_value)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+BOOST_AUTO_TEST_SUITE(xml_parsing_edge_cases)
+
+BOOST_AUTO_TEST_CASE(parse_empty_string_value)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse>"
+        "<params>"
+        "<param><value><string></string></value></param>"
+        "</params>"
+        "</methodResponse>";
+
+    Response resp = parse_response(xml);
+    BOOST_CHECK(resp.value().is_string());
+    BOOST_CHECK(resp.value().get_string().empty());
+}
+
+BOOST_AUTO_TEST_CASE(parse_value_without_type_tag)
+{
+    // Value without type tag should be treated as string
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse>"
+        "<params>"
+        "<param><value>implicit string</value></param>"
+        "</params>"
+        "</methodResponse>";
+
+    Response resp = parse_response(xml);
+    BOOST_CHECK(resp.value().is_string());
+    BOOST_CHECK_EQUAL(resp.value().get_string(), "implicit string");
+}
+
+BOOST_AUTO_TEST_CASE(parse_base64_value)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse>"
+        "<params>"
+        "<param><value><base64>SGVsbG8gV29ybGQ=</base64></value></param>"
+        "</params>"
+        "</methodResponse>";
+
+    Response resp = parse_response(xml);
+    BOOST_CHECK(resp.value().is_binary());
+}
+
+BOOST_AUTO_TEST_CASE(parse_datetime_value)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse>"
+        "<params>"
+        "<param><value><dateTime.iso8601>20260101T12:00:00</dateTime.iso8601></value></param>"
+        "</params>"
+        "</methodResponse>";
+
+    Response resp = parse_response(xml);
+    BOOST_CHECK(resp.value().is_datetime());
+}
+
+BOOST_AUTO_TEST_CASE(parse_request_without_params_element)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodCall>"
+        "<methodName>no.params</methodName>"
+        "</methodCall>";
+
+    std::unique_ptr<Request> req(parse_request(xml));
+    BOOST_REQUIRE(req != nullptr);
+    BOOST_CHECK_EQUAL(req->get_name(), "no.params");
+    BOOST_CHECK(req->get_params().empty());
+}
+
+BOOST_AUTO_TEST_CASE(parse_empty_array)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse>"
+        "<params>"
+        "<param><value><array><data></data></array></value></param>"
+        "</params>"
+        "</methodResponse>";
+
+    Response resp = parse_response(xml);
+    BOOST_CHECK(resp.value().is_array());
+    BOOST_CHECK_EQUAL(resp.value().size(), 0u);
+}
+
+BOOST_AUTO_TEST_CASE(parse_struct_with_member)
+{
+    // Test struct parsing using dump/parse roundtrip
+    Struct s;
+    s.insert("key", Value("val"));
+    Response orig(new Value(s));
+
+    std::string xml = dump_response(orig);
+    Response parsed = parse_response(xml);
+
+    BOOST_CHECK(!parsed.is_fault());
+    BOOST_CHECK(parsed.value().is_struct());
+    BOOST_CHECK_EQUAL(parsed.value()["key"].get_string(), "val");
+}
+
+BOOST_AUTO_TEST_CASE(parse_negative_int)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse>"
+        "<params>"
+        "<param><value><i4>-12345</i4></value></param>"
+        "</params>"
+        "</methodResponse>";
+
+    Response resp = parse_response(xml);
+    BOOST_CHECK(resp.value().is_int());
+    BOOST_CHECK_EQUAL(resp.value().get_int(), -12345);
+}
+
+BOOST_AUTO_TEST_CASE(parse_negative_double)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse>"
+        "<params>"
+        "<param><value><double>-123.456</double></value></param>"
+        "</params>"
+        "</methodResponse>";
+
+    Response resp = parse_response(xml);
+    BOOST_CHECK(resp.value().is_double());
+    BOOST_CHECK_CLOSE(resp.value().get_double(), -123.456, 0.001);
+}
+
+BOOST_AUTO_TEST_CASE(parse_special_chars_in_string)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse>"
+        "<params>"
+        "<param><value><string>&lt;test&gt; &amp; \"quoted\"</string></value></param>"
+        "</params>"
+        "</methodResponse>";
+
+    Response resp = parse_response(xml);
+    BOOST_CHECK(resp.value().is_string());
+    BOOST_CHECK_EQUAL(resp.value().get_string(), "<test> & \"quoted\"");
+}
+
+BOOST_AUTO_TEST_CASE(dump_special_chars_in_string)
+{
+    Param_list params;
+    params.push_back(Value("<test> & \"quoted\""));
+    Request req("test", params);
+    std::string xml = dump_request(req);
+
+    // Should be XML-escaped
+    BOOST_CHECK(xml.find("&lt;") != std::string::npos);
+    BOOST_CHECK(xml.find("&gt;") != std::string::npos);
+    BOOST_CHECK(xml.find("&amp;") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(parse_mixed_array)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse>"
+        "<params>"
+        "<param><value><array><data>"
+        "<value><i4>1</i4></value>"
+        "<value><string>two</string></value>"
+        "<value><boolean>1</boolean></value>"
+        "<value><double>4.0</double></value>"
+        "</data></array></value></param>"
+        "</params>"
+        "</methodResponse>";
+
+    Response resp = parse_response(xml);
+    BOOST_CHECK(resp.value().is_array());
+    BOOST_CHECK_EQUAL(resp.value().size(), 4u);
+    BOOST_CHECK(resp.value()[0].is_int());
+    BOOST_CHECK(resp.value()[1].is_string());
+    BOOST_CHECK(resp.value()[2].is_bool());
+    BOOST_CHECK(resp.value()[3].is_double());
+}
+
+BOOST_AUTO_TEST_CASE(fault_with_negative_code)
+{
+    Response resp(-32600, "Invalid Request");
+    std::string xml = dump_response(resp);
+    Response parsed = parse_response(xml);
+
+    BOOST_CHECK(parsed.is_fault());
+    BOOST_CHECK_EQUAL(parsed.fault_code(), -32600);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(server_mode_serialization)
+
+BOOST_AUTO_TEST_CASE(response_string_without_omit_tag)
+{
+    // Default: omit_string_tag_in_responses is false
+    bool original = Value::omit_string_tag_in_responses();
+    Value::omit_string_tag_in_responses(false);
+
+    Response resp(new Value("test string"));
+    std::string xml = dump_response(resp);
+
+    // Should have <string> tag
+    BOOST_CHECK(xml.find("<string>") != std::string::npos);
+    BOOST_CHECK(xml.find("</string>") != std::string::npos);
+
+    Value::omit_string_tag_in_responses(original);
+}
+
+BOOST_AUTO_TEST_CASE(response_string_with_omit_tag)
+{
+    // When omit_string_tag_in_responses is true, server responses omit <string> tag
+    bool original = Value::omit_string_tag_in_responses();
+    Value::omit_string_tag_in_responses(true);
+
+    Response resp(new Value("test string"));
+    std::string xml = dump_response(resp);
+
+    // Should NOT have <string> tag (just raw text in <value>)
+    BOOST_CHECK(xml.find("<string>") == std::string::npos);
+    BOOST_CHECK(xml.find("</string>") == std::string::npos);
+    // But should still have the string content within <value>
+    BOOST_CHECK(xml.find("test string") != std::string::npos);
+
+    Value::omit_string_tag_in_responses(original);
+}
+
+BOOST_AUTO_TEST_CASE(response_string_with_omit_tag_roundtrip)
+{
+    // Verify that strings without <string> tag can be parsed
+    bool original = Value::omit_string_tag_in_responses();
+    Value::omit_string_tag_in_responses(true);
+
+    Response resp(new Value("roundtrip test"));
+    std::string xml = dump_response(resp);
+    Response parsed = parse_response(xml);
+
+    BOOST_CHECK(!parsed.is_fault());
+    BOOST_CHECK(parsed.value().is_string());
+    BOOST_CHECK_EQUAL(parsed.value().get_string(), "roundtrip test");
+
+    Value::omit_string_tag_in_responses(original);
+}
+
+BOOST_AUTO_TEST_CASE(response_struct_with_string_omit_tag)
+{
+    // Struct members should also respect omit_string_tag in server mode
+    bool original = Value::omit_string_tag_in_responses();
+    Value::omit_string_tag_in_responses(true);
+
+    Struct s;
+    s.insert("key", Value("value"));
+    Response resp(new Value(s));
+    std::string xml = dump_response(resp);
+
+    // String values in struct should not have <string> tag
+    BOOST_CHECK(xml.find("<string>") == std::string::npos);
+    BOOST_CHECK(xml.find("value") != std::string::npos);
+
+    Value::omit_string_tag_in_responses(original);
+}
+
+BOOST_AUTO_TEST_CASE(response_array_with_string_omit_tag)
+{
+    // Array elements should also respect omit_string_tag in server mode
+    bool original = Value::omit_string_tag_in_responses();
+    Value::omit_string_tag_in_responses(true);
+
+    Array arr;
+    arr.push_back(Value("first"));
+    arr.push_back(Value("second"));
+    Response resp(new Value(arr));
+    std::string xml = dump_response(resp);
+
+    // String values in array should not have <string> tag
+    BOOST_CHECK(xml.find("<string>") == std::string::npos);
+    BOOST_CHECK(xml.find("first") != std::string::npos);
+    BOOST_CHECK(xml.find("second") != std::string::npos);
+
+    Value::omit_string_tag_in_responses(original);
+}
+
+BOOST_AUTO_TEST_CASE(response_fault_with_string_omit_tag)
+{
+    // Fault strings should also respect omit_string_tag
+    bool original = Value::omit_string_tag_in_responses();
+    Value::omit_string_tag_in_responses(true);
+
+    Response resp(500, "Server error message");
+    std::string xml = dump_response(resp);
+
+    // Fault string should not have <string> tag
+    BOOST_CHECK(xml.find("<string>") == std::string::npos);
+    BOOST_CHECK(xml.find("Server error message") != std::string::npos);
+
+    Value::omit_string_tag_in_responses(original);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(error_handling_tests)
+
+BOOST_AUTO_TEST_CASE(parse_malformed_xml_throws)
+{
+    std::string xml = "not valid xml at all";
+    BOOST_CHECK_THROW(parse_response(xml), Parse_error);
+}
+
+BOOST_AUTO_TEST_CASE(parse_missing_method_name_throws)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodCall>"
+        "<params></params>"
+        "</methodCall>";
+
+    BOOST_CHECK_THROW(parse_request(xml), XML_RPC_violation);
+}
+
+BOOST_AUTO_TEST_CASE(parse_empty_method_name_accepted)
+{
+    // Empty method name is accepted by the parser (validation happens at dispatch)
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodCall>"
+        "<methodName></methodName>"
+        "</methodCall>";
+
+    std::unique_ptr<Request> req(parse_request(xml));
+    BOOST_REQUIRE(req != nullptr);
+    BOOST_CHECK(req->get_name().empty());
+}
+
+BOOST_AUTO_TEST_CASE(parse_invalid_root_element_throws)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<invalid>content</invalid>";
+
+    BOOST_CHECK_THROW(parse_request(xml), XML_RPC_violation);
+    BOOST_CHECK_THROW(parse_response(xml), XML_RPC_violation);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
 // vim:ts=2:sw=2:et
