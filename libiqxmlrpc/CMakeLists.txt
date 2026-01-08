@@ -78,7 +78,7 @@ set(PRIVATE_HEADERS
   xml_builder.h
 )
 
-add_library(iqxmlrpc SHARED
+add_library(iqxmlrpc
   ${PUBLIC_HEADERS}
   ${PRIVATE_HEADERS}
   acceptor.cc
