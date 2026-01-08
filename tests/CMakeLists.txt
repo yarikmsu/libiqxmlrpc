@@ -6,21 +6,48 @@ if (NOT Boost_USE_STATIC_LIBS)
 	add_definitions(-DBOOST_TEST_DYN_LINK)
 endif (NOT Boost_USE_STATIC_LIBS)
 
+# List to collect all unit test targets
+set(UNIT_TEST_TARGETS "" CACHE INTERNAL "")
+
+# Macro for unit tests (added to ctest)
 macro (iqxmlrpc_test test_name)
 	message("Add test ${test_name}")
 	add_executable(${test_name} ${ARGN})
 	target_link_libraries(${test_name} iqxmlrpc ${Boost_LIBRARIES} ${LIBXML2_LIBRARIES} ${OPENSSL_LIBRARIES})
+	add_test(NAME ${test_name} COMMAND ${test_name})
+	set(UNIT_TEST_TARGETS ${UNIT_TEST_TARGETS} ${test_name} CACHE INTERNAL "")
 endmacro (iqxmlrpc_test)
 
+# Macro for integration tests (not added to ctest - require server/client setup)
+macro (iqxmlrpc_integration_test test_name)
+	message("Add integration test ${test_name}")
+	add_executable(${test_name} ${ARGN})
+	target_link_libraries(${test_name} iqxmlrpc ${Boost_LIBRARIES} ${LIBXML2_LIBRARIES} ${OPENSSL_LIBRARIES})
+endmacro (iqxmlrpc_integration_test)
+
 iqxmlrpc_test(value-test test_value_usage.cc)
-iqxmlrpc_test(server-test test_server.cc server_config.h server_config.cc methods.h methods.cc)
+iqxmlrpc_integration_test(server-test test_server.cc server_config.h server_config.cc methods.h methods.cc)
 set(CLIENT_COMMON_SRC client_common.h client_common.cc client_opts.h client_opts.cc)
-iqxmlrpc_test(client-test ${CLIENT_COMMON_SRC} client.cc)
-iqxmlrpc_test(client-stress-test ${CLIENT_COMMON_SRC} client_stress.cc)
+iqxmlrpc_integration_test(client-test ${CLIENT_COMMON_SRC} client.cc)
+iqxmlrpc_integration_test(client-stress-test ${CLIENT_COMMON_SRC} client_stress.cc)
 iqxmlrpc_test(xheaders-test test_xheaders.cc)
 
 if (NOT WIN32)
 	iqxmlrpc_test(parser-test parser2.cc)
 endif (NOT WIN32)
+
+# New unit tests for coverage
+iqxmlrpc_test(http-test test_http.cc)
+iqxmlrpc_test(request-response-test test_request_response.cc)
+iqxmlrpc_test(inet-addr-test test_inet_addr.cc)
+iqxmlrpc_test(value-types-extended-test test_value_types_extended.cc)
+
+# Run tests automatically after build
+add_custom_target(check ALL
+	COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+	DEPENDS ${UNIT_TEST_TARGETS}
+	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+	COMMENT "Running unit tests..."
+)
 
 # TODO: server-stop-test

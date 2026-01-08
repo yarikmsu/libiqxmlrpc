@@ -257,7 +257,7 @@ public:
   const_iterator find( const std::string& key ) const { return values.find(key); }
   iterator find( const std::string& key ) { return values.find(key); }
 
-  void erase( const std::string& key ) { values.erase(key); }
+  void erase( const std::string& key );  // defined in value_type.cc
 };
 
 #ifdef _MSC_VER
