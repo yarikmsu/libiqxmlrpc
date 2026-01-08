@@ -100,7 +100,7 @@ jobs:
       run: cmake --build build
 
     - name: Test
-      run: ctest --test-dir build --output-on-failure --output-junit build/junit.xml
+      run: ctest --test-dir build --output-on-failure --output-junit junit.xml
 
     - name: Upload test results to Codecov
       if: ${{ !cancelled() }}
