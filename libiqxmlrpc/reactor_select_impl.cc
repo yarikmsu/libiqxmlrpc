@@ -26,15 +26,15 @@ void Reactor_select_impl::reset(const HandlerStateList& in)
   FD_ZERO( &write_set );
   FD_ZERO( &err_set );
 
-  for( HandlerStateList::const_iterator i = in.begin(); i != in.end(); ++i )
+  for (const auto& h : in)
   {
-    if( i->mask & Reactor_base::INPUT )
-      FD_SET( i->fd, &read_set );
-    if( i->mask & Reactor_base::OUTPUT )
-      FD_SET( i->fd, &write_set );
+    if (h.mask & Reactor_base::INPUT)
+      FD_SET(h.fd, &read_set);
+    if (h.mask & Reactor_base::OUTPUT)
+      FD_SET(h.fd, &write_set);
 
-    FD_SET( i->fd, &err_set );
-    max_fd = i->fd > max_fd ? i->fd : max_fd;
+    FD_SET(h.fd, &err_set);
+    max_fd = h.fd > max_fd ? h.fd : max_fd;
   }
 }
 
@@ -66,18 +66,18 @@ bool Reactor_select_impl::poll(HandlerStateList& out, Reactor_base::Timeout to_m
 
   } while (false);
 
-  for( HandlerStateList::const_iterator i = hs.begin(); i != hs.end(); ++i )
+  for (const auto& handler : hs)
   {
     short revents = 0;
-    revents |= FD_ISSET( i->fd, &read_set ) ? Reactor_base::INPUT : 0;
-    revents |= FD_ISSET( i->fd, &write_set ) ? Reactor_base::OUTPUT : 0;
-    revents |= FD_ISSET( i->fd, &err_set ) ? Reactor_base::OUTPUT : 0;
+    revents |= FD_ISSET(handler.fd, &read_set) ? Reactor_base::INPUT : 0;
+    revents |= FD_ISSET(handler.fd, &write_set) ? Reactor_base::OUTPUT : 0;
+    revents |= FD_ISSET(handler.fd, &err_set) ? Reactor_base::OUTPUT : 0;
 
-    if( revents )
+    if (revents)
     {
-      Reactor_base::HandlerState h( i->fd );
+      Reactor_base::HandlerState h(handler.fd);
       h.revents = revents;
-      out.push_back( h );
+      out.push_back(h);
     }
   }
 

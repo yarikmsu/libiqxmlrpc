@@ -3,7 +3,12 @@ include(FindLibXml2)
 include(FindOpenSSL)
 include(CheckFunctionExists)
 
-find_package(Boost 1.41.0 COMPONENTS date_time thread system REQUIRED)
+# Require C++11 standard
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+find_package(Boost 1.41.0 COMPONENTS date_time thread REQUIRED)
 include_directories(${Boost_INCLUDE_DIR} ${XML2_INCLUDE_DIRS} ${LIBXML2_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR} ${PROJECT_BINARY_DIR}/libiqxmlrpc)
 
 check_function_exists(poll HAVE_POLL)
