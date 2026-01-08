@@ -39,15 +39,18 @@ private:
   Reactor_base* reactor_;
 };
 
-class Reactor_interrupter::Impl: boost::noncopyable {
+class Reactor_interrupter::Impl {
 public:
+  Impl(const Impl&) = delete;
+  Impl& operator=(const Impl&) = delete;
+
   Impl(Reactor_base* reactor);
   ~Impl() {}
 
   void make_interrupt();
 
 private:
-  std::auto_ptr<Interrupter_connection> server_;
+  std::unique_ptr<Interrupter_connection> server_;
   Socket client_;
   boost::mutex lock_;
 };

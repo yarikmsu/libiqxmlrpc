@@ -1,13 +1,11 @@
-#include <memory>
 #include <iostream>
+#include <memory>
 #include <boost/bind.hpp>
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread.hpp>
 #include <boost/thread/condition.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/test/test_tools.hpp>
 #include <boost/test/unit_test.hpp>
-#include <boost/utility.hpp>
 #include "libiqxmlrpc/libiqxmlrpc.h"
 #include "libiqxmlrpc/http_server.h"
 #include "libiqxmlrpc/executor.h"
@@ -21,8 +19,11 @@
 using namespace boost::unit_test_framework;
 using namespace iqxmlrpc;
 
-class TestServer: boost::noncopyable {
+class TestServer {
 public:
+  TestServer(const TestServer&) = delete;
+  TestServer& operator=(const TestServer&) = delete;
+
   TestServer(int port, unsigned threads):
     exec_factory_(threads > 1 ?
       static_cast<Executor_factory_base*>(new Pool_executor_factory(threads)) :
@@ -43,9 +44,9 @@ public:
   }
 
 private:
-  boost::scoped_ptr<iqxmlrpc::Executor_factory_base> exec_factory_;
-  boost::scoped_ptr<iqxmlrpc::Server> serv_;
-  boost::scoped_ptr<boost::thread> thread_;
+  std::unique_ptr<iqxmlrpc::Executor_factory_base> exec_factory_;
+  std::unique_ptr<iqxmlrpc::Server> serv_;
+  std::unique_ptr<boost::thread> thread_;
 
   static void run(TestServer* obj)
   {

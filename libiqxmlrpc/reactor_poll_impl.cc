@@ -33,12 +33,12 @@ void Reactor_poll_impl::reset(const HandlerStateList& in)
 {
   impl->pfd.clear();
 
-  for( HandlerStateList::const_iterator i = in.begin(); i != in.end(); ++i )
+  for (const auto& h : in)
   {
-    short events = i->mask & Reactor_base::INPUT ? POLLIN : 0;
-    events |= i->mask & Reactor_base::OUTPUT ? POLLOUT : 0;
-    struct pollfd sfd = { i->fd, events, 0 };
-    impl->pfd.push_back( sfd );
+    short events = h.mask & Reactor_base::INPUT ? POLLIN : 0;
+    events |= h.mask & Reactor_base::OUTPUT ? POLLOUT : 0;
+    struct pollfd sfd = { h.fd, events, 0 };
+    impl->pfd.push_back(sfd);
   }
 }
 

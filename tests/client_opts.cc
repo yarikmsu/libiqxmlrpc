@@ -65,7 +65,7 @@ boost::optional<FingerprintVerifier> server_verifier;
 iqxmlrpc::Client_base*
 Client_opts::create_instance() const
 {
-  Client_base* retval = 0;
+  Client_base* retval = nullptr;
 
   if (use_ssl_)
   {

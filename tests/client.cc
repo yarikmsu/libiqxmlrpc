@@ -20,7 +20,7 @@ using namespace iqxmlrpc;
 
 // Global
 Client_opts test_config;
-Client_base* test_client = 0;
+Client_base* test_client = nullptr;
 
 class ClientFixture {
 public:
@@ -115,7 +115,7 @@ BOOST_AUTO_TEST_CASE( get_file_test )
 
   MD5(reinterpret_cast<md5char*>(d.get_data().data()),
     d.get_data().length(), md5);
-  std::auto_ptr<Binary_data> gen_md5( Binary_data::from_data(
+  std::unique_ptr<Binary_data> gen_md5( Binary_data::from_data(
     reinterpret_cast<strchar*>(md5), sizeof(md5)) );
 
   BOOST_TEST_MESSAGE("Recieved MD5:   " + m.get_base64());
