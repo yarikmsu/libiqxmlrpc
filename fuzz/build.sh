@@ -25,7 +25,8 @@ for fuzzer in fuzz/fuzz_*.cc; do
         -o "$OUT/$name" \
         build/libiqxmlrpc/libiqxmlrpc.a \
         $LIB_FUZZING_ENGINE \
-        -lxml2 -lboost_date_time -lboost_thread -lboost_system -lpthread
+        $(pkg-config --libs --static libxml-2.0) \
+        -lboost_date_time -lboost_thread -lboost_system -lpthread
 done
 
 # Copy seed corpus
