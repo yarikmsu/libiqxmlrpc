@@ -248,7 +248,7 @@ public:
     Packet( new Response_header(code, phrase), "" ),
     Exception( "HTTP: " + phrase ) {}
 
-  ~Error_response() throw() {};
+  ~Error_response() throw() override {};
 
   const Response_header* response_header() const
   {

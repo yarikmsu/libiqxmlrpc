@@ -17,21 +17,21 @@ class Https_server_connection:
   public iqxmlrpc::Server_connection
 {
 public:
-  Https_server_connection( const iqnet::Socket& );
+  explicit Https_server_connection( const iqnet::Socket& );
 
-  void post_accept() { Reaction_connection::post_accept(); }
-  void finish() { delete this; }
+  void post_accept() override { Reaction_connection::post_accept(); }
+  void finish() override { delete this; }
 
-  bool catch_in_reactor() const { return true; }
-  void log_exception( const std::exception& );
-  void log_unknown_exception();
+  bool catch_in_reactor() const override { return true; }
+  void log_exception( const std::exception& ) override;
+  void log_unknown_exception() override;
 
 protected:
   void my_reg_recv();
-  void accept_succeed();
-  void recv_succeed( bool& terminate, size_t req_len, size_t real_len );
-  void send_succeed( bool& terminate );
-  virtual void do_schedule_response();
+  void accept_succeed() override;
+  void recv_succeed( bool& terminate, size_t req_len, size_t real_len ) override;
+  void send_succeed( bool& terminate ) override;
+  void do_schedule_response() override;
 };
 
 typedef Server_conn_factory<Https_server_connection> Https_conn_factory;

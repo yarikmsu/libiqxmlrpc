@@ -110,7 +110,7 @@ public:
   Array( const Array& );
   Array( Array&& other ) noexcept : values(std::move(other.values)) {}
   Array() {}
-  ~Array();
+  ~Array() override;
 
   Array& operator =( const Array& );
   Array& operator =( Array&& other ) noexcept { swap(other); return *this; }
@@ -233,7 +233,7 @@ public:
   Struct( const Struct& );
   Struct( Struct&& other ) noexcept : values(std::move(other.values)) {}
   Struct() {}
-  ~Struct();
+  ~Struct() override;
 
   Struct& operator =( const Struct& );
   Struct& operator =( Struct&& other ) noexcept { swap(other); return *this; }

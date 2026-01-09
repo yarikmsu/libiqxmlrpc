@@ -92,20 +92,20 @@ private:
 //! Value_type visitor that prints visited values recursively.
 class LIBIQXMLRPC_API Print_value_visitor: public Value_type_visitor {
 public:
-  Print_value_visitor(std::ostream&);
+  explicit Print_value_visitor(std::ostream&);
 
 private:
-  virtual void do_visit_value(const Value_type&);
-  virtual void do_visit_nil();
-  virtual void do_visit_int(int);
-  virtual void do_visit_int64(int64_t);
-  virtual void do_visit_double(double);
-  virtual void do_visit_bool(bool);
-  virtual void do_visit_string(const std::string&);
-  virtual void do_visit_struct(const Struct&);
-  virtual void do_visit_array(const Array&);
-  virtual void do_visit_base64(const Binary_data&);
-  virtual void do_visit_datetime(const Date_time&);
+  void do_visit_value(const Value_type&) override;
+  void do_visit_nil() override;
+  void do_visit_int(int) override;
+  void do_visit_int64(int64_t) override;
+  void do_visit_double(double) override;
+  void do_visit_bool(bool) override;
+  void do_visit_string(const std::string&) override;
+  void do_visit_struct(const Struct&) override;
+  void do_visit_array(const Array&) override;
+  void do_visit_base64(const Binary_data&) override;
+  void do_visit_datetime(const Date_time&) override;
 
   std::ostream& out_;
 };

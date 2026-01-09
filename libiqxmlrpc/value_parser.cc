@@ -20,7 +20,7 @@ public:
   StructBuilder(const StructBuilder&) = delete;
   StructBuilder& operator=(const StructBuilder&) = delete;
 
-  StructBuilder(Parser& parser):
+  explicit StructBuilder(Parser& parser):
     ValueBuilderBase(parser),
     state_(parser, NONE),
     value_(0)
@@ -43,8 +43,8 @@ private:
     VALUE_READ,
   };
 
-  virtual void
-  do_visit_element(const std::string& tagname)
+  void
+  do_visit_element(const std::string& tagname) override
   {
     switch (state_.change(tagname)) {
     case NAME_READ:
@@ -64,8 +64,8 @@ private:
     }
   }
 
-  virtual void
-  do_visit_element_end(const std::string& tagname)
+  void
+  do_visit_element_end(const std::string& tagname) override
   {
     if (tagname == "member") {
       if (state_.get_state() != VALUE_READ) {
@@ -89,7 +89,7 @@ public:
   ArrayBuilder(const ArrayBuilder&) = delete;
   ArrayBuilder& operator=(const ArrayBuilder&) = delete;
 
-  ArrayBuilder(Parser& parser):
+  explicit ArrayBuilder(Parser& parser):
     ValueBuilderBase(parser),
     state_(parser, NONE),
     proxy_(0)
@@ -111,8 +111,8 @@ private:
     VALUES
   };
 
-  virtual void
-  do_visit_element(const std::string& tagname)
+  void
+  do_visit_element(const std::string& tagname) override
   {
     if (state_.change(tagname) == VALUES) {
       Value_type* tmp = sub_build<Value_type*, ValueBuilder>();

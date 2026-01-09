@@ -80,7 +80,7 @@ class LIBIQXMLRPC_API exception: public std::exception {
 public:
   exception() throw();
   explicit exception( unsigned long ssl_err ) throw();
-  exception( const std::string& msg ) throw();
+  explicit exception( const std::string& msg ) throw();
   virtual ~exception() throw() {}
 
   const char*   what() const throw() { return msg.c_str(); }
@@ -96,7 +96,7 @@ public:
 class LIBIQXMLRPC_API connection_close: public ssl::exception {
   bool clean;
 public:
-  connection_close( bool clean_ ):
+  explicit connection_close( bool clean_ ):
     exception( "Connection has been closed." ),
     clean(clean_) {}
 
@@ -105,7 +105,7 @@ public:
 
 class LIBIQXMLRPC_API io_error: public ssl::exception {
 public:
-  io_error( int err ):
+  explicit io_error( int err ):
     exception( err ) {}
 };
 

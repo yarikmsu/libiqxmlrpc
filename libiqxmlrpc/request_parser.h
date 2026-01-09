@@ -12,14 +12,14 @@ namespace iqxmlrpc {
 
 class RequestBuilder: public BuilderBase {
 public:
-  RequestBuilder(Parser&);
+  explicit RequestBuilder(Parser&);
 
   Request*
   get();
 
 private:
-  virtual void
-  do_visit_element(const std::string&);
+  void
+  do_visit_element(const std::string&) override;
 
   StateMachine state_;
   std::optional<std::string> method_name_;
