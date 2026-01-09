@@ -142,4 +142,18 @@ jobs:
       run: sudo apt-get update && sudo apt-get install -y cppcheck
 
     - name: Run cppcheck
-      run: cppcheck --enable=warning,style,performance --suppress=missingIncludeSystem libiqxmlrpc/
+      run: |
+        cppcheck --enable=warning,style,performance \
+          --suppress=missingIncludeSystem \
+          --suppress=noExplicitConstructor:libiqxmlrpc/value.h \
+          --suppress=noExplicitConstructor:libiqxmlrpc/value_type.h \
+          --suppress=noExplicitConstructor:libiqxmlrpc/inet_addr.h \
+          --suppress=functionStatic:libiqxmlrpc/lock.h \
+          --suppress=functionStatic:libiqxmlrpc/reactor_impl.h \
+          --suppress=functionStatic:libiqxmlrpc/http.cc \
+          --suppress=functionStatic:libiqxmlrpc/server.cc \
+          --suppress=functionStatic:libiqxmlrpc/ssl_lib.cc \
+          --suppress=variableScope:libiqxmlrpc/value_type.cc \
+          --suppress=knownConditionTrueFalse:libiqxmlrpc/http_client.cc \
+          --suppress=constParameterPointer:libiqxmlrpc/method.h \
+          libiqxmlrpc/

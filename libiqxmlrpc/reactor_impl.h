@@ -61,14 +61,14 @@ private:
   hs_iterator       end()         { return handlers_states.end(); }
 
   Event_handler* find_handler(Socket::Handler);
-  hs_iterator find_handler_state(Event_handler*);
+  hs_iterator find_handler_state(const Event_handler*);
 
   void handle_user_events();
   bool handle_system_events( Timeout );
 
-  void invoke_clients_handler( Event_handler*, HandlerState&, bool& terminate );
-  void invoke_servers_handler( Event_handler*, HandlerState&, bool& terminate );
-  void invoke_event_handler( HandlerState& );
+  void invoke_clients_handler( Event_handler*, const HandlerState&, bool& terminate );
+  void invoke_servers_handler( Event_handler*, const HandlerState&, bool& terminate );
+  void invoke_event_handler( const HandlerState& );
 
 private:
   Lock lock;
@@ -91,7 +91,7 @@ Reactor<Lock>::Reactor():
 
 template <class Lock>
 typename Reactor<Lock>::hs_iterator
-Reactor<Lock>::find_handler_state(Event_handler* eh)
+Reactor<Lock>::find_handler_state(const Event_handler* eh)
 {
   return std::find(begin(), end(), HandlerState(eh->get_handler()));
 }
@@ -175,7 +175,7 @@ void Reactor<Lock>::fake_event( Event_handler* eh, Event_mask mask )
 
 template <class Lock>
 void Reactor<Lock>::invoke_clients_handler(
-  Event_handler* handler, HandlerState& hs, bool& terminate )
+  Event_handler* handler, const HandlerState& hs, bool& terminate )
 {
   bool in  = (hs.revents & Reactor_base::INPUT) != 0;
   bool out = (hs.revents & Reactor_base::OUTPUT) != 0;
@@ -188,7 +188,7 @@ void Reactor<Lock>::invoke_clients_handler(
 
 template <class Lock>
 void Reactor<Lock>::invoke_servers_handler(
-    Event_handler* handler, HandlerState& hs, bool& terminate )
+    Event_handler* handler, const HandlerState& hs, bool& terminate )
 {
   try {
     invoke_clients_handler( handler, hs, terminate );
@@ -206,7 +206,7 @@ void Reactor<Lock>::invoke_servers_handler(
 }
 
 template <class Lock>
-void Reactor<Lock>::invoke_event_handler( Reactor_base::HandlerState& hs )
+void Reactor<Lock>::invoke_event_handler( const Reactor_base::HandlerState& hs )
 {
   bool terminate = false;
 
