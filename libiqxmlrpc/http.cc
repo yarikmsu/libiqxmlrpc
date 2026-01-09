@@ -364,6 +364,7 @@ Response_header::Response_header( int c, const std::string& p ):
   set_option(names::server, PACKAGE " " VERSION);
 }
 
+// cppcheck-suppress functionStatic
 std::string Response_header::current_date() const
 {
   using namespace boost::posix_time;

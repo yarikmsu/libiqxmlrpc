@@ -163,6 +163,7 @@ ConnectionVerifier::verify(bool prev_ok, X509_STORE_CTX* ctx) const
 }
 
 std::string
+// cppcheck-suppress functionStatic
 ConnectionVerifier::cert_finger_sha256(X509_STORE_CTX* ctx) const
 {
   X509* x = X509_STORE_CTX_get_current_cert(ctx);

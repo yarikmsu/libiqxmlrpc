@@ -32,6 +32,7 @@ public:
   int verify(bool preverified_ok, X509_STORE_CTX*) const;
 
 protected:
+  // cppcheck-suppress functionStatic
   std::string cert_finger_sha256(X509_STORE_CTX*) const;
 
 private:

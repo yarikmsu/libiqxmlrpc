@@ -35,6 +35,7 @@ public:
   Inet_addr() {}
 
   explicit Inet_addr( const struct sockaddr_in& );
+  // cppcheck-suppress noExplicitConstructor
   Inet_addr( const std::string& host, int port = 0 );
   explicit Inet_addr( int port );
 
