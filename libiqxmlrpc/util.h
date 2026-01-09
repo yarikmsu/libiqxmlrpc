@@ -19,7 +19,7 @@ public:
   using argument_type = typename M::value_type;
   using result_type = typename M::mapped_type;
 
-  typename M::mapped_type operator ()(typename M::value_type& i)
+  typename M::mapped_type operator ()(const typename M::value_type& i)
   {
     return i.second;
   }
@@ -74,7 +74,7 @@ public:
   LockedBool(const LockedBool&) = delete;
   LockedBool& operator=(const LockedBool&) = delete;
 
-  LockedBool(bool default_):
+  explicit LockedBool(bool default_):
     val(default_) {}
 
   ~LockedBool() {}

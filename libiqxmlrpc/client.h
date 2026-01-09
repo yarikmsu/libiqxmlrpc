@@ -89,7 +89,7 @@ public:
       \param uri  Requested URI (default "/RPC");
       \param vhost Requested virtual host (by default calculated form addr).
   */
-  Client(
+  explicit Client(
     const iqnet::Inet_addr& addr,
     const std::string& uri   = "/RPC",
     const std::string& vhost = ""
