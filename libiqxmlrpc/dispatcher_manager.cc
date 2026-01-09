@@ -91,6 +91,9 @@ private:
 
 class Method_dispatcher_manager::Impl {
 public:
+  Impl(const Impl&) = delete;
+  Impl& operator=(const Impl&) = delete;
+
   typedef std::deque<Method_dispatcher_base*> DispatchersSet;
   DispatchersSet dispatchers;
   Default_method_dispatcher* default_disp;

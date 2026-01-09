@@ -51,6 +51,10 @@ struct Pool_executor_traits
 
 //! Abstract executor class. Defines the policy for method execution.
 class LIBIQXMLRPC_API Executor {
+public:
+  Executor(const Executor&) = delete;
+  Executor& operator=(const Executor&) = delete;
+
 protected:
   Method* method;
   Interceptor* interceptors;
