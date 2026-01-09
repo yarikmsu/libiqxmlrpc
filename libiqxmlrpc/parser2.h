@@ -123,7 +123,7 @@ private:
 
   const Parser& parser_;
   int curr_;
-  TransitionMap trans_;
+  TransitionMap trans_ = nullptr;
 };
 
 } // namespace iqxmlrpc

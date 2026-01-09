@@ -126,7 +126,10 @@ public:
 
     ParseStep():
       done(false),
-      is_empty(false)
+      element_begin(false),
+      element_end(false),
+      is_empty(false),
+      is_text(false)
     {
     }
 

@@ -16,7 +16,7 @@ class Http_server_connection:
   public iqnet::Connection,
   public Server_connection
 {
-  iqnet::Reactor_base* reactor;
+  iqnet::Reactor_base* reactor = nullptr;
 
 public:
   Http_server_connection( const iqnet::Socket& );

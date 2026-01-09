@@ -17,6 +17,9 @@ namespace {
 
 class StructBuilder: public ValueBuilderBase {
 public:
+  StructBuilder(const StructBuilder&) = delete;
+  StructBuilder& operator=(const StructBuilder&) = delete;
+
   StructBuilder(Parser& parser):
     ValueBuilderBase(parser),
     state_(parser, NONE),
@@ -83,6 +86,9 @@ private:
 
 class ArrayBuilder: public ValueBuilderBase {
 public:
+  ArrayBuilder(const ArrayBuilder&) = delete;
+  ArrayBuilder& operator=(const ArrayBuilder&) = delete;
+
   ArrayBuilder(Parser& parser):
     ValueBuilderBase(parser),
     state_(parser, NONE),

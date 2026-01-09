@@ -42,7 +42,7 @@ public:
 
 private:
   std::shared_ptr<Value> value_;
-  int fault_code_;
+  int fault_code_ = 0;
   std::string fault_string_;
 };
 
