@@ -109,9 +109,8 @@ void Header::parse(const std::string& s)
     if (j.begin() == line.end())
       throw Malformed_packet("option line does not contain a colon symbol");
 
-    std::string opt_name, opt_value;
-    std::copy(line.begin(), j.begin(), std::back_inserter(opt_name));
-    std::copy(j.end(), line.end(), std::back_inserter(opt_value));
+    std::string opt_name(line.begin(), j.begin());
+    std::string opt_value(j.end(), line.end());
 
     boost::trim(opt_name);
     boost::trim(opt_value);
@@ -187,9 +186,14 @@ void Header::set_option_default(const std::string& name, const std::string& valu
 std::string Header::dump() const
 {
   std::string retval = dump_head();
+  // Pre-reserve space: estimate ~64 bytes per option
+  retval.reserve(retval.size() + options_.size() * 64 + 4);
 
   for (const auto& opt : options_) {
-    retval += opt.first + ": " + opt.second + names::crlf;
+    retval += opt.first;
+    retval += ": ";
+    retval += opt.second;
+    retval += names::crlf;
   }
 
   retval += names::crlf;
@@ -441,10 +445,9 @@ bool Packet_reader::read_header( const std::string& s )
   if( i.begin() == i.end() )
     return false;
 
-  std::string tmp;
-  std::copy(header_cache.begin(), i.begin(), std::back_inserter(tmp));
-  std::copy(i.end(), header_cache.end(), std::back_inserter(content_cache));
-  header_cache = tmp;
+  // Use direct string construction instead of std::copy with back_inserter
+  content_cache.append(i.end(), header_cache.end());
+  header_cache.erase(i.begin(), header_cache.end());
   return true;
 }
 
