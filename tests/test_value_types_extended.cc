@@ -376,13 +376,13 @@ BOOST_AUTO_TEST_CASE(value_assignment)
 BOOST_AUTO_TEST_CASE(value_bad_cast_int_to_string)
 {
     Value v = 42;
-    BOOST_CHECK_THROW(v.get_string(), Value::Bad_cast);
+    BOOST_CHECK_THROW(v.get_string(), Value::Value::Bad_cast);
 }
 
 BOOST_AUTO_TEST_CASE(value_bad_cast_string_to_int)
 {
     Value v = "not a number";
-    BOOST_CHECK_THROW(v.get_int(), Value::Bad_cast);
+    BOOST_CHECK_THROW(v.get_int(), Value::Value::Bad_cast);
 }
 
 BOOST_AUTO_TEST_CASE(array_out_of_range)
@@ -771,6 +771,331 @@ BOOST_AUTO_TEST_CASE(print_value_function)
     Value v = 42;
     print_value(v, oss);
     BOOST_CHECK_EQUAL(oss.str(), "42");
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(value_type_tests)
+
+BOOST_AUTO_TEST_CASE(int_type_clone)
+{
+    Int original(42);
+    std::unique_ptr<Value_type> cloned(original.clone());
+    BOOST_CHECK_EQUAL(dynamic_cast<Int*>(cloned.get())->value(), 42);
+}
+
+BOOST_AUTO_TEST_CASE(int64_type_clone)
+{
+    Int64 original(9876543210LL);
+    std::unique_ptr<Value_type> cloned(original.clone());
+    BOOST_CHECK_EQUAL(dynamic_cast<Int64*>(cloned.get())->value(), 9876543210LL);
+}
+
+BOOST_AUTO_TEST_CASE(double_type_clone)
+{
+    Double original(3.14159);
+    std::unique_ptr<Value_type> cloned(original.clone());
+    BOOST_CHECK_CLOSE(dynamic_cast<Double*>(cloned.get())->value(), 3.14159, 0.00001);
+}
+
+BOOST_AUTO_TEST_CASE(bool_type_clone)
+{
+    Bool original(true);
+    std::unique_ptr<Value_type> cloned(original.clone());
+    BOOST_CHECK_EQUAL(dynamic_cast<Bool*>(cloned.get())->value(), true);
+}
+
+BOOST_AUTO_TEST_CASE(string_type_clone)
+{
+    String original("test");
+    std::unique_ptr<Value_type> cloned(original.clone());
+    BOOST_CHECK_EQUAL(dynamic_cast<String*>(cloned.get())->value(), "test");
+}
+
+BOOST_AUTO_TEST_CASE(nil_type_clone)
+{
+    Nil original;
+    std::unique_ptr<Value_type> cloned(original.clone());
+    BOOST_CHECK(dynamic_cast<Nil*>(cloned.get()) != nullptr);
+}
+
+BOOST_AUTO_TEST_CASE(array_type_clone)
+{
+    Array original;
+    original.push_back(Value_ptr(new Value(1)));
+    original.push_back(Value_ptr(new Value(2)));
+    std::unique_ptr<Value_type> cloned(original.clone());
+    Array* arr = dynamic_cast<Array*>(cloned.get());
+    BOOST_REQUIRE(arr != nullptr);
+    BOOST_CHECK_EQUAL(arr->size(), 2u);
+}
+
+BOOST_AUTO_TEST_CASE(struct_type_clone)
+{
+    Struct original;
+    original.insert("key", Value_ptr(new Value("val")));
+    std::unique_ptr<Value_type> cloned(original.clone());
+    Struct* st = dynamic_cast<Struct*>(cloned.get());
+    BOOST_REQUIRE(st != nullptr);
+    BOOST_CHECK(st->has_field("key"));
+}
+
+BOOST_AUTO_TEST_CASE(binary_type_clone)
+{
+    std::unique_ptr<Binary_data> original(Binary_data::from_data("data"));
+    std::unique_ptr<Value_type> cloned(original->clone());
+    Binary_data* bin = dynamic_cast<Binary_data*>(cloned.get());
+    BOOST_REQUIRE(bin != nullptr);
+    BOOST_CHECK_EQUAL(bin->get_data(), "data");
+}
+
+BOOST_AUTO_TEST_CASE(datetime_type_clone)
+{
+    Date_time original(std::string("20260108T12:30:45"));
+    std::unique_ptr<Value_type> cloned(original.clone());
+    Date_time* dt = dynamic_cast<Date_time*>(cloned.get());
+    BOOST_REQUIRE(dt != nullptr);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(value_bad_cast_tests)
+
+BOOST_AUTO_TEST_CASE(int_on_string_throws)
+{
+    Value v = "string";
+    BOOST_CHECK_THROW(v.get_int(), Value::Bad_cast);
+}
+
+BOOST_AUTO_TEST_CASE(int64_on_int_throws)
+{
+    Value v = 42;
+    BOOST_CHECK_THROW(v.get_int64(), Value::Bad_cast);
+}
+
+BOOST_AUTO_TEST_CASE(double_on_int_throws)
+{
+    Value v = 42;
+    BOOST_CHECK_THROW(v.get_double(), Value::Bad_cast);
+}
+
+BOOST_AUTO_TEST_CASE(bool_on_string_throws)
+{
+    Value v = "true";
+    BOOST_CHECK_THROW(v.get_bool(), Value::Bad_cast);
+}
+
+BOOST_AUTO_TEST_CASE(string_on_int_throws)
+{
+    Value v = 42;
+    BOOST_CHECK_THROW(v.get_string(), Value::Bad_cast);
+}
+
+BOOST_AUTO_TEST_CASE(binary_on_string_throws)
+{
+    Value v = "data";
+    BOOST_CHECK_THROW(v.get_binary(), Value::Bad_cast);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_on_string_throws)
+{
+    Value v = "20260108";
+    BOOST_CHECK_THROW(v.get_datetime(), Value::Bad_cast);
+}
+
+BOOST_AUTO_TEST_CASE(array_on_struct_throws)
+{
+    Struct s;
+    Value v = s;
+    BOOST_CHECK_THROW(v.the_array(), Value::Bad_cast);
+}
+
+BOOST_AUTO_TEST_CASE(struct_on_array_throws)
+{
+    Array a;
+    Value v = a;
+    BOOST_CHECK_THROW(v.the_struct(), Value::Bad_cast);
+}
+
+BOOST_AUTO_TEST_CASE(index_on_struct_throws)
+{
+    Struct s;
+    Value v = s;
+    BOOST_CHECK_THROW(v[0], Value::Bad_cast);
+}
+
+BOOST_AUTO_TEST_CASE(field_on_array_throws)
+{
+    Array a;
+    Value v = a;
+    BOOST_CHECK_THROW(v["key"], Value::Bad_cast);
+}
+
+BOOST_AUTO_TEST_CASE(push_back_on_struct_throws)
+{
+    Struct s;
+    Value v = s;
+    BOOST_CHECK_THROW(v.push_back(Value(1)), Value::Bad_cast);
+}
+
+BOOST_AUTO_TEST_CASE(insert_on_array_throws)
+{
+    Array a;
+    Value v = a;
+    BOOST_CHECK_THROW(v.insert("key", Value(1)), Value::Bad_cast);
+}
+
+BOOST_AUTO_TEST_CASE(has_field_on_array_throws)
+{
+    Array a;
+    Value v = a;
+    BOOST_CHECK_THROW(v.has_field("key"), Value::Bad_cast);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(datetime_parsing_tests)
+
+BOOST_AUTO_TEST_CASE(datetime_valid_format)
+{
+    // Format must be exactly YYYYMMDDTHHMMSS (17 chars)
+    Date_time dt(std::string("20260108T12:30:45"));
+    struct tm t = dt.get_tm();
+    BOOST_CHECK_EQUAL(t.tm_year, 2026 - 1900);
+    BOOST_CHECK_EQUAL(t.tm_mon, 0);
+    BOOST_CHECK_EQUAL(t.tm_mday, 8);
+    BOOST_CHECK_EQUAL(t.tm_hour, 12);
+    BOOST_CHECK_EQUAL(t.tm_min, 30);
+    BOOST_CHECK_EQUAL(t.tm_sec, 45);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_malformed_throws)
+{
+    BOOST_CHECK_THROW(Date_time(std::string("invalid")), Date_time::Malformed_iso8601);
+    BOOST_CHECK_THROW(Date_time(std::string("")), Date_time::Malformed_iso8601);
+    BOOST_CHECK_THROW(Date_time(std::string("2026")), Date_time::Malformed_iso8601);
+    BOOST_CHECK_THROW(Date_time(std::string("2026-01-08T12:30:45")), Date_time::Malformed_iso8601);  // Wrong length
+}
+
+BOOST_AUTO_TEST_CASE(datetime_to_string)
+{
+    Date_time dt(std::string("20260108T12:30:45"));
+    std::string str = dt.to_string();
+    BOOST_CHECK(str.find("2026") != std::string::npos);
+    BOOST_CHECK(str.find("12:30:45") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(binary_data_extended_tests)
+
+BOOST_AUTO_TEST_CASE(binary_from_data_extended)
+{
+    std::unique_ptr<Binary_data> bin(Binary_data::from_data("test data"));
+    BOOST_CHECK_EQUAL(bin->get_data(), "test data");
+}
+
+BOOST_AUTO_TEST_CASE(binary_from_base64_decode)
+{
+    // "SGVsbG8=" is base64 for "Hello"
+    std::unique_ptr<Binary_data> bin(Binary_data::from_base64("SGVsbG8="));
+    BOOST_CHECK_EQUAL(bin->get_data(), "Hello");
+}
+
+BOOST_AUTO_TEST_CASE(binary_get_base64_encode)
+{
+    std::unique_ptr<Binary_data> bin(Binary_data::from_data("Hello"));
+    std::string base64 = bin->get_base64();
+    BOOST_CHECK_EQUAL(base64, "SGVsbG8=");
+}
+
+BOOST_AUTO_TEST_CASE(binary_empty_data_extended)
+{
+    std::unique_ptr<Binary_data> bin(Binary_data::from_data(""));
+    BOOST_CHECK(bin->get_data().empty());
+    BOOST_CHECK(bin->get_base64().empty());
+}
+
+BOOST_AUTO_TEST_CASE(binary_roundtrip_extended)
+{
+    std::string original = "Test binary \x00\x01\x02 data";
+    std::unique_ptr<Binary_data> bin1(Binary_data::from_data(original));
+    std::string base64 = bin1->get_base64();
+    std::unique_ptr<Binary_data> bin2(Binary_data::from_base64(base64));
+    BOOST_CHECK_EQUAL(bin2->get_data(), original);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(struct_operations_extended)
+
+BOOST_AUTO_TEST_CASE(struct_insert_value_ptr)
+{
+    Struct s;
+    s.insert("key", Value_ptr(new Value(42)));
+    BOOST_CHECK(s.has_field("key"));
+    BOOST_CHECK_EQUAL(s["key"].get_int(), 42);
+}
+
+BOOST_AUTO_TEST_CASE(struct_iterator)
+{
+    Struct s;
+    s.insert("a", Value(1));
+    s.insert("b", Value(2));
+
+    int count = 0;
+    for (Struct::const_iterator it = s.begin(); it != s.end(); ++it) {
+        count++;
+    }
+    BOOST_CHECK_EQUAL(count, 2);
+}
+
+BOOST_AUTO_TEST_CASE(struct_find_missing_returns_end)
+{
+    Struct s;
+    s.insert("exists", Value(1));
+    BOOST_CHECK(s.find("missing") == s.end());
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(array_operations_extended)
+
+BOOST_AUTO_TEST_CASE(array_const_iterator)
+{
+    Array a;
+    a.push_back(Value(1));
+    a.push_back(Value(2));
+    a.push_back(Value(3));
+
+    const Array& ca = a;
+    int sum = 0;
+    for (Array::const_iterator it = ca.begin(); it != ca.end(); ++it) {
+        sum += (*it).get_int();
+    }
+    BOOST_CHECK_EQUAL(sum, 6);
+}
+
+BOOST_AUTO_TEST_CASE(array_index_access)
+{
+    Array a;
+    a.push_back(Value(10));
+    a.push_back(Value(20));
+
+    BOOST_CHECK_EQUAL(a[0].get_int(), 10);
+    BOOST_CHECK_EQUAL(a[1].get_int(), 20);
+}
+
+BOOST_AUTO_TEST_CASE(array_size_check)
+{
+    Array a;
+    BOOST_CHECK_EQUAL(a.size(), 0u);
+
+    a.push_back(Value(1));
+    BOOST_CHECK_EQUAL(a.size(), 1u);
+
+    a.push_back(Value(2));
+    BOOST_CHECK_EQUAL(a.size(), 2u);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
