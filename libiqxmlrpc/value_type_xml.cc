@@ -26,7 +26,8 @@ void Value_type_to_xml::do_visit_value(const Value_type& v)
 
 void Value_type_to_xml::do_visit_nil()
 {
-  XmlNode(builder_, "nil");
+  XmlNode nil_node(builder_, "nil");
+  (void)nil_node;  // RAII: destructor writes end tag
 }
 
 void Value_type_to_xml::do_visit_int(int val)

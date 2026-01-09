@@ -428,7 +428,7 @@ void Binary_data::encode() const
 }
 
 
-inline char Binary_data::get_idx( char c )
+/*static*/ inline char Binary_data::get_idx( char c )
 {
   if( c == '=' )
     throw End_of_data();
@@ -527,9 +527,9 @@ void Binary_data::apply_visitor(Value_type_visitor& v) const
 
 
 // ----------------------------------------------------------------------------
-Date_time::Date_time( const struct tm* t )
+Date_time::Date_time( const struct tm* t ):
+  tm_(*t)
 {
-  tm_ = *t;
 }
 
 

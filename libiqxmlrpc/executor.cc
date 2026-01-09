@@ -89,25 +89,25 @@ void Pool_executor_factory::Pool_thread::operator ()()
   Pool_executor_factory::Pool_thread* obj =
     static_cast<Pool_executor_factory::Pool_thread*>(this);
 
-  Pool_executor_factory* pool = obj->pool;
+  Pool_executor_factory* pool_ptr = obj->pool;
 
   for(;;)
   {
-    scoped_lock lk(pool->req_queue_lock);
+    scoped_lock lk(pool_ptr->req_queue_lock);
 
-    if (pool->req_queue.empty())
+    if (pool_ptr->req_queue.empty())
     {
-      pool->req_queue_cond.wait(lk);
+      pool_ptr->req_queue_cond.wait(lk);
 
-      if (pool->is_being_destructed())
+      if (pool_ptr->is_being_destructed())
         return;
 
-      if (pool->req_queue.empty())
+      if (pool_ptr->req_queue.empty())
         continue;
     }
 
-    Pool_executor* executor = pool->req_queue.front();
-    pool->req_queue.pop_front();
+    Pool_executor* executor = pool_ptr->req_queue.front();
+    pool_ptr->req_queue.pop_front();
     lk.unlock();
 
     executor->process_actual_execution();

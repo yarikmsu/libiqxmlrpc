@@ -97,7 +97,7 @@ Inet_addr::Impl::init_sockaddr() const
   IQXMLRPC_GETHOSTBYNAME(host.c_str());
   sa->sin_family = PF_INET;
   sa->sin_port = htons(port);
-  memcpy( (char*)&(sa->sin_addr), (char*)hent->h_addr, hent->h_length );
+  memcpy( static_cast<void*>(&(sa->sin_addr)), static_cast<const void*>(hent->h_addr), hent->h_length );
 }
 
 Inet_addr::Inet_addr( const std::string& host, int port ):

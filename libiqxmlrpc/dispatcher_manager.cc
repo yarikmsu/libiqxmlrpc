@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <deque>
+#include <iterator>
 #include <map>
 
 namespace iqxmlrpc {
@@ -58,10 +59,8 @@ Method* Default_method_dispatcher::do_create_method(const std::string& name)
 
 void Default_method_dispatcher::do_get_methods_list(Array& retval) const
 {
-  for (const auto& entry : fs)
-  {
-    retval.push_back(entry.first);
-  }
+  std::transform(fs.begin(), fs.end(), std::back_inserter(retval),
+    [](const Factory_map::value_type& entry) { return Value(entry.first); });
 }
 
 //
