@@ -1,8 +1,6 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
-#include <boost/foreach.hpp>
-
 #include "request.h"
 #include "request_parser.h"
 
@@ -35,7 +33,7 @@ dump_request(const Request& request)
 
   {
     XmlBuilder::Node params(writer, "params");
-    BOOST_FOREACH(const Value& v, request.get_params()) {
+    for (const Value& v : request.get_params()) {
       XmlBuilder::Node param(writer, "param");
       value_to_xml(writer, v);
     }
