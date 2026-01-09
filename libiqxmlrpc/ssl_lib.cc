@@ -194,6 +194,13 @@ struct Ctx::Impl {
     require_client_cert(false)
   {
   }
+
+  ~Impl()
+  {
+    if (ctx) {
+      SSL_CTX_free(ctx);
+    }
+  }
 };
 
 Ctx::Ctx( const std::string& cert_path, const std::string& key_path, bool client ):
