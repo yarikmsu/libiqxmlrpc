@@ -80,7 +80,7 @@ protected:
 
 class Parser {
 public:
-  Parser(const std::string& buf);
+  explicit Parser(const std::string& buf);
 
   void
   parse(BuilderBase& builder);

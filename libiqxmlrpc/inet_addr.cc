@@ -60,9 +60,9 @@ struct Inet_addr::Impl {
   std::string host;
   int port;
 
-  Impl( const SystemSockAddrIn& );
+  explicit Impl( const SystemSockAddrIn& );
   Impl( const std::string& host, int port );
-  Impl( int port );
+  explicit Impl( int port );
 
   void init_sockaddr() const;
 };

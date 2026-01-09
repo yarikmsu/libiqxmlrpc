@@ -19,23 +19,23 @@ class Http_server_connection:
   iqnet::Reactor_base* reactor = nullptr;
 
 public:
-  Http_server_connection( const iqnet::Socket& );
+  explicit Http_server_connection( const iqnet::Socket& );
 
   void set_reactor( iqnet::Reactor_base* r ) { reactor = r; }
 
-  void post_accept();
-  void finish();
+  void post_accept() override;
+  void finish() override;
 
-  void handle_input( bool& );
-  void handle_output( bool& );
+  void handle_input( bool& ) override;
+  void handle_output( bool& ) override;
 
 
-  bool catch_in_reactor() const { return true; }
-  void log_exception( const std::exception& );
-  void log_unknown_exception();
+  bool catch_in_reactor() const override { return true; }
+  void log_exception( const std::exception& ) override;
+  void log_unknown_exception() override;
 
 private:
-  virtual void do_schedule_response();
+  void do_schedule_response() override;
 };
 
 typedef Server_conn_factory<Http_server_connection> Http_conn_factory;

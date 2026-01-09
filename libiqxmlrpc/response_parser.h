@@ -13,14 +13,14 @@ namespace iqxmlrpc {
 
 class ResponseBuilder: public BuilderBase {
 public:
-  ResponseBuilder(Parser&);
+  explicit ResponseBuilder(Parser&);
 
   Response
   get();
 
 private:
-  virtual void
-  do_visit_element(const std::string&);
+  void
+  do_visit_element(const std::string&) override;
 
   void
   parse_ok();
