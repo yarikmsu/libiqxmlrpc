@@ -33,11 +33,11 @@ public:
 
   void set_firewall( iqnet::Firewall_base* );
 
-  void handle_input( bool& );
+  void handle_input( bool& ) override;
 
 protected:
-  void finish() {}
-  Socket::Handler get_handler() const { return sock.get_handler(); }
+  void finish() override {}
+  Socket::Handler get_handler() const override { return sock.get_handler(); }
 
   void accept();
   void listen();

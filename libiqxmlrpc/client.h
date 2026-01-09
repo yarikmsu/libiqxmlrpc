@@ -98,12 +98,12 @@ public:
     ctr(addr) {}
 
 private:
-  virtual void do_set_proxy(const iqnet::Inet_addr& addr)
+  void do_set_proxy(const iqnet::Inet_addr& addr) override
   {
     proxy_ctr = iqnet::Connector<Proxy_connection>(addr);
   }
 
-  virtual Client_connection* get_connection()
+  Client_connection* get_connection() override
   {
     if (proxy_ctr)
       return proxy_ctr->connect(timeout());
