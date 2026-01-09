@@ -1057,6 +1057,52 @@ BOOST_AUTO_TEST_CASE(struct_find_missing_returns_end)
     BOOST_CHECK(s.find("missing") == s.end());
 }
 
+BOOST_AUTO_TEST_CASE(struct_move_constructor)
+{
+    Struct a;
+    a.insert("x", Value(10));
+    a.insert("y", Value(20));
+    a.insert("z", Value(30));
+
+    Struct b(std::move(a));
+
+    // Moved-to struct should have the values
+    BOOST_CHECK_EQUAL(b.size(), 3u);
+    BOOST_CHECK(b.has_field("x"));
+    BOOST_CHECK(b.has_field("y"));
+    BOOST_CHECK(b.has_field("z"));
+    BOOST_CHECK_EQUAL(b["x"].get_int(), 10);
+    BOOST_CHECK_EQUAL(b["y"].get_int(), 20);
+    BOOST_CHECK_EQUAL(b["z"].get_int(), 30);
+
+    // Moved-from struct should be empty
+    BOOST_CHECK_EQUAL(a.size(), 0u);
+}
+
+BOOST_AUTO_TEST_CASE(struct_move_assignment)
+{
+    Struct a;
+    a.insert("key1", Value(100));
+    a.insert("key2", Value(200));
+
+    Struct b;
+    b.insert("old", Value(999));
+
+    b = std::move(a);
+
+    // Moved-to struct should have the values from a
+    BOOST_CHECK_EQUAL(b.size(), 2u);
+    BOOST_CHECK(b.has_field("key1"));
+    BOOST_CHECK(b.has_field("key2"));
+    BOOST_CHECK_EQUAL(b["key1"].get_int(), 100);
+    BOOST_CHECK_EQUAL(b["key2"].get_int(), 200);
+
+    // Moved-from struct has the old values from b (swap semantics)
+    BOOST_CHECK_EQUAL(a.size(), 1u);
+    BOOST_CHECK(a.has_field("old"));
+    BOOST_CHECK_EQUAL(a["old"].get_int(), 999);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE(array_operations_extended)
@@ -1096,6 +1142,46 @@ BOOST_AUTO_TEST_CASE(array_size_check)
 
     a.push_back(Value(2));
     BOOST_CHECK_EQUAL(a.size(), 2u);
+}
+
+BOOST_AUTO_TEST_CASE(array_move_constructor)
+{
+    Array a;
+    a.push_back(Value(1));
+    a.push_back(Value(2));
+    a.push_back(Value(3));
+
+    Array b(std::move(a));
+
+    // Moved-to array should have the values
+    BOOST_CHECK_EQUAL(b.size(), 3u);
+    BOOST_CHECK_EQUAL(b[0].get_int(), 1);
+    BOOST_CHECK_EQUAL(b[1].get_int(), 2);
+    BOOST_CHECK_EQUAL(b[2].get_int(), 3);
+
+    // Moved-from array should be empty
+    BOOST_CHECK_EQUAL(a.size(), 0u);
+}
+
+BOOST_AUTO_TEST_CASE(array_move_assignment)
+{
+    Array a;
+    a.push_back(Value(10));
+    a.push_back(Value(20));
+
+    Array b;
+    b.push_back(Value(100));
+
+    b = std::move(a);
+
+    // Moved-to array should have the values from a
+    BOOST_CHECK_EQUAL(b.size(), 2u);
+    BOOST_CHECK_EQUAL(b[0].get_int(), 10);
+    BOOST_CHECK_EQUAL(b[1].get_int(), 20);
+
+    // Moved-from array has the old values from b (swap semantics)
+    BOOST_CHECK_EQUAL(a.size(), 1u);
+    BOOST_CHECK_EQUAL(a[0].get_int(), 100);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
