@@ -44,6 +44,10 @@ iqxmlrpc_test(value-types-extended-test test_value_types_extended.cc)
 iqxmlrpc_test(method-dispatch-test test_method_dispatch.cc)
 iqxmlrpc_test(exceptions-test test_exceptions.cc)
 
+# Integration test (in-process server/client testing)
+iqxmlrpc_test(integration-test test_integration.cc methods.cc)
+set_tests_properties(integration-test PROPERTIES TIMEOUT 120)
+
 # Run tests automatically after build
 add_custom_target(check ALL
 	COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
