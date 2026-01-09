@@ -981,23 +981,213 @@ BOOST_AUTO_TEST_SUITE_END()
 // SSL/HTTPS Tests - covers ssl_lib.cc lines 104, 140, 258
 //
 // These tests verify SSL context creation and HTTPS client/server functionality.
-// The tests cover:
-//   - Line 104: SSL_get_ex_new_index in init_library
-//   - Line 140: iqxmlrpc_SSL_verify callback
-//   - Line 258: SSL_set_ex_data with verifier
+// Coverage:
+//   - Line 104: SSL_get_ex_new_index in init_library (ssl_client_only_context)
+//   - Line 140: iqxmlrpc_SSL_verify callback (https_handshake_with_verifier)
+//   - Line 258: SSL_set_ex_data with verifier (https_handshake_with_verifier)
 //
-// Note: Tests requiring certificates will skip if certs are not available.
+// The HTTPS handshake tests use an embedded self-signed certificate.
 //=============================================================================
 
 #include <fstream>
+#include <cstdio>
 
 namespace {
-// Check if test certificates are available
+
+// Embedded self-signed certificate for testing
+// Generated with: openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 36500 -nodes -subj "/CN=localhost"
+const char* EMBEDDED_TEST_CERT = R"(-----BEGIN CERTIFICATE-----
+MIIDCzCCAfOgAwIBAgIUXzkbleG5HOcIm3Ke/qrw3JCCCVMwDQYJKoZIhvcNAQEL
+BQAwFDESMBAGA1UEAwwJbG9jYWxob3N0MCAXDTI2MDEwOTIxMTYxNVoYDzIxMjUx
+MjE2MjExNjE1WjAUMRIwEAYDVQQDDAlsb2NhbGhvc3QwggEiMA0GCSqGSIb3DQEB
+AQUAA4IBDwAwggEKAoIBAQDWUSUBs2Am6ptXHZkz3zZAwzA06jF+r5PMCFmhf2ZY
+o54a0dUgh2XElgpo7saEWFNnt5EgTxJQpUCRHs7QKkB39/6itjg/4rmR7C7nXj1n
+q1jkYUXiPXlihkHwycXp4jUh0zgLFAtQNYBl6AajlsZcxkLUB+4pFxTmtCXuOX6E
+fh4iiougQgkzUL89dNC/+PViUOKkO3WxZ3ZcuLEaiyBEBfuqLH/YBKp45nIaFr8H
+iFyEx6Y5nuZ1grPDDbZZ4MXmdm+aC6OUNTrIYtSzaP2wO3BiJhLVshDB/cIDmYsX
+H80aB3zbrKWClTTAVxFgn/y83lNAIciP90XvDQSP59EDAgMBAAGjUzBRMB0GA1Ud
+DgQWBBQo6uxnhPB3W3xFzqQ42Xgzg//+wjAfBgNVHSMEGDAWgBQo6uxnhPB3W3xF
+zqQ42Xgzg//+wjAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQCa
+iBhA4uamOdZAulJQV3/VKOlqzCPyzokSwh+D7H2fgvJRf4dt4CvZYlFtM2iK7+EW
+h7wYNJ5qo4pq88/iAfDgIe8Vbpbr9IpwcHw1hLfVxqOys845Z4bXRrvFaE4GaaAa
+Nx+Zbr+asm0eL2w/df8HHcp78vHYZSDZL04skyv1Ybx1buoFY3G59kl/I2v7SRXi
+73m7JurSbDWaVXV9M2k/znSPifdx9bqOKHX8zX7liitHcSyVGG9DWl1yB+2iP0dM
+0eioGoqxoNt3Gws8wSieB11r2k5cfqcGFLbjEfV6YDenjRs2FB2xVfrmocBrbJ9V
+5ntzlSfNSe7ZowUs1202
+-----END CERTIFICATE-----
+)";
+
+const char* EMBEDDED_TEST_KEY = R"(-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDWUSUBs2Am6ptX
+HZkz3zZAwzA06jF+r5PMCFmhf2ZYo54a0dUgh2XElgpo7saEWFNnt5EgTxJQpUCR
+Hs7QKkB39/6itjg/4rmR7C7nXj1nq1jkYUXiPXlihkHwycXp4jUh0zgLFAtQNYBl
+6AajlsZcxkLUB+4pFxTmtCXuOX6Efh4iiougQgkzUL89dNC/+PViUOKkO3WxZ3Zc
+uLEaiyBEBfuqLH/YBKp45nIaFr8HiFyEx6Y5nuZ1grPDDbZZ4MXmdm+aC6OUNTrI
+YtSzaP2wO3BiJhLVshDB/cIDmYsXH80aB3zbrKWClTTAVxFgn/y83lNAIciP90Xv
+DQSP59EDAgMBAAECggEAUcqzIGSIUCHeOg+SPgE0j9/OQIuWax5v/gC70E4yTabX
++q1VNO5nkPCgNW7XNYAOCLm+ecGjoEKJEzlaPYi6hO6Q8CEx83PAVaf5OJS3Q57Z
+tINJK/BBKLBLby1aSonptCiLrXKvZKOehoXYLsumlZaWv5vtMSJdeDSNe07W8ZIL
+VxlKFsVANHPMP9wK/NIx2z0G+Qd/e8UJukuLccN5G+oL/oPfGdMtxY3onHlSQdL0
+X20v5dcbTKRwO+kYMK9nLz6ZF9sL/MDi3/AmlCyPQ87Vaz/LTw2t8JlSe9hqHoZ9
+hJat8c6KRnRvL6hhs3YFuXnh5uecs6SdsltXrf6UBQKBgQD0Bg6rP1OTv/BIFY3p
+CT8M/Eop49eM3d5jIkWGEo0LDZp6TVQ6geWIhTYXB24D7zzk/FlhUiWrYlCSJhjc
+NFff7ysdbZft0gVtYRddepEgN2JafJqs8R1+GoYubrxUcFz/v4qIkt8NXs54Z+J3
+TCQqIf8aEK0XO1gN3qlITzZS9wKBgQDg1dlMFDGrSUdu19vnXK85t/dQvroyrnKZ
+MyObUceSLSkYNbOJAplI48LMTVApmUccG370WNg/qGiZhBdw90UxdHLPdt3Ca/C5
+3wmGUNakg5bDfdFhmHsooQlh6wvbJ1SX3O9UApWDqLMstSaUZqppbVgjpbrHG9AV
+e/94Vo2jVQKBgQC7Ye9ftsgh+9CyOcL4QL5m5VC57Bi4NiMwMr/6XUJrS23lHn5g
+UyED/W70riLf6JT1LYYhAmiku2EtaQ3MAnG8JrcP6PkyiQTb4iOEB7trZrwiye4o
+gRppnEqPWz9JA+OWC+qAR2/6n2Oi9/riKtjWdbajuEyCO3K5a9LIEPOhLwKBgQCk
+P/Wn25TRgg4aTr2Kjq4/50JYjY0vGzwC6VYY0KyQAEfmNMz8yZY7ppAXel+WlDBb
+u0aKsSEBmEEZ7WLGlw3IbD63iynEL+DDmMm3gvTbaHpKRG8i8ib+7m4RR4n4xwnI
+i5GXeO/LKAIFJi2R+lKCBGyAVkFV1d6040olmm2MpQKBgBEkhuUdBaSkNBt8YJxM
+BU2PiriNuFw5UMWFRRcysMKO3oA9UWeXEHEX7z4jyThCmLl2+X0Q9KvAezhKdRjP
+H/+tEBbXrHM9aOHqPvhkMe6foDk3VZdXwiU/XO+gBidrsQVoHRuz3TA5xMYflvHg
+rK0fmiWyi5lQX70lb9kyDkqP
+-----END PRIVATE KEY-----
+)";
+
+// Write embedded cert/key to temp files and return their paths
+std::pair<std::string, std::string> create_temp_cert_files() {
+  std::string cert_path = "/tmp/iqxmlrpc_test_cert.pem";
+  std::string key_path = "/tmp/iqxmlrpc_test_key.pem";
+
+  std::ofstream cert_file(cert_path);
+  cert_file << EMBEDDED_TEST_CERT;
+  cert_file.close();
+
+  std::ofstream key_file(key_path);
+  key_file << EMBEDDED_TEST_KEY;
+  key_file.close();
+
+  return std::make_pair(cert_path, key_path);
+}
+
+// Verifier that tracks how many times it was called
+class TrackingVerifier : public iqnet::ssl::ConnectionVerifier {
+  mutable std::atomic<int> call_count_{0};
+
+  int do_verify(bool, X509_STORE_CTX*) const override {
+    ++call_count_;
+    return 1;  // Accept all
+  }
+
+public:
+  int get_call_count() const { return call_count_.load(); }
+  void reset() { call_count_ = 0; }
+};
+
+// HTTPS integration test fixture with embedded certificates
+class HttpsIntegrationFixture {
+protected:
+  std::unique_ptr<Https_server> server_;
+  std::unique_ptr<Executor_factory_base> exec_factory_;
+  boost::thread server_thread_;
+  boost::mutex ready_mutex_;
+  boost::condition_variable ready_cond_;
+  bool server_ready_ = false;
+  std::atomic<bool> server_running_{false};
+  int port_ = 19950;
+  iqnet::ssl::Ctx* saved_ctx_ = nullptr;
+  iqnet::ssl::Ctx* test_ctx_ = nullptr;
+  std::string temp_cert_path_;
+  std::string temp_key_path_;
+
+public:
+  HttpsIntegrationFixture() : saved_ctx_(iqnet::ssl::ctx) {}
+
+  ~HttpsIntegrationFixture() {
+    stop_server();
+    cleanup_ssl();
+    cleanup_temp_files();
+  }
+
+  bool setup_ssl_context() {
+    try {
+      auto paths = create_temp_cert_files();
+      temp_cert_path_ = paths.first;
+      temp_key_path_ = paths.second;
+
+      test_ctx_ = iqnet::ssl::Ctx::client_server(temp_cert_path_, temp_key_path_);
+      iqnet::ssl::ctx = test_ctx_;
+      return true;
+    } catch (...) {
+      return false;
+    }
+  }
+
+  void cleanup_ssl() {
+    iqnet::ssl::ctx = saved_ctx_;
+    if (test_ctx_) {
+      delete test_ctx_;
+      test_ctx_ = nullptr;
+    }
+  }
+
+  void cleanup_temp_files() {
+    if (!temp_cert_path_.empty()) std::remove(temp_cert_path_.c_str());
+    if (!temp_key_path_.empty()) std::remove(temp_key_path_.c_str());
+  }
+
+  void start_server(int port_offset = 0) {
+    port_ = 19950 + port_offset;
+
+    exec_factory_.reset(new Serial_executor_factory);
+
+    server_.reset(new Https_server(
+      Inet_addr("127.0.0.1", port_),
+      exec_factory_.get()));
+
+    register_user_methods(*server_);
+
+    server_running_ = true;
+    server_thread_ = boost::thread([this]() {
+      {
+        boost::mutex::scoped_lock lk(ready_mutex_);
+        server_ready_ = true;
+        ready_cond_.notify_one();
+      }
+      server_->work();
+      server_running_ = false;
+    });
+
+    boost::mutex::scoped_lock lk(ready_mutex_);
+    ready_cond_.timed_wait(lk,
+      boost::posix_time::seconds(5),
+      [this]{ return server_ready_; });
+
+    boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+  }
+
+  void stop_server() {
+    if (server_ && server_running_) {
+      server_->set_exit_flag();
+      server_->interrupt();
+      if (server_thread_.joinable()) {
+        server_thread_.timed_join(boost::posix_time::seconds(5));
+      }
+    }
+    server_.reset();
+    exec_factory_.reset();
+    server_ready_ = false;
+    server_running_ = false;
+  }
+
+  std::unique_ptr<Client_base> create_client() {
+    return std::unique_ptr<Client_base>(
+      new Client<Https_client_connection>(Inet_addr("127.0.0.1", port_)));
+  }
+
+  iqnet::ssl::Ctx* get_context() { return test_ctx_; }
+};
+
+// Check if external test certificates are available (for backward compat tests)
 bool ssl_certs_available() {
   std::ifstream cert("../tests/data/cert.pem");
   std::ifstream key("../tests/data/pk.pem");
   return cert.good() && key.good();
 }
+
 }
 
 BOOST_AUTO_TEST_SUITE(ssl_tests)
@@ -1142,6 +1332,44 @@ BOOST_AUTO_TEST_CASE(ssl_exception_types)
 
   iqnet::ssl::connection_close close_unclean(false);
   BOOST_CHECK(!close_unclean.is_clean());
+}
+
+// Test basic HTTPS client/server communication (without custom verifier)
+BOOST_FIXTURE_TEST_CASE(https_basic_communication, HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to set up SSL context with embedded certificates");
+
+  start_server(200);
+  auto client = create_client();
+
+  Response r = client->execute("echo", Value("https test"));
+
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), "https test");
+}
+
+// Test that TLS handshake invokes verifier callback
+// This test actually performs a TLS handshake and covers:
+// - ssl_lib.cc line 140 (iqxmlrpc_SSL_verify callback)
+// - ssl_lib.cc line 258 (SSL_set_ex_data in prepare_verify)
+BOOST_FIXTURE_TEST_CASE(https_handshake_triggers_verify, HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to set up SSL context with embedded certificates");
+
+  TrackingVerifier client_verifier;
+  get_context()->verify_server(&client_verifier);
+
+  start_server(201);
+  auto client = create_client();
+
+  Response r = client->execute("echo", Value("handshake test"));
+
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), "handshake test");
+  // Verify the callback was actually invoked during TLS handshake
+  BOOST_CHECK_GT(client_verifier.get_call_count(), 0);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

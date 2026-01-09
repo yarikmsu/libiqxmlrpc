@@ -279,8 +279,10 @@ exception::exception() throw():
 
 exception::exception( unsigned long err ) throw():
   ssl_err(err),
-  msg( ERR_reason_error_string(ssl_err) )
+  msg()
 {
+  const char* reason = ERR_reason_error_string(ssl_err);
+  msg = reason ? reason : "unknown error";
   msg.insert(0, "SSL: ");
 }
 
