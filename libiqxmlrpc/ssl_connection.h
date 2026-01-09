@@ -22,7 +22,7 @@ protected:
 
 public:
   explicit Connection( const Socket& sock );
-  ~Connection();
+  ~Connection() override;
 
   void shutdown();
   size_t send( const char*, size_t ) override;

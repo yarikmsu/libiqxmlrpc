@@ -21,14 +21,14 @@ public:
     reactor_->register_handler(this, Reactor_base::INPUT);
   }
 
-  ~Interrupter_connection()
+  ~Interrupter_connection() override
   {
     reactor_->unregister_handler(this);
   }
 
-  bool is_stopper() const { return true; }
+  bool is_stopper() const override { return true; }
 
-  void handle_input(bool& /* terminate */)
+  void handle_input(bool& /* terminate */) override
   {
     char nothing;
     recv(&nothing, 1);
@@ -43,7 +43,7 @@ public:
   Impl(const Impl&) = delete;
   Impl& operator=(const Impl&) = delete;
 
-  Impl(Reactor_base* reactor);
+  explicit Impl(Reactor_base* reactor);
   ~Impl() {}
 
   void make_interrupt();

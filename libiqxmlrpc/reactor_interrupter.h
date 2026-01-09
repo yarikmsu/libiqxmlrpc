@@ -18,7 +18,7 @@ public:
   Reactor_interrupter(const Reactor_interrupter&) = delete;
   Reactor_interrupter& operator=(const Reactor_interrupter&) = delete;
 
-  Reactor_interrupter(Reactor_base*);
+  explicit Reactor_interrupter(Reactor_base*);
   ~Reactor_interrupter();
 
   void make_interrupt();

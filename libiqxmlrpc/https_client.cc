@@ -18,11 +18,11 @@ namespace iqxmlrpc {
 
 class LIBIQXMLRPC_API Proxy_request_header: public http::Header {
 public:
-  Proxy_request_header( const iqnet::Inet_addr& connect_addr ):
+  explicit Proxy_request_header( const iqnet::Inet_addr& connect_addr ):
     addr_(connect_addr) {}
 
 private:
-  virtual std::string dump_head() const
+  std::string dump_head() const override
   {
     return
       "CONNECT "
