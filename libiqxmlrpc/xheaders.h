@@ -34,6 +34,6 @@ inline std::ostream& operator<<(std::ostream& os, const XHeaders& xheaders) {
 
 class LIBIQXMLRPC_API Error_xheader: public std::invalid_argument {
 public:
-  Error_xheader(const char* msg);
+  explicit Error_xheader(const char* msg);
 };
 }

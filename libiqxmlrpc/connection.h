@@ -24,9 +24,7 @@ protected:
 
 public:
   explicit Connection( const Socket& );
-  virtual ~Connection();
-
-  void finish() override;
+  ~Connection() override;
 
   virtual void post_accept() {}
   virtual void post_connect() {}

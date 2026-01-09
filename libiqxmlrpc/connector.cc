@@ -16,18 +16,18 @@ struct Connect_processor: public Event_handler {
   Reactor_base& reactor;
   Socket sock;
 
-  Connect_processor(Reactor_base& r):
+  explicit Connect_processor(Reactor_base& r):
     reactor(r)
   {
     sock.set_non_blocking(true);
   }
 
-  Socket::Handler get_handler() const
+  Socket::Handler get_handler() const override
   {
     return sock.get_handler();
   }
 
-  void handle_output( bool& terminate )
+  void handle_output( bool& terminate ) override
   {
     terminate = true;
     int err = sock.get_last_error();
