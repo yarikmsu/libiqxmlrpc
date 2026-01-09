@@ -37,7 +37,7 @@ private:
   virtual std::string decorate_uri() const;
 
   http::Packet_reader preader;
-  const Client_options* options;
+  const Client_options* options = nullptr;
   std::vector<char> read_buf_;
 };
 
