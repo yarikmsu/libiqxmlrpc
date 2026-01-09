@@ -21,19 +21,20 @@ exception_message(const std::string& prefix, bool use_errno, int myerrno)
 
     char buf[256];
     buf[255] = 0;
-    char* b = buf;
 
-    myerrno = myerrno ? myerrno : errno;
-
-#if !defined WIN32 && defined _GNU_SOURCE
-    b = strerror_r( myerrno, buf, sizeof(buf) - 1 );
-#elif !defined WIN32
-    strerror_r( myerrno, buf, sizeof(buf) - 1 );
-#else
+#if defined WIN32
     strerror_s( buf, sizeof(buf) - 1, WSAGetLastError() );
-#endif
-
+    retval += std::string(buf);
+#else
+    int err = myerrno ? myerrno : errno;
+#if defined _GNU_SOURCE
+    char* b = strerror_r( err, buf, sizeof(buf) - 1 );
     retval += std::string(b);
+#else
+    strerror_r( err, buf, sizeof(buf) - 1 );
+    retval += std::string(buf);
+#endif
+#endif
   }
 
   return retval;

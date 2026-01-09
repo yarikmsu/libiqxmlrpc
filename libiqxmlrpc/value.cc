@@ -96,7 +96,7 @@ Value::Value( double d ):
 {
 }
 
-Value::Value( std::string s ):
+Value::Value( const std::string& s ):
   value( new String(s) )
 {
 }
