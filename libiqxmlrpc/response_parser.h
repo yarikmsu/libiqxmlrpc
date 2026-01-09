@@ -30,7 +30,7 @@ private:
 
   StateMachine state_;
   std::optional<Value> ok_;
-  int fault_code_;
+  int fault_code_ = 0;
   std::optional<std::string> fault_str_;
 };
 

@@ -49,11 +49,11 @@ class LIBIQXMLRPC_API Reaction_connection: public ssl::Connection {
   Reactor_base* reactor;
 
   enum State { EMPTY, ACCEPTING, CONNECTING, READING, WRITING, SHUTDOWN };
-  State state;
+  State state = EMPTY;
 
-  char* recv_buf;
-  const char* send_buf;
-  size_t buf_len;
+  char* recv_buf = nullptr;
+  const char* send_buf = nullptr;
+  size_t buf_len = 0;
 
 public:
   Reaction_connection( const Socket&, Reactor_base* = 0 );

@@ -183,7 +183,7 @@ ConnectionVerifier::cert_finger_sha256(X509_STORE_CTX* ctx) const
 //
 
 struct Ctx::Impl {
-  SSL_CTX* ctx;
+  SSL_CTX* ctx = nullptr;
   ConnectionVerifier* server_verifier;
   ConnectionVerifier* client_verifier;
   bool require_client_cert;
