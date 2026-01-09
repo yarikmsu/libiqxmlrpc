@@ -13,7 +13,7 @@ namespace iqnet
 class LIBIQXMLRPC_API Null_lock {
 public:
   struct scoped_lock {
-    scoped_lock(Null_lock&) {}
+    explicit scoped_lock(Null_lock&) {}
     ~scoped_lock() {}
 
     void lock() {}
