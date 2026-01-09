@@ -34,9 +34,9 @@ public:
   //! Does nothing.
   Inet_addr() {}
 
-  Inet_addr( const struct sockaddr_in& );
+  explicit Inet_addr( const struct sockaddr_in& );
   Inet_addr( const std::string& host, int port = 0 );
-  Inet_addr( int port );
+  explicit Inet_addr( int port );
 
   virtual ~Inet_addr() {}
 

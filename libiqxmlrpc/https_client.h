@@ -24,11 +24,11 @@ class LIBIQXMLRPC_API Https_proxy_client_connection:
 public:
   Https_proxy_client_connection( const iqnet::Socket&, bool non_block_flag );
 
-  void handle_input( bool& );
-  void handle_output( bool& );
+  void handle_input( bool& ) override;
+  void handle_output( bool& ) override;
 
 protected:
-  http::Packet* do_process_session( const std::string& );
+  http::Packet* do_process_session( const std::string& ) override;
 
   void setup_tunnel();
 
@@ -53,19 +53,19 @@ public:
 
   Https_client_connection( const iqnet::Socket&, bool non_block_flag );
 
-  void post_connect()
+  void post_connect() override
   {
     set_reactor( reactor.get() );
     iqnet::ssl::Reaction_connection::post_connect();
   }
 
-  void connect_succeed();
-  void send_succeed( bool& );
-  void recv_succeed( bool&, size_t req_len, size_t real_len  );
+  void connect_succeed() override;
+  void send_succeed( bool& ) override;
+  void recv_succeed( bool&, size_t req_len, size_t real_len  ) override;
 
 protected:
   friend class Https_proxy_client_connection;
-  http::Packet* do_process_session( const std::string& );
+  http::Packet* do_process_session( const std::string& ) override;
 
 private:
   void reg_send_request();

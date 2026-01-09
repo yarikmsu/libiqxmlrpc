@@ -24,7 +24,7 @@ class LIBIQXMLRPC_API Exception: public std::runtime_error {
   int ex_code;
 
 public:
-  Exception( const std::string& i, int c = -32000 /*undefined error*/ ):
+  explicit Exception( const std::string& i, int c = -32000 /*undefined error*/ ):
     runtime_error( i ), ex_code(c) {}
 
   virtual int code() const { return ex_code; }
@@ -37,14 +37,14 @@ public:
 //! XML Parser error.
 class LIBIQXMLRPC_API Parse_error: public Exception {
 public:
-  Parse_error( const std::string& d ):
+  explicit Parse_error( const std::string& d ):
     Exception(std::string("Parser error. ") += d, -32700) {}
 };
 
 //! XML Parser error.
 class LIBIQXMLRPC_API XmlBuild_error: public Exception {
 public:
-  XmlBuild_error( const std::string& d ):
+  explicit XmlBuild_error( const std::string& d ):
     Exception(std::string("XML build error. ") += d, -32705) {}
 };
 
@@ -59,7 +59,7 @@ public:
   XML_RPC_violation():
     Exception("Server error. XML-RPC violation.", -32600) {}
 
-  XML_RPC_violation( const std::string& s ):
+  explicit XML_RPC_violation( const std::string& s ):
     Exception(std::string("Server error. XML-RPC violation: ") += s, -32600) {}
 };
 
@@ -67,7 +67,7 @@ public:
 //! Method object for unregistered name.
 class LIBIQXMLRPC_API Unknown_method: public Exception {
 public:
-  Unknown_method( const std::string& name ):
+  explicit Unknown_method( const std::string& name ):
     Exception((std::string("Server error. Method '") += name) += "' not found.", -32601) {}
 };
 

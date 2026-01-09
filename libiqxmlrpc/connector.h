@@ -12,7 +12,7 @@ class LIBIQXMLRPC_API Connector_base {
   Inet_addr peer_addr;
 
 public:
-  Connector_base( const iqnet::Inet_addr& peer );
+  explicit Connector_base( const iqnet::Inet_addr& peer );
   virtual ~Connector_base();
 
   //! Process connection.
@@ -26,14 +26,14 @@ private:
 template <class Conn_type>
 class Connector: public Connector_base {
 public:
-  Connector( const iqnet::Inet_addr& peer ):
+  explicit Connector( const iqnet::Inet_addr& peer ):
     Connector_base(peer)
   {
   }
 
 private:
-  virtual iqxmlrpc::Client_connection*
-  create_connection(const Socket& s)
+  iqxmlrpc::Client_connection*
+  create_connection(const Socket& s) override
   {
     Conn_type* c = new Conn_type( s, true );
     c->post_connect();
