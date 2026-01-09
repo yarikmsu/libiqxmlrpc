@@ -284,7 +284,7 @@ bool Reactor<Lock>::handle_events(Reactor_base::Timeout ms)
   if (handlers.empty())
     return false;
 
-  if (handlers.size() - num_stoppers <= 0)
+  if (handlers.size() <= num_stoppers)
     throw No_handlers();
 
   handle_user_events();

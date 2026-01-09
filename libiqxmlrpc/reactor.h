@@ -56,7 +56,7 @@ public:
     short           mask;
     short           revents;
 
-    HandlerState( Socket::Handler fd_ = 0 ):
+    explicit HandlerState( Socket::Handler fd_ = 0 ):
       fd(fd_), mask(0), revents(0) {}
 
     HandlerState( Socket::Handler fd_, Event_mask m ):

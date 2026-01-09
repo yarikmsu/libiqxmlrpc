@@ -129,7 +129,7 @@ class LIBIQXMLRPC_API Response_header: public Header {
 
 public:
   Response_header( Verification_level, const std::string& to_parse );
-  Response_header( int = 200, const std::string& = "OK" );
+  explicit Response_header( int = 200, const std::string& = "OK" );
 
   int code() const { return code_; }
   const std::string& phrase() const { return phrase_; }
