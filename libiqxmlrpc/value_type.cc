@@ -392,6 +392,9 @@ void Binary_data::encode() const
   const char* d = data.data();
   size_t dsz = data.length();
 
+  // Pre-allocate: base64 is 4/3 of original size, plus padding
+  base64.reserve((dsz * 4) / 3 + 4);
+
   for( size_t i = 0; i < dsz; i += 3 )
   {
     unsigned c = 0xff0000 & d[i] << 16;
@@ -449,7 +452,7 @@ inline char Binary_data::get_idx( char c )
 }
 
 
-inline void Binary_data::decode_four( const std::string& four )
+inline void Binary_data::decode_four( const char* four )
 {
   char c1 = four[0];
   char c2 = four[1];
@@ -479,22 +482,28 @@ void Binary_data::decode()
 {
   const char* d = base64.data();
   size_t dsz = base64.length();
-  std::string four;
+
+  // Pre-allocate: decoded is 3/4 of base64 size
+  data.reserve((dsz * 3) / 4);
+
+  // Use fixed-size buffer instead of string accumulator
+  char four[4];
+  size_t four_idx = 0;
 
   for( size_t i = 0; i < dsz; i++ )
   {
     if( isspace( d[i] ) )
       continue;
 
-    four += d[i];
-    if( four.length() == 4 )
+    four[four_idx++] = d[i];
+    if( four_idx == 4 )
     {
       decode_four( four );
-      four.erase();
+      four_idx = 0;
     }
   }
 
-  if( !four.empty() )
+  if( four_idx != 0 )
     throw Malformed_base64();
 }
 
