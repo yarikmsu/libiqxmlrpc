@@ -110,10 +110,12 @@ private:
 
 public:
   Array( const Array& );
+  Array( Array&& other ) noexcept : values(std::move(other.values)) {}
   Array() {}
   ~Array();
 
   Array& operator =( const Array& );
+  Array& operator =( Array&& other ) noexcept { swap(other); return *this; }
 
   void swap(Array&) throw();
   Array* clone() const;
@@ -231,10 +233,12 @@ public:
   typedef Value_stor::iterator iterator;
 
   Struct( const Struct& );
+  Struct( Struct&& other ) noexcept : values(std::move(other.values)) {}
   Struct() {}
   ~Struct();
 
   Struct& operator =( const Struct& );
+  Struct& operator =( Struct&& other ) noexcept { swap(other); return *this; }
 
   void swap(Struct&) throw();
   Struct* clone() const;
@@ -306,7 +310,7 @@ private:
   void encode() const;
 
   char get_idx( char );
-  void decode_four( const std::string& );
+  void decode_four( const char* four );
   void decode();
 };
 
