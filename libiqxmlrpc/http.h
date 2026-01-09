@@ -186,6 +186,9 @@ class Packet_reader {
   bool continue_sent_;
 
 public:
+  Packet_reader(const Packet_reader&) = delete;
+  Packet_reader& operator=(const Packet_reader&) = delete;
+
   Packet_reader():
     header(0),
     ver_level_(HTTP_CHECK_WEAK),
