@@ -53,7 +53,7 @@ public:
 //! HTTP/1.1 415 Unsupported media type
 class LIBIQXMLRPC_API Unsupported_content_type: public Error_response {
 public:
-  Unsupported_content_type(const std::string& wrong):
+  explicit Unsupported_content_type(const std::string& wrong):
     Error_response( "Unsupported media type '" + wrong + "'", 415 ) {}
 };
 

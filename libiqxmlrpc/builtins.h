@@ -18,10 +18,10 @@ class LIBIQXMLRPC_API List_methods: public Method {
   Method_dispatcher_manager* disp_manager_;
 
 public:
-  List_methods(Method_dispatcher_manager*);
+  explicit List_methods(Method_dispatcher_manager*);
 
 private:
-  void execute( const Param_list& params, Value& response );
+  void execute( const Param_list& params, Value& response ) override;
 };
 
 } // namespace builtins

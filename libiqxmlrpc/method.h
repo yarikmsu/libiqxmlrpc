@@ -36,7 +36,7 @@ public:
   Server_feedback():
     server_(0) {}
 
-  Server_feedback(Server* s):
+  explicit Server_feedback(Server* s):
     server_(s) {}
 
   void set_exit_flag();
@@ -141,11 +141,11 @@ private:
 //! \see Method_function
 class LIBIQXMLRPC_API Method_function_adapter: public Method {
 public:
-  Method_function_adapter(Method_function f):
+  explicit Method_function_adapter(Method_function f):
     function(f) {}
 
 private:
-  void execute(const Param_list& params, Value& result)
+  void execute(const Param_list& params, Value& result) override
   {
     function(this, params, result);
   }
@@ -170,7 +170,7 @@ public:
 template <class T>
 class Method_factory: public Method_factory_base {
 public:
-  T* create() { return new T(); }
+  T* create() override { return new T(); }
 };
 
 
@@ -178,10 +178,10 @@ public:
 template <>
 class Method_factory<Method_function_adapter>: public Method_factory_base {
 public:
-  Method_factory(Method_function fn):
+  explicit Method_factory(Method_function fn):
     function(fn) {}
 
-  Method* create() { return new Method_function_adapter(function); }
+  Method* create() override { return new Method_function_adapter(function); }
 
 private:
   Method_function function;

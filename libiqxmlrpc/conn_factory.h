@@ -21,7 +21,7 @@ public:
 template <class Conn_type>
 class Serial_conn_factory: public Accepted_conn_factory {
 public:
-  void create_accepted( const Socket& sock )
+  void create_accepted( const Socket& sock ) override
   {
     Conn_type* c = new Conn_type( sock );
     post_create( c );

@@ -39,13 +39,13 @@ public:
   Reactor();
   ~Reactor() {}
 
-  void register_handler( Event_handler*, Event_mask );
-  void unregister_handler( Event_handler*, Event_mask );
-  void unregister_handler( Event_handler* );
+  void register_handler( Event_handler*, Event_mask ) override;
+  void unregister_handler( Event_handler*, Event_mask ) override;
+  void unregister_handler( Event_handler* ) override;
 
-  void fake_event( Event_handler*, Event_mask );
+  void fake_event( Event_handler*, Event_mask ) override;
 
-  bool handle_events( Timeout ms = -1 );
+  bool handle_events( Timeout ms = -1 ) override;
 
 private:
   typedef typename Lock::scoped_lock        scoped_lock;
