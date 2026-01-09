@@ -20,11 +20,6 @@ Connection::~Connection()
 }
 
 
-void Connection::finish()
-{
-}
-
-
 size_t Connection::send( const char* data, size_t len )
 {
   return sock.send( data, len );
