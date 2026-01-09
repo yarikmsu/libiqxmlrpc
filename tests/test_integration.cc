@@ -742,4 +742,236 @@ BOOST_FIXTURE_TEST_CASE(unicode_string, IntegrationFixture)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+//=============================================================================
+// Firewall Tests
+//=============================================================================
+BOOST_AUTO_TEST_SUITE(firewall_tests)
+
+BOOST_FIXTURE_TEST_CASE(firewall_allows_connection, IntegrationFixture)
+{
+  start_server(1, 80);
+  AllowAllFirewall fw;
+  server().set_firewall(&fw);
+
+  auto client = create_client();
+  Response r = client->execute("echo", Value("allowed"));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), "allowed");
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+//=============================================================================
+// Interceptor Tests
+//=============================================================================
+BOOST_AUTO_TEST_SUITE(interceptor_tests)
+
+// Simple interceptor that counts calls
+class CountingInterceptor : public Interceptor {
+public:
+  static int call_count;
+
+  void process(Method* m, const Param_list& params, Value& result) override {
+    ++call_count;
+    yield(m, params, result);
+  }
+};
+
+int CountingInterceptor::call_count = 0;
+
+BOOST_FIXTURE_TEST_CASE(interceptor_invoked, IntegrationFixture)
+{
+  start_server(1, 85);
+  CountingInterceptor::call_count = 0;
+  server().push_interceptor(new CountingInterceptor());
+
+  auto client = create_client();
+  Response r1 = client->execute("echo", Value("test1"));
+  Response r2 = client->execute("echo", Value("test2"));
+
+  BOOST_CHECK(!r1.is_fault());
+  BOOST_CHECK(!r2.is_fault());
+  BOOST_CHECK_EQUAL(CountingInterceptor::call_count, 2);
+}
+
+// Interceptor that modifies the result
+class ModifyingInterceptor : public Interceptor {
+public:
+  void process(Method* m, const Param_list& params, Value& result) override {
+    yield(m, params, result);
+    // Append suffix to string results
+    if (result.is_string()) {
+      result = Value(result.get_string() + "_modified");
+    }
+  }
+};
+
+BOOST_FIXTURE_TEST_CASE(interceptor_modifies_result, IntegrationFixture)
+{
+  start_server(1, 86);
+  server().push_interceptor(new ModifyingInterceptor());
+
+  auto client = create_client();
+  Response r = client->execute("echo", Value("test"));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), "test_modified");
+}
+
+// Chained interceptors
+BOOST_FIXTURE_TEST_CASE(chained_interceptors, IntegrationFixture)
+{
+  start_server(1, 87);
+  CountingInterceptor::call_count = 0;
+  server().push_interceptor(new CountingInterceptor());
+  server().push_interceptor(new CountingInterceptor());
+
+  auto client = create_client();
+  Response r = client->execute("echo", Value("test"));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(CountingInterceptor::call_count, 2);  // Both interceptors called
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+//=============================================================================
+// Error Path Tests
+//=============================================================================
+BOOST_AUTO_TEST_SUITE(error_path_tests)
+
+BOOST_FIXTURE_TEST_CASE(method_throws_fault, IntegrationFixture)
+{
+  start_server(1, 90);
+  auto client = create_client();
+
+  Response r = client->execute("error_method", Value(""));
+  BOOST_CHECK(r.is_fault());
+  BOOST_CHECK_EQUAL(r.fault_code(), 123);
+}
+
+BOOST_FIXTURE_TEST_CASE(method_returns_complex_fault, IntegrationFixture)
+{
+  start_server(1, 91);
+  auto client = create_client();
+
+  // error_method throws Fault(123, "My fault")
+  Response r = client->execute("error_method", Value("test"));
+  BOOST_CHECK(r.is_fault());
+  std::string fault_str = r.fault_string();
+  BOOST_CHECK(fault_str.find("fault") != std::string::npos ||
+              fault_str.find("Fault") != std::string::npos);
+}
+
+BOOST_FIXTURE_TEST_CASE(sequential_errors, IntegrationFixture)
+{
+  start_server(1, 92);
+  auto client = create_client();
+
+  // Multiple error calls should all work
+  for (int i = 0; i < 3; ++i) {
+    Response r = client->execute("error_method", Value(i));
+    BOOST_CHECK(r.is_fault());
+  }
+}
+
+BOOST_FIXTURE_TEST_CASE(error_then_success, IntegrationFixture)
+{
+  start_server(1, 93);
+  auto client = create_client();
+
+  Response r1 = client->execute("error_method", Value(""));
+  BOOST_CHECK(r1.is_fault());
+
+  // Server should still work after error
+  Response r2 = client->execute("echo", Value("still working"));
+  BOOST_CHECK(!r2.is_fault());
+  BOOST_CHECK_EQUAL(r2.value().get_string(), "still working");
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+//=============================================================================
+// Server Configuration Tests
+//=============================================================================
+BOOST_AUTO_TEST_SUITE(server_config_tests)
+
+BOOST_FIXTURE_TEST_CASE(verification_level_weak, IntegrationFixture)
+{
+  start_server(1, 95);
+  server().set_verification_level(http::HTTP_CHECK_WEAK);
+
+  auto client = create_client();
+  Response r = client->execute("echo", Value("weak"));
+  BOOST_CHECK(!r.is_fault());
+}
+
+BOOST_FIXTURE_TEST_CASE(verification_level_strict, IntegrationFixture)
+{
+  start_server(1, 96);
+  server().set_verification_level(http::HTTP_CHECK_STRICT);
+
+  auto client = create_client();
+  Response r = client->execute("echo", Value("strict"));
+  BOOST_CHECK(!r.is_fault());
+}
+
+BOOST_FIXTURE_TEST_CASE(get_reactor, IntegrationFixture)
+{
+  start_server(1, 97);
+
+  // Verify reactor is accessible
+  BOOST_CHECK(server().get_reactor() != nullptr);
+
+  auto client = create_client();
+  Response r = client->execute("echo", Value("reactor_test"));
+  BOOST_CHECK(!r.is_fault());
+}
+
+BOOST_FIXTURE_TEST_CASE(max_request_size_boundary, IntegrationFixture)
+{
+  start_server(1, 98);
+  server().set_max_request_sz(10000);  // 10KB limit
+
+  auto client = create_client();
+
+  // Just under the limit should work
+  std::string data(500, 'x');
+  Response r = client->execute("echo", Value(data));
+  BOOST_CHECK(!r.is_fault());
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+//=============================================================================
+// Connection Reuse Tests
+//=============================================================================
+BOOST_AUTO_TEST_SUITE(connection_reuse_tests)
+
+BOOST_FIXTURE_TEST_CASE(many_requests_same_client, IntegrationFixture)
+{
+  start_server(1, 100);
+  auto client = create_client();
+  client->set_keep_alive(true);
+
+  // Many requests on same connection
+  for (int i = 0; i < 20; ++i) {
+    Response r = client->execute("echo", Value(i));
+    BOOST_CHECK(!r.is_fault());
+    BOOST_CHECK_EQUAL(r.value().get_int(), i);
+  }
+}
+
+BOOST_FIXTURE_TEST_CASE(alternating_keep_alive, IntegrationFixture)
+{
+  start_server(1, 101);
+
+  for (int i = 0; i < 5; ++i) {
+    auto client = create_client();
+    client->set_keep_alive(i % 2 == 0);
+    Response r = client->execute("echo", Value(i));
+    BOOST_CHECK(!r.is_fault());
+  }
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
 // vim:ts=2:sw=2:et
