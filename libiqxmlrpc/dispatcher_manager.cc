@@ -20,16 +20,16 @@ class Default_method_dispatcher: public Method_dispatcher_base {
   Factory_map fs;
 
 public:
-  ~Default_method_dispatcher();
+  ~Default_method_dispatcher() override;
 
   void register_method(const std::string& name, Method_factory_base*);
 
 private:
-  virtual Method*
-  do_create_method(const std::string&);
+  Method*
+  do_create_method(const std::string&) override;
 
-  virtual void
-  do_get_methods_list(Array&) const;
+  void
+  do_get_methods_list(Array&) const override;
 };
 
 Default_method_dispatcher::~Default_method_dispatcher()
@@ -73,13 +73,13 @@ class System_method_factory: public Method_factory_base {
   Method_dispatcher_manager* dmgr_;
 
 public:
-  System_method_factory(Method_dispatcher_manager* dmgr):
+  explicit System_method_factory(Method_dispatcher_manager* dmgr):
     dmgr_(dmgr)
   {
   }
 
 private:
-  T* create()
+  T* create() override
   {
     return new T(dmgr_);
   }

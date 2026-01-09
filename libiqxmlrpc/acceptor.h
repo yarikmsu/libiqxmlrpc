@@ -29,7 +29,7 @@ class LIBIQXMLRPC_API Acceptor: public Event_handler {
 
 public:
   Acceptor( const iqnet::Inet_addr& bind_addr, Accepted_conn_factory*, Reactor_base* );
-  virtual ~Acceptor();
+  ~Acceptor() override;
 
   void set_firewall( iqnet::Firewall_base* );
 

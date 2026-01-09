@@ -99,7 +99,7 @@ BuilderBase::do_visit_text(const std::string&)
 
 class Parser::Impl {
 public:
-  Impl(const std::string& str):
+  explicit Impl(const std::string& str):
     buf(str),
     pushed_back(false)
   {
