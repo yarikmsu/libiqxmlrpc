@@ -37,7 +37,7 @@ public:
   Reactor& operator=(const Reactor&) = delete;
 
   Reactor();
-  ~Reactor() {}
+  ~Reactor() override {}
 
   void register_handler( Event_handler*, Event_mask ) override;
   void unregister_handler( Event_handler*, Event_mask ) override;
