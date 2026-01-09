@@ -1,4 +1,4 @@
-find_package(Boost 1.41.0 COMPONENTS unit_test_framework program_options thread)
+find_package(Boost 1.41.0 COMPONENTS unit_test_framework program_options thread chrono)
 
 include_directories(${OPENSSL_INCLUDE_DIR} ${LIBXML2_INCLUDE_DIR} ${Boost_INCLUDE_DIR} ${PROJECT_SOURCE_DIR})
 
@@ -43,6 +43,10 @@ iqxmlrpc_test(inet-addr-test test_inet_addr.cc)
 iqxmlrpc_test(value-types-extended-test test_value_types_extended.cc)
 iqxmlrpc_test(method-dispatch-test test_method_dispatch.cc)
 iqxmlrpc_test(exceptions-test test_exceptions.cc)
+
+# Integration test (in-process server/client testing)
+iqxmlrpc_test(integration-test test_integration.cc methods.cc)
+set_tests_properties(integration-test PROPERTIES TIMEOUT 120)
 
 # Run tests automatically after build
 add_custom_target(check ALL
