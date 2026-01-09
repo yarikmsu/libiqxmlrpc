@@ -742,6 +742,207 @@ BOOST_AUTO_TEST_CASE(response_fault_with_string_omit_tag)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+BOOST_AUTO_TEST_SUITE(parser_state_machine_tests)
+
+BOOST_AUTO_TEST_CASE(parse_empty_int_with_default)
+{
+    Value::set_default_int(42);
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse><params><param><value><i4></i4></value></param></params></methodResponse>";
+    Response resp = parse_response(xml);
+    BOOST_CHECK(resp.value().is_int());
+    BOOST_CHECK_EQUAL(resp.value().get_int(), 42);
+    Value::drop_default_int();
+}
+
+BOOST_AUTO_TEST_CASE(parse_empty_int64_with_default)
+{
+    Value::set_default_int64(9876543210LL);
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse><params><param><value><i8></i8></value></param></params></methodResponse>";
+    Response resp = parse_response(xml);
+    BOOST_CHECK(resp.value().is_int64());
+    BOOST_CHECK_EQUAL(resp.value().get_int64(), 9876543210LL);
+    Value::drop_default_int64();
+}
+
+BOOST_AUTO_TEST_CASE(parse_empty_int_without_default_throws)
+{
+    Value::drop_default_int();
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse><params><param><value><i4></i4></value></param></params></methodResponse>";
+    BOOST_CHECK_THROW(parse_response(xml), XML_RPC_violation);
+}
+
+BOOST_AUTO_TEST_CASE(parse_empty_int64_without_default_throws)
+{
+    Value::drop_default_int64();
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse><params><param><value><i8></i8></value></param></params></methodResponse>";
+    BOOST_CHECK_THROW(parse_response(xml), XML_RPC_violation);
+}
+
+BOOST_AUTO_TEST_CASE(parse_empty_binary_value)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse><params><param><value><base64></base64></value></param></params></methodResponse>";
+    Response resp = parse_response(xml);
+    BOOST_CHECK(resp.value().is_binary());
+    BOOST_CHECK(resp.value().get_binary().get_data().empty());
+}
+
+BOOST_AUTO_TEST_CASE(parse_empty_value_tag)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse><params><param><value></value></param></params></methodResponse>";
+    Response resp = parse_response(xml);
+    BOOST_CHECK(resp.value().is_string());
+    BOOST_CHECK(resp.value().get_string().empty());
+}
+
+BOOST_AUTO_TEST_CASE(parse_struct_with_empty_value_member)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse><params><param><value>"
+        "<struct><member><name>key</name><value></value></member></struct>"
+        "</value></param></params></methodResponse>";
+    Response resp = parse_response(xml);
+    BOOST_CHECK(resp.value().is_struct());
+    BOOST_CHECK(resp.value()["key"].is_string());
+    BOOST_CHECK(resp.value()["key"].get_string().empty());
+}
+
+BOOST_AUTO_TEST_CASE(parse_array_with_empty_value)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse><params><param><value>"
+        "<array><data><value></value><value><i4>42</i4></value></data></array>"
+        "</value></param></params></methodResponse>";
+    Response resp = parse_response(xml);
+    BOOST_CHECK(resp.value().is_array());
+    BOOST_CHECK_EQUAL(resp.value().size(), 2u);
+    BOOST_CHECK(resp.value()[0].is_string());
+    BOOST_CHECK_EQUAL(resp.value()[1].get_int(), 42);
+}
+
+BOOST_AUTO_TEST_CASE(parse_deeply_nested_struct)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse><params><param><value>"
+        "<struct><member><name>l1</name><value>"
+        "<struct><member><name>l2</name><value>"
+        "<struct><member><name>l3</name><value><string>deep</string></value></member></struct>"
+        "</value></member></struct>"
+        "</value></member></struct>"
+        "</value></param></params></methodResponse>";
+    Response resp = parse_response(xml);
+    BOOST_CHECK_EQUAL(resp.value()["l1"]["l2"]["l3"].get_string(), "deep");
+}
+
+BOOST_AUTO_TEST_CASE(parse_struct_multiple_members)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse><params><param><value>"
+        "<struct>"
+        "<member><name>a</name><value><i4>1</i4></value></member>"
+        "<member><name>b</name><value><i4>2</i4></value></member>"
+        "<member><name>c</name><value><i4>3</i4></value></member>"
+        "</struct>"
+        "</value></param></params></methodResponse>";
+    Response resp = parse_response(xml);
+    BOOST_CHECK_EQUAL(resp.value()["a"].get_int(), 1);
+    BOOST_CHECK_EQUAL(resp.value()["b"].get_int(), 2);
+    BOOST_CHECK_EQUAL(resp.value()["c"].get_int(), 3);
+}
+
+BOOST_AUTO_TEST_CASE(dump_request_with_all_types)
+{
+    Param_list params;
+    params.push_back(Value(42));
+    params.push_back(Value(static_cast<int64_t>(123456789012LL)));
+    params.push_back(Value(3.14));
+    params.push_back(Value(true));
+    params.push_back(Value("test"));
+    params.push_back(Value(Nil()));
+    Request req("test.allTypes", params);
+    std::string xml = dump_request(req);
+    BOOST_CHECK(xml.find("<i4>42</i4>") != std::string::npos);
+    BOOST_CHECK(xml.find("<i8>123456789012</i8>") != std::string::npos);
+    BOOST_CHECK(xml.find("<boolean>1</boolean>") != std::string::npos);
+    BOOST_CHECK(xml.find("<nil/>") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(dump_request_with_nested_struct)
+{
+    Struct inner;
+    inner.insert("nk", Value("nv"));
+    Struct outer;
+    outer.insert("inner", Value(inner));
+    Param_list params;
+    params.push_back(Value(outer));
+    Request req("test.nested", params);
+    std::string xml = dump_request(req);
+    BOOST_CHECK(xml.find("<name>inner</name>") != std::string::npos);
+    BOOST_CHECK(xml.find("<name>nk</name>") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(dump_request_with_binary)
+{
+    std::unique_ptr<Binary_data> bin(Binary_data::from_data("bin"));
+    Param_list params;
+    params.push_back(Value(*bin));
+    Request req("test.bin", params);
+    std::string xml = dump_request(req);
+    BOOST_CHECK(xml.find("<base64>") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(dump_request_with_datetime)
+{
+    Date_time dt(std::string("20260108T12:30:45"));
+    Param_list params;
+    params.push_back(Value(dt));
+    Request req("test.dt", params);
+    std::string xml = dump_request(req);
+    BOOST_CHECK(xml.find("<dateTime.iso8601>20260108T12:30:45</dateTime.iso8601>") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(parse_empty_boolean_throws)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse><params><param><value><boolean></boolean></value></param></params></methodResponse>";
+    BOOST_CHECK_THROW(parse_response(xml), XML_RPC_violation);
+}
+
+BOOST_AUTO_TEST_CASE(parse_empty_double_throws)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse><params><param><value><double></double></value></param></params></methodResponse>";
+    BOOST_CHECK_THROW(parse_response(xml), XML_RPC_violation);
+}
+
+BOOST_AUTO_TEST_CASE(parse_empty_datetime_throws)
+{
+    // Empty datetime causes XML_RPC_violation at parsing level
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse><params><param><value><dateTime.iso8601></dateTime.iso8601></value></param></params></methodResponse>";
+    BOOST_CHECK_THROW(parse_response(xml), XML_RPC_violation);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
 BOOST_AUTO_TEST_SUITE(error_handling_tests)
 
 BOOST_AUTO_TEST_CASE(parse_malformed_xml_throws)
