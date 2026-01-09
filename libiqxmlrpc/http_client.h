@@ -30,11 +30,11 @@ public:
 
   Http_client_connection( const iqnet::Socket&, bool non_block );
 
-  void handle_input( bool& );
-  void handle_output( bool& );
+  void handle_input( bool& ) override;
+  void handle_output( bool& ) override;
 
 protected:
-  http::Packet* do_process_session( const std::string& );
+  http::Packet* do_process_session( const std::string& ) override;
 };
 
 //! XML-RPC \b HTTP PROXY client connection.
@@ -47,7 +47,7 @@ public:
     Http_client_connection( s, non_block ) {}
 
 private:
-  virtual std::string decorate_uri() const;
+  std::string decorate_uri() const override;
 };
 
 } // namespace iqxmlrpc

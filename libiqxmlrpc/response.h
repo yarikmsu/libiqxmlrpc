@@ -27,7 +27,7 @@ LIBIQXMLRPC_API std::string dump_response( const Response& );
 //! XML-RPC response.
 class LIBIQXMLRPC_API Response {
 public:
-  Response( Value* );
+  explicit Response( Value* );
   Response( int fault_code, const std::string& fault_string );
 
   //! Returns response value or throws iqxmlrpc::Fault in case of fault.

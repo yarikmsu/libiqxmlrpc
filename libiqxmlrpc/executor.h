@@ -95,15 +95,15 @@ public:
   Serial_executor( Method* m, Server* s, Server_connection* c ):
     Executor( m, s, c ) {}
 
-  void execute( const Param_list& );
+  void execute( const Param_list& ) override;
 };
 
 
 //! Factory class for Serial_executor.
 class LIBIQXMLRPC_API Serial_executor_factory: public Executor_factory_base {
 public:
-  Executor* create( Method* m, Server* s, Server_connection* c );
-  iqnet::Reactor_base* create_reactor();
+  Executor* create( Method* m, Server* s, Server_connection* c ) override;
+  iqnet::Reactor_base* create_reactor() override;
 };
 
 #ifdef _MSC_VER
@@ -120,7 +120,7 @@ public:
   Pool_executor( Pool_executor_factory*, Method*, Server*, Server_connection* );
   ~Pool_executor();
 
-  void execute( const Param_list& );
+  void execute( const Param_list& ) override;
   void process_actual_execution();
 };
 
@@ -141,11 +141,11 @@ class LIBIQXMLRPC_API Pool_executor_factory: public Executor_factory_base {
   boost::mutex  destructor_lock;
 
 public:
-  Pool_executor_factory(unsigned num_threads);
+  explicit Pool_executor_factory(unsigned num_threads);
   ~Pool_executor_factory();
 
-  Executor* create( Method* m, Server* s, Server_connection* c );
-  iqnet::Reactor_base* create_reactor();
+  Executor* create( Method* m, Server* s, Server_connection* c ) override;
+  iqnet::Reactor_base* create_reactor() override;
 
   //! Add some threads to the pool.
   void add_threads(unsigned num);

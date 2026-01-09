@@ -21,17 +21,17 @@ protected:
   SSL *ssl;
 
 public:
-  Connection( const Socket& sock );
+  explicit Connection( const Socket& sock );
   ~Connection();
 
   void shutdown();
-  size_t send( const char*, size_t );
-  size_t recv( char*, size_t );
+  size_t send( const char*, size_t ) override;
+  size_t recv( char*, size_t ) override;
 
   //! Does ssl_accept()
-  void post_accept();
+  void post_accept() override;
   //! Does ssl_connect()
-  void post_connect();
+  void post_connect() override;
 
 protected:
   //! Performs SSL accepting
@@ -64,10 +64,10 @@ public:
     reactor = r;
   }
 
-  void post_accept();
-  void post_connect();
-  void handle_input( bool& );
-  void handle_output( bool& );
+  void post_accept() override;
+  void post_connect() override;
+  void handle_input( bool& ) override;
+  void handle_output( bool& ) override;
 
 private:
   void switch_state( bool& terminate );
@@ -75,8 +75,8 @@ private:
   size_t try_recv();
 
 protected:
-  void ssl_accept();
-  void ssl_connect();
+  void ssl_accept() override;
+  void ssl_connect() override;
   //! Returns true if shutdown already performed.
   bool reg_shutdown();
   void reg_accept();

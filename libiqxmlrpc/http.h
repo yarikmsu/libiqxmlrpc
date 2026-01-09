@@ -119,7 +119,7 @@ public:
   void set_authinfo(const std::string& user, const std::string& password);
 
 private:
-  virtual std::string dump_head() const;
+  std::string dump_head() const override;
 };
 
 //! HTTP response's header.
@@ -137,7 +137,7 @@ public:
 
 private:
   std::string current_date() const;
-  virtual std::string dump_head() const;
+  std::string dump_head() const override;
 };
 
 #ifdef _MSC_VER
@@ -233,7 +233,7 @@ public:
   Malformed_packet():
     Exception( "Malformed HTTP packet received.") {}
 
-  Malformed_packet(const std::string& problem_domain):
+  explicit Malformed_packet(const std::string& problem_domain):
     Exception( "Malformed HTTP packet received (" + problem_domain + ")." ) {}
 };
 
