@@ -307,7 +307,7 @@ private:
   void add_base64_char( int idx ) const;
   void encode() const;
 
-  char get_idx( char );
+  static char get_idx( char );
   void decode_four( const char* four );
   void decode();
 };

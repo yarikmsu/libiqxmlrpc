@@ -29,6 +29,7 @@ private:
   Value_type* value;
 
 public:
+  // cppcheck-suppress noExplicitConstructor
   Value( Value_type* );
   Value( const Value& );
   Value( Nil );
@@ -36,7 +37,7 @@ public:
   Value( int64_t );
   Value( bool );
   Value( double );
-  Value( std::string );
+  Value( const std::string& );
   Value( const char* );
   Value( const Binary_data& );
   Value( const Date_time& );
