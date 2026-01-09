@@ -13,7 +13,7 @@ namespace iqxmlrpc {
 
 class ValueBuilderBase: public BuilderBase {
 public:
-  ValueBuilderBase(Parser& parser, bool expect_text = false);
+  explicit ValueBuilderBase(Parser& parser, bool expect_text = false);
 
   Value_type*
   result()
@@ -27,17 +27,17 @@ protected:
 
 class ValueBuilder: public ValueBuilderBase {
 public:
-  ValueBuilder(Parser& parser);
+  explicit ValueBuilder(Parser& parser);
 
 private:
-  virtual void
-  do_visit_element(const std::string&);
+  void
+  do_visit_element(const std::string&) override;
 
-  virtual void
-  do_visit_element_end(const std::string&);
+  void
+  do_visit_element_end(const std::string&) override;
 
-  virtual void
-  do_visit_text(const std::string&);
+  void
+  do_visit_text(const std::string&) override;
 
   StateMachine state_;
 };

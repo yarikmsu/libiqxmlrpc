@@ -114,7 +114,7 @@ class Array::Array_inserter {
   Array::Val_vector* vv;
 
 public:
-  Array_inserter( Array::Val_vector* v ): vv(v) {}
+  explicit Array_inserter( Array::Val_vector* v ): vv(v) {}
 
   void operator ()( const Value& v )
   {
@@ -203,7 +203,7 @@ class Struct::Struct_inserter
   Struct::Value_stor* vs;
 
 public:
-  Struct_inserter( Struct::Value_stor* v ): vs(v) {}
+  explicit Struct_inserter( Struct::Value_stor* v ): vs(v) {}
 
   void operator ()( const std::pair<std::string, Value*>& vp )
   {

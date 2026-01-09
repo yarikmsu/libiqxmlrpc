@@ -122,7 +122,7 @@ class LIBIQXMLRPC_API Pool_executor: public Executor {
 
 public:
   Pool_executor( Pool_executor_factory*, Method*, Server*, Server_connection* );
-  ~Pool_executor();
+  ~Pool_executor() override;
 
   void execute( const Param_list& ) override;
   void process_actual_execution();
@@ -146,7 +146,7 @@ class LIBIQXMLRPC_API Pool_executor_factory: public Executor_factory_base {
 
 public:
   explicit Pool_executor_factory(unsigned num_threads);
-  ~Pool_executor_factory();
+  ~Pool_executor_factory() override;
 
   Executor* create( Method* m, Server* s, Server_connection* c ) override;
   iqnet::Reactor_base* create_reactor() override;
