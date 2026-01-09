@@ -29,6 +29,7 @@ private:
   Value_type* value;
 
 public:
+  // cppcheck-suppress noExplicitConstructor
   Value( Value_type* );
   Value( const Value& );
   Value( Nil );
