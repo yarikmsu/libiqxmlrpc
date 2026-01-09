@@ -113,18 +113,15 @@ jobs:
 
     - name: Generate coverage report
       run: |
-        echo "=== Coverage data files ==="
-        find . -name "*.gcda" | head -20
-        echo ""
         echo "=== Capturing coverage ==="
-        lcov --capture --directory . --output-file coverage.info --ignore-errors empty,gcov,mismatch,negative
-        lcov --remove coverage.info '/usr/*' '*/tests/*' '*/boost/*' --output-file coverage.info --ignore-errors empty,unused,mismatch,negative
+        lcov --capture --directory . --output-file coverage.info --ignore-errors empty,gcov,mismatch,negative --rc lcov_branch_coverage=0
+        lcov --remove coverage.info '/usr/*' '*/tests/*' '*/boost/*' --output-file coverage.info --ignore-errors empty,unused,mismatch,negative --rc lcov_branch_coverage=0
         echo ""
         echo "=== Coverage Summary ==="
-        lcov --summary coverage.info --ignore-errors empty
+        lcov --summary coverage.info --ignore-errors empty --rc lcov_branch_coverage=0
         echo ""
-        echo "=== Coverage by File ==="
-        lcov --list coverage.info --ignore-errors empty
+        echo "=== Per-file coverage (from gcov) ==="
+        gcov -n build/libiqxmlrpc/CMakeFiles/iqxmlrpc.dir/*.gcda 2>/dev/null | grep -E "^File|^Lines" | paste - - | grep "libiqxmlrpc/" | sed 's/File .libiqxmlrpc\///' | sed "s/'$//" | column -t || true
 
     - name: Upload to Codecov
       uses: codecov/codecov-action@v4
