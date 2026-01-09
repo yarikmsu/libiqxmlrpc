@@ -117,8 +117,8 @@ jobs:
         find . -name "*.gcda" | head -20
         echo ""
         echo "=== Capturing coverage ==="
-        lcov --capture --directory . --output-file coverage.info --ignore-errors empty,gcov,mismatch
-        lcov --remove coverage.info '/usr/*' '*/tests/*' '*/boost/*' --output-file coverage.info --ignore-errors empty,unused,mismatch
+        lcov --capture --directory . --output-file coverage.info --ignore-errors empty,gcov,mismatch,negative
+        lcov --remove coverage.info '/usr/*' '*/tests/*' '*/boost/*' --output-file coverage.info --ignore-errors empty,unused,mismatch,negative
         echo ""
         echo "=== Coverage Summary ==="
         lcov --summary coverage.info --ignore-errors empty
