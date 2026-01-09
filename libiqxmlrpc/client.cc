@@ -61,7 +61,7 @@ public:
   }
 
 private:
-  Client_connection* create_connection(Client_base& client)
+  static Client_connection* create_connection(Client_base& client)
   {
     return client.get_connection();
   }

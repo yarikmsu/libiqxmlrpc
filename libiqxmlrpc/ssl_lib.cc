@@ -101,7 +101,7 @@ init_library()
     CRYPTO_set_id_callback(&openssl_id_function);
 #endif
 
-  iqxmlrpc_ssl_data_idx = SSL_get_ex_new_index(0, (void*)"iqxmlrpc verifier", NULL, NULL, NULL);
+  iqxmlrpc_ssl_data_idx = SSL_get_ex_new_index(0, const_cast<void*>(static_cast<const void*>("iqxmlrpc verifier")), NULL, NULL, NULL);
 }
 
 //
@@ -137,7 +137,7 @@ int
 iqxmlrpc_SSL_verify(int prev_ok, X509_STORE_CTX* ctx)
 {
   SSL* ssl = reinterpret_cast<SSL*>(X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
-  ConnectionVerifier* v = reinterpret_cast<ConnectionVerifier*>(SSL_get_ex_data(ssl, iqxmlrpc_ssl_data_idx));
+  const ConnectionVerifier* v = reinterpret_cast<const ConnectionVerifier*>(SSL_get_ex_data(ssl, iqxmlrpc_ssl_data_idx));
   return v->verify(prev_ok, ctx);
 }
 
@@ -255,7 +255,7 @@ Ctx::prepare_verify(SSL* ssl, bool server)
 
   if (v) {
     SSL_set_verify(ssl, mode, iqxmlrpc_SSL_verify);
-    SSL_set_ex_data(ssl, iqxmlrpc_ssl_data_idx, (void*)v);
+    SSL_set_ex_data(ssl, iqxmlrpc_ssl_data_idx, const_cast<void*>(static_cast<const void*>(v)));
   } else {
     SSL_set_verify(ssl, mode, 0);
   }

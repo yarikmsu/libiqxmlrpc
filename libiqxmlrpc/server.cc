@@ -207,8 +207,8 @@ void Server::schedule_execute( http::Packet* pkt, Server_connection* conn )
   {
     log_err_msg( e.what() );
     std::unique_ptr<Executor> executor_to_delete(executor);
-    http::Packet *pkt = new http::Packet(e);
-    conn->schedule_response( pkt );
+    http::Packet *err_pkt = new http::Packet(e);
+    conn->schedule_response( err_pkt );
   }
   catch( const iqxmlrpc::Exception& e )
   {
