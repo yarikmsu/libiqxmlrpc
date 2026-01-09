@@ -73,7 +73,7 @@ public:
 };
 
 // Free function for Method_function_adapter test
-void test_function(Method* m, const Param_list& params, Value& result) {
+void test_function(Method* /*m*/, const Param_list& params, Value& result) {
     result = static_cast<int>(params.size());
 }
 
