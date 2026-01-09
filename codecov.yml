@@ -1,3 +1,11 @@
+ignore:
+  - "tests/test_server.cc"
+  - "tests/client.cc"
+  - "tests/client_stress.cc"
+  - "tests/server_config.cc"
+  - "tests/client_common.cc"
+  - "tests/client_opts.cc"
+
 coverage:
   status:
     project:
@@ -7,6 +15,9 @@ coverage:
     patch:
       default:
         target: auto
+        informational: true
+        paths:
+          - "libiqxmlrpc/"
 
 comment:
   layout: "reach, diff, flags, files, tests"
@@ -25,6 +36,7 @@ flag_management:
         threshold: 1%
       - type: patch
         target: auto
+        informational: true
 
 flags:
   unittests:

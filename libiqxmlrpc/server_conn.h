@@ -33,7 +33,7 @@ protected:
   bool keep_alive;
 
 public:
-  Server_connection( const iqnet::Inet_addr& );
+  explicit Server_connection( const iqnet::Inet_addr& );
   virtual ~Server_connection() = 0;
 
   const iqnet::Inet_addr& get_peer_addr() const { return peer_addr; }
