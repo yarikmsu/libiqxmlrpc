@@ -70,12 +70,10 @@ iqnet::Reactor_base* Serial_executor_factory::create_reactor()
 // ----------------------------------------------------------------------------
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
 class Pool_executor_factory::Pool_thread {
-  unsigned id;
   Pool_executor_factory* pool;
 
 public:
-  Pool_thread( unsigned id_, Pool_executor_factory* pool_ ):
-    id(id_),
+  Pool_thread( unsigned, Pool_executor_factory* pool_ ):
     pool(pool_)
   {
   }

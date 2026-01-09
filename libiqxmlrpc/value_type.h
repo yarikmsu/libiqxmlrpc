@@ -49,8 +49,6 @@ public:
 //! XML-RPC extension: Nil type.
 /*! \see http://ontosys.com/xml-rpc/extensions.html */
 class LIBIQXMLRPC_API Nil: public Value_type {
-  int nope;
-
 public:
   Value_type* clone() const;
   const std::string& type_name() const;

@@ -64,9 +64,9 @@ void echo_user(
 }
 
 void error_method(
-  iqxmlrpc::Method* m,
+  iqxmlrpc::Method* /*m*/,
   const iqxmlrpc::Param_list&,
-  iqxmlrpc::Value& retval )
+  iqxmlrpc::Value& /*retval*/ )
 {
   BOOST_TEST_MESSAGE("error_method method invoked.");
   throw iqxmlrpc::Fault(123, "My fault");
