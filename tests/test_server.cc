@@ -117,11 +117,11 @@ Test_server::Test_server(const Test_server_config& conf):
   {
     namespace ssl = iqnet::ssl;
     ssl::ctx = ssl::Ctx::server_only("data/cert.pem", "data/pk.pem");
-    impl_.reset(new Https_server(conf.port, ef_.get()));
+    impl_.reset(new Https_server(iqnet::Inet_addr(conf.port), ef_.get()));
   }
   else
   {
-    impl_.reset(new Http_server(conf.port, ef_.get()));
+    impl_.reset(new Http_server(iqnet::Inet_addr(conf.port), ef_.get()));
   }
 
   impl_->push_interceptor(new CallCountingInterceptor);

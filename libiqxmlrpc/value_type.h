@@ -50,9 +50,9 @@ public:
 /*! \see http://ontosys.com/xml-rpc/extensions.html */
 class LIBIQXMLRPC_API Nil: public Value_type {
 public:
-  Value_type* clone() const;
-  const std::string& type_name() const;
-  void apply_visitor(Value_type_visitor&) const;
+  Value_type* clone() const override;
+  const std::string& type_name() const override;
+  void apply_visitor(Value_type_visitor&) const override;
 };
 
 
@@ -63,11 +63,11 @@ protected:
   T value_;
 
 public:
-  Scalar( const T& t ): value_(t) {}
-  Scalar<T>* clone() const { return new Scalar<T>(value_); }
+  explicit Scalar( const T& t ): value_(t) {}
+  Scalar<T>* clone() const override { return new Scalar<T>(value_); }
 
-  void apply_visitor(Value_type_visitor&) const;
-  const std::string& type_name() const;
+  void apply_visitor(Value_type_visitor&) const override;
+  const std::string& type_name() const override;
 
   const T& value() const { return value_; }
   T&       value()       { return value_; }
@@ -116,9 +116,9 @@ public:
   Array& operator =( Array&& other ) noexcept { swap(other); return *this; }
 
   void swap(Array&) throw();
-  Array* clone() const;
-  const std::string& type_name() const;
-  void apply_visitor(Value_type_visitor&) const;
+  Array* clone() const override;
+  const std::string& type_name() const override;
+  void apply_visitor(Value_type_visitor&) const override;
 
   size_t size() const { return values.size(); }
 
@@ -172,7 +172,7 @@ private:
   Array::Val_vector::const_iterator i;
 
 public:
-  const_iterator( Array::Val_vector::const_iterator i_ ):
+  const_iterator( Array::Val_vector::const_iterator i_ ):  // NOLINT(google-explicit-constructor)
     i(i_) {}
   ~const_iterator() {}
 
@@ -215,7 +215,7 @@ public:
   //! to access structure's unexistent member.
   class No_field: public Exception {
   public:
-    No_field( const std::string& f ):
+    explicit No_field( const std::string& f ):
       Exception( "Struct: field '" + f + "' not exist." ) {}
   };
 
@@ -239,9 +239,9 @@ public:
   Struct& operator =( Struct&& other ) noexcept { swap(other); return *this; }
 
   void swap(Struct&) throw();
-  Struct* clone() const;
-  const std::string& type_name() const;
-  void apply_visitor(Value_type_visitor&) const;
+  Struct* clone() const override;
+  const std::string& type_name() const override;
+  void apply_visitor(Value_type_visitor&) const override;
 
   size_t size() const;
   bool has_field( const std::string& ) const;
@@ -295,9 +295,9 @@ public:
   //! Get raw data.
   const std::string& get_data() const;
 
-  Value_type* clone() const;
-  const std::string& type_name() const;
-  void apply_visitor( Value_type_visitor& ) const;
+  Value_type* clone() const override;
+  const std::string& type_name() const override;
+  void apply_visitor( Value_type_visitor& ) const override;
 
 private:
   class End_of_data {};
@@ -328,16 +328,16 @@ private:
   mutable std::string cache;
 
 public:
-  Date_time( const struct tm* );
+  explicit Date_time( const struct tm* );
   explicit Date_time( const std::string& dateTime_iso8601 );
   explicit Date_time( bool localtime );
 
   const struct tm& get_tm() const { return tm_; }
   const std::string& to_string() const;
 
-  Value_type* clone() const;
-  const std::string& type_name() const;
-  void apply_visitor(Value_type_visitor&) const;
+  Value_type* clone() const override;
+  const std::string& type_name() const override;
+  void apply_visitor(Value_type_visitor&) const override;
 };
 
 } // namespace iqxmlrpc

@@ -23,10 +23,10 @@ protected:
   Socket sock;
 
 public:
-  Connection( const Socket& );
+  explicit Connection( const Socket& );
   virtual ~Connection();
 
-  void finish();
+  void finish() override;
 
   virtual void post_accept() {}
   virtual void post_connect() {}
@@ -36,7 +36,7 @@ public:
     return sock.get_peer_addr();
   }
 
-  Socket::Handler get_handler() const
+  Socket::Handler get_handler() const override
   {
     return sock.get_handler();
   }
