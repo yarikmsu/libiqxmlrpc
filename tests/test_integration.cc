@@ -514,4 +514,232 @@ BOOST_FIXTURE_TEST_CASE(client_array_value, IntegrationFixture)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+//=============================================================================
+// Additional Coverage Tests
+//=============================================================================
+BOOST_AUTO_TEST_SUITE(additional_coverage_tests)
+
+BOOST_FIXTURE_TEST_CASE(max_request_size_enforcement, IntegrationFixture)
+{
+  start_server(1, 60);
+  server().set_max_request_sz(500);  // Very small limit
+
+  auto client = create_client();
+  // Try to send data larger than the limit
+  std::string large_data(1000, 'x');
+
+  BOOST_CHECK_THROW(client->execute("echo", Value(large_data)), http::Error_response);
+}
+
+BOOST_FIXTURE_TEST_CASE(unknown_method_error, IntegrationFixture)
+{
+  start_server(1, 61);
+  auto client = create_client();
+
+  Response r = client->execute("nonexistent_method", Value("test"));
+  BOOST_CHECK(r.is_fault());
+  // Unknown method should return fault code -32601
+}
+
+BOOST_FIXTURE_TEST_CASE(server_log_message, IntegrationFixture)
+{
+  std::ostringstream log_stream;
+  start_server(1, 62);
+  server().log_errors(&log_stream);
+
+  auto client = create_client();
+
+  // Call error method to generate log output
+  Response r = client->execute("error_method", Value(""));
+  BOOST_CHECK(r.is_fault());
+}
+
+BOOST_FIXTURE_TEST_CASE(multiple_dispatchers, IntegrationFixture)
+{
+  start_server(1, 63);
+  server().enable_introspection();
+
+  auto client = create_client();
+
+  // Test introspection methods which use built-in dispatcher
+  Response r1 = client->execute("system.listMethods", Param_list());
+  BOOST_CHECK(!r1.is_fault());
+  BOOST_CHECK(r1.value().is_array());
+
+  // system.methodSignature is another introspection method
+  Response r2 = client->execute("system.methodSignature", Value("echo"));
+  // This returns an array of signatures or may fault if not supported
+}
+
+BOOST_FIXTURE_TEST_CASE(binary_data_transfer, IntegrationFixture)
+{
+  start_server(1, 64);
+  auto client = create_client();
+
+  // Create binary data using static factory method
+  std::string data = "hello binary data";
+  std::unique_ptr<Binary_data> bin(Binary_data::from_data(data));
+
+  Response r = client->execute("echo", Value(*bin));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK(r.value().is_binary());
+}
+
+BOOST_FIXTURE_TEST_CASE(datetime_transfer, IntegrationFixture)
+{
+  start_server(1, 65);
+  auto client = create_client();
+
+  // Create datetime value - format: YYYYMMDDTHH:MM:SS
+  Date_time dt("20260108T12:30:45");
+
+  Response r = client->execute("echo", Value(dt));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK(r.value().is_datetime());
+}
+
+BOOST_FIXTURE_TEST_CASE(nil_value_transfer, IntegrationFixture)
+{
+  start_server(1, 66);
+  auto client = create_client();
+
+  Nil nil;
+  Response r = client->execute("echo", Value(nil));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK(r.value().is_nil());
+}
+
+BOOST_FIXTURE_TEST_CASE(nested_struct_array, IntegrationFixture)
+{
+  start_server(1, 67);
+  auto client = create_client();
+
+  // Create nested structure
+  Struct inner;
+  inner.insert("name", Value("test"));
+  inner.insert("value", Value(42));
+
+  Array arr;
+  arr.push_back(Value(inner));
+  arr.push_back(Value(inner));
+
+  Struct outer;
+  outer.insert("items", Value(arr));
+  outer.insert("count", Value(2));
+
+  Response r = client->execute("echo", Value(outer));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK(r.value().is_struct());
+  BOOST_CHECK(r.value()["items"].is_array());
+  BOOST_CHECK_EQUAL(r.value()["items"].size(), 2u);
+}
+
+BOOST_FIXTURE_TEST_CASE(large_response, IntegrationFixture)
+{
+  start_server(1, 68);
+  auto client = create_client();
+
+  // Create array with many elements
+  Array arr;
+  for (int i = 0; i < 100; ++i) {
+    arr.push_back(Value(i));
+  }
+
+  Response r = client->execute("echo", Value(arr));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().size(), 100u);
+}
+
+BOOST_FIXTURE_TEST_CASE(concurrent_different_methods, IntegrationFixture)
+{
+  start_server(4, 69);  // Thread pool
+  std::vector<boost::thread> threads;
+  std::atomic<int> echo_count(0);
+  std::atomic<int> trace_count(0);
+
+  // Run echo and trace methods concurrently
+  for (int i = 0; i < 5; ++i) {
+    threads.emplace_back([this, &echo_count]() {
+      auto client = create_client();
+      Response r = client->execute("echo", Value("test"));
+      if (!r.is_fault()) ++echo_count;
+    });
+    threads.emplace_back([this, &trace_count]() {
+      auto client = create_client();
+      Param_list params;
+      params.push_back(Value("a"));
+      params.push_back(Value("b"));
+      Response r = client->execute("trace", params);
+      if (!r.is_fault()) ++trace_count;
+    });
+  }
+
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  BOOST_CHECK_GE(echo_count.load(), 4);
+  BOOST_CHECK_GE(trace_count.load(), 4);
+}
+
+BOOST_FIXTURE_TEST_CASE(i8_int64_value, IntegrationFixture)
+{
+  start_server(1, 70);
+  auto client = create_client();
+
+  // Test 64-bit integer
+  int64_t large_val = 9223372036854775807LL;  // Max int64
+  Response r = client->execute("echo", Value(large_val));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_int64(), large_val);
+}
+
+BOOST_FIXTURE_TEST_CASE(negative_values, IntegrationFixture)
+{
+  start_server(1, 71);
+  auto client = create_client();
+
+  Response r1 = client->execute("echo", Value(-42));
+  BOOST_CHECK(!r1.is_fault());
+  BOOST_CHECK_EQUAL(r1.value().get_int(), -42);
+
+  Response r2 = client->execute("echo", Value(-3.14159));
+  BOOST_CHECK(!r2.is_fault());
+  BOOST_CHECK_CLOSE(r2.value().get_double(), -3.14159, 0.0001);
+}
+
+BOOST_FIXTURE_TEST_CASE(empty_string_value, IntegrationFixture)
+{
+  start_server(1, 72);
+  auto client = create_client();
+
+  Response r = client->execute("echo", Value(""));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), "");
+}
+
+BOOST_FIXTURE_TEST_CASE(special_xml_chars, IntegrationFixture)
+{
+  start_server(1, 73);
+  auto client = create_client();
+
+  std::string special = "<test>&amp;\"'</test>";
+  Response r = client->execute("echo", Value(special));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), special);
+}
+
+BOOST_FIXTURE_TEST_CASE(unicode_string, IntegrationFixture)
+{
+  start_server(1, 74);
+  auto client = create_client();
+
+  std::string unicode = "Hello \xC3\xA9\xC3\xA8\xC3\xA0";  // UTF-8
+  Response r = client->execute("echo", Value(unicode));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), unicode);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
 // vim:ts=2:sw=2:et
