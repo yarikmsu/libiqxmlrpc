@@ -1499,4 +1499,299 @@ BOOST_AUTO_TEST_CASE(struct_insert_rvalue)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+//=============================================================================
+// Additional coverage tests for value_type.cc edge cases
+//=============================================================================
+
+BOOST_AUTO_TEST_SUITE(value_type_edge_cases)
+
+// Test Struct self-assignment
+BOOST_AUTO_TEST_CASE(struct_self_assignment)
+{
+    Struct s;
+    s.insert("key", Value(42));
+
+    // Self-assignment should be a no-op
+    Struct* ptr = &s;
+    *ptr = s;
+
+    BOOST_CHECK_EQUAL(s.size(), 1u);
+    BOOST_CHECK_EQUAL(s["key"].get_int(), 42);
+}
+
+// Test Array self-assignment
+BOOST_AUTO_TEST_CASE(array_self_assignment)
+{
+    Array a;
+    a.push_back(Value(1));
+    a.push_back(Value(2));
+
+    // Self-assignment should be a no-op
+    Array* ptr = &a;
+    *ptr = a;
+
+    BOOST_CHECK_EQUAL(a.size(), 2u);
+    BOOST_CHECK_EQUAL(a[0].get_int(), 1);
+    BOOST_CHECK_EQUAL(a[1].get_int(), 2);
+}
+
+// Test Struct::erase on non-existent key (should be no-op)
+BOOST_AUTO_TEST_CASE(struct_erase_nonexistent)
+{
+    Struct s;
+    s.insert("key", Value(42));
+
+    // Erasing non-existent key should not throw
+    BOOST_CHECK_NO_THROW(s.erase("nonexistent"));
+    BOOST_CHECK_EQUAL(s.size(), 1u);
+}
+
+// Test Struct::clear
+BOOST_AUTO_TEST_CASE(struct_clear)
+{
+    Struct s;
+    s.insert("a", Value(1));
+    s.insert("b", Value(2));
+    s.insert("c", Value(3));
+
+    BOOST_CHECK_EQUAL(s.size(), 3u);
+
+    s.clear();
+
+    BOOST_CHECK_EQUAL(s.size(), 0u);
+    BOOST_CHECK(!s.has_field("a"));
+}
+
+// Test Array::clear
+BOOST_AUTO_TEST_CASE(array_clear)
+{
+    Array a;
+    a.push_back(Value(1));
+    a.push_back(Value(2));
+    a.push_back(Value(3));
+
+    BOOST_CHECK_EQUAL(a.size(), 3u);
+
+    a.clear();
+
+    BOOST_CHECK_EQUAL(a.size(), 0u);
+}
+
+// Test Struct operator[] with non-existent key throws
+BOOST_AUTO_TEST_CASE(struct_subscript_throws_no_field)
+{
+    Struct s;
+    s.insert("exists", Value(42));
+
+    BOOST_CHECK_THROW(s["nonexistent"], Struct::No_field);
+
+    // Check const version too
+    const Struct& cs = s;
+    BOOST_CHECK_THROW(cs["nonexistent"], Struct::No_field);
+}
+
+// Test Array swap
+BOOST_AUTO_TEST_CASE(array_swap)
+{
+    Array a, b;
+    a.push_back(Value(1));
+    b.push_back(Value(2));
+    b.push_back(Value(3));
+
+    a.swap(b);
+
+    BOOST_CHECK_EQUAL(a.size(), 2u);
+    BOOST_CHECK_EQUAL(b.size(), 1u);
+    BOOST_CHECK_EQUAL(a[0].get_int(), 2);
+    BOOST_CHECK_EQUAL(b[0].get_int(), 1);
+}
+
+// Test Struct swap
+BOOST_AUTO_TEST_CASE(struct_swap)
+{
+    Struct a, b;
+    a.insert("x", Value(1));
+    b.insert("y", Value(2));
+    b.insert("z", Value(3));
+
+    a.swap(b);
+
+    BOOST_CHECK_EQUAL(a.size(), 2u);
+    BOOST_CHECK_EQUAL(b.size(), 1u);
+    BOOST_CHECK(a.has_field("y"));
+    BOOST_CHECK(b.has_field("x"));
+}
+
+// Test Binary_data get_base64 lazy encoding
+BOOST_AUTO_TEST_CASE(binary_lazy_encoding)
+{
+    // Create from raw data (no base64 yet)
+    std::unique_ptr<Binary_data> bin(Binary_data::from_data("hello"));
+
+    // First call to get_base64 should encode
+    const std::string& b64_1 = bin->get_base64();
+    BOOST_CHECK(!b64_1.empty());
+
+    // Second call should return cached value
+    const std::string& b64_2 = bin->get_base64();
+    BOOST_CHECK_EQUAL(&b64_1, &b64_2);  // Same object (cached)
+}
+
+// Test Date_time with local time constructor
+BOOST_AUTO_TEST_CASE(datetime_local_time)
+{
+    // Create with local time
+    Date_time dt_local(true);
+
+    // Should produce valid string
+    const std::string& s = dt_local.to_string();
+    BOOST_CHECK_EQUAL(s.length(), 17u);
+    BOOST_CHECK_EQUAL(s[8], 'T');
+}
+
+// Test Date_time with UTC constructor
+BOOST_AUTO_TEST_CASE(datetime_utc_time)
+{
+    // Create with UTC
+    Date_time dt_utc(false);
+
+    // Should produce valid string
+    const std::string& s = dt_utc.to_string();
+    BOOST_CHECK_EQUAL(s.length(), 17u);
+    BOOST_CHECK_EQUAL(s[8], 'T');
+}
+
+// Test Date_time to_string caching
+BOOST_AUTO_TEST_CASE(datetime_to_string_caching)
+{
+    // Note: Must use std::string explicitly, otherwise the string literal
+    // converts to bool (standard conversion) instead of std::string (user-defined)
+    Date_time dt(std::string("20230615T12:30:45"));
+
+    // First call computes the string
+    const std::string& s1 = dt.to_string();
+
+    // Second call returns cached string
+    const std::string& s2 = dt.to_string();
+
+    BOOST_CHECK_EQUAL(&s1, &s2);  // Same object (cached)
+    BOOST_CHECK_EQUAL(s1, "20230615T12:30:45");
+}
+
+// Test Nil type
+BOOST_AUTO_TEST_CASE(nil_type_operations)
+{
+    Nil nil;
+
+    // Check type name
+    BOOST_CHECK_EQUAL(nil.type_name(), "nil");
+
+    // Check clone
+    std::unique_ptr<Value_type> cloned(nil.clone());
+    BOOST_CHECK_EQUAL(cloned->type_name(), "nil");
+}
+
+// Test Scalar types - Int
+BOOST_AUTO_TEST_CASE(scalar_int_operations)
+{
+    Int i(42);
+
+    BOOST_CHECK_EQUAL(i.value(), 42);
+    BOOST_CHECK_EQUAL(i.type_name(), "i4");
+
+    std::unique_ptr<Value_type> cloned(i.clone());
+    Int* cloned_int = dynamic_cast<Int*>(cloned.get());
+    BOOST_REQUIRE(cloned_int != nullptr);
+    BOOST_CHECK_EQUAL(cloned_int->value(), 42);
+}
+
+// Test Scalar types - Int64
+BOOST_AUTO_TEST_CASE(scalar_int64_operations)
+{
+    Int64 i(9876543210LL);
+
+    BOOST_CHECK_EQUAL(i.value(), 9876543210LL);
+    BOOST_CHECK_EQUAL(i.type_name(), "i8");
+
+    std::unique_ptr<Value_type> cloned(i.clone());
+    Int64* cloned_int64 = dynamic_cast<Int64*>(cloned.get());
+    BOOST_REQUIRE(cloned_int64 != nullptr);
+    BOOST_CHECK_EQUAL(cloned_int64->value(), 9876543210LL);
+}
+
+// Test Scalar types - Bool
+BOOST_AUTO_TEST_CASE(scalar_bool_operations)
+{
+    Bool b_true(true);
+    Bool b_false(false);
+
+    BOOST_CHECK_EQUAL(b_true.value(), true);
+    BOOST_CHECK_EQUAL(b_false.value(), false);
+    BOOST_CHECK_EQUAL(b_true.type_name(), "boolean");
+
+    std::unique_ptr<Value_type> cloned(b_true.clone());
+    Bool* cloned_bool = dynamic_cast<Bool*>(cloned.get());
+    BOOST_REQUIRE(cloned_bool != nullptr);
+    BOOST_CHECK_EQUAL(cloned_bool->value(), true);
+}
+
+// Test Scalar types - Double
+BOOST_AUTO_TEST_CASE(scalar_double_operations)
+{
+    Double d(3.14159);
+
+    BOOST_CHECK_CLOSE(d.value(), 3.14159, 0.0001);
+    BOOST_CHECK_EQUAL(d.type_name(), "double");
+
+    std::unique_ptr<Value_type> cloned(d.clone());
+    Double* cloned_double = dynamic_cast<Double*>(cloned.get());
+    BOOST_REQUIRE(cloned_double != nullptr);
+    BOOST_CHECK_CLOSE(cloned_double->value(), 3.14159, 0.0001);
+}
+
+// Test Scalar types - String
+BOOST_AUTO_TEST_CASE(scalar_string_operations)
+{
+    String s("hello world");
+
+    BOOST_CHECK_EQUAL(s.value(), "hello world");
+    BOOST_CHECK_EQUAL(s.type_name(), "string");
+
+    std::unique_ptr<Value_type> cloned(s.clone());
+    String* cloned_string = dynamic_cast<String*>(cloned.get());
+    BOOST_REQUIRE(cloned_string != nullptr);
+    BOOST_CHECK_EQUAL(cloned_string->value(), "hello world");
+}
+
+// Test Struct replace existing key
+BOOST_AUTO_TEST_CASE(struct_replace_existing_key)
+{
+    Struct s;
+    s.insert("key", Value(1));
+    BOOST_CHECK_EQUAL(s["key"].get_int(), 1);
+
+    // Replace with new value
+    s.insert("key", Value(999));
+    BOOST_CHECK_EQUAL(s["key"].get_int(), 999);
+    BOOST_CHECK_EQUAL(s.size(), 1u);  // Still just one key
+}
+
+// Test Date_time edge cases for month/day/time validation
+BOOST_AUTO_TEST_CASE(datetime_boundary_values)
+{
+    // January 1st
+    Date_time dt1(std::string("20230101T00:00:00"));
+    BOOST_CHECK_EQUAL(dt1.to_string(), "20230101T00:00:00");
+
+    // December 31st
+    Date_time dt2(std::string("20231231T23:59:59"));
+    BOOST_CHECK_EQUAL(dt2.to_string(), "20231231T23:59:59");
+
+    // Leap second (61 seconds is valid in tm)
+    Date_time dt3(std::string("20230630T23:59:60"));
+    BOOST_CHECK_EQUAL(dt3.to_string(), "20230630T23:59:60");
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
 // vim:ts=2:sw=2:et
