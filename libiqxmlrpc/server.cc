@@ -230,6 +230,7 @@ void Server::schedule_execute( http::Packet* pkt, Server_connection* conn )
   }
 }
 
+// cppcheck-suppress functionStatic
 void Server::schedule_response(
   const Response& resp, Server_connection* conn, Executor* exec )
 {

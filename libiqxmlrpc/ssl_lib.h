@@ -32,7 +32,7 @@ public:
   int verify(bool preverified_ok, X509_STORE_CTX*) const;
 
 protected:
-  std::string cert_finger_sha256(X509_STORE_CTX*) const;
+  static std::string cert_finger_sha256(X509_STORE_CTX*);
 
 private:
   virtual int do_verify(bool preverified_ok, X509_STORE_CTX*) const = 0;

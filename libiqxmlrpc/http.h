@@ -136,7 +136,7 @@ public:
   std::string server() const;
 
 private:
-  std::string current_date() const;
+  static std::string current_date();
   std::string dump_head() const override;
 };
 

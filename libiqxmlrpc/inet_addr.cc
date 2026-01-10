@@ -93,6 +93,7 @@ void
 Inet_addr::Impl::init_sockaddr() const
 {
   sa = SystemSockAddrIn();
+  // cppcheck-suppress constVariablePointer
   struct hostent* hent = nullptr;
   IQXMLRPC_GETHOSTBYNAME(host.c_str());
   sa->sin_family = PF_INET;

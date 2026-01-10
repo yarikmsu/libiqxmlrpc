@@ -32,17 +32,29 @@ public:
   // cppcheck-suppress noExplicitConstructor
   Value( Value_type* );
   Value( const Value& );
+  // cppcheck-suppress noExplicitConstructor
   Value( Nil );
+  // cppcheck-suppress noExplicitConstructor
   Value( int );
+  // cppcheck-suppress noExplicitConstructor
   Value( int64_t );
+  // cppcheck-suppress noExplicitConstructor
   Value( bool );
+  // cppcheck-suppress noExplicitConstructor
   Value( double );
+  // cppcheck-suppress noExplicitConstructor
   Value( const std::string& );
+  // cppcheck-suppress noExplicitConstructor
   Value( const char* );
+  // cppcheck-suppress noExplicitConstructor
   Value( const Binary_data& );
+  // cppcheck-suppress noExplicitConstructor
   Value( const Date_time& );
+  // cppcheck-suppress noExplicitConstructor
   Value( const struct tm* );
+  // cppcheck-suppress noExplicitConstructor
   Value( const Array& );
+  // cppcheck-suppress noExplicitConstructor
   Value( const Struct& );
 
   virtual ~Value();

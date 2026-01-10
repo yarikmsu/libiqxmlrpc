@@ -117,6 +117,7 @@ public:
    * method on a server side. This method must call actual XML-RPC method
    * (along with other stacked interceptors) via calling yield() member
    */
+  // cppcheck-suppress constParameterPointer
   virtual void process(Method*, const Param_list&, Value&) = 0;
 
 protected:
