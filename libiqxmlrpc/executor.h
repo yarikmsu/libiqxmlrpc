@@ -20,6 +20,7 @@
 #pragma warning(pop)
 #endif
 
+#include <atomic>
 #include <deque>
 #include <vector>
 
@@ -144,8 +145,7 @@ class LIBIQXMLRPC_API Pool_executor_factory: public Executor_factory_base {
   boost::mutex               req_queue_lock;
   boost::condition           req_queue_cond;
 
-  bool          in_destructor;
-  boost::mutex  destructor_lock;
+  std::atomic<bool> in_destructor;
 
 public:
   explicit Pool_executor_factory(unsigned num_threads);

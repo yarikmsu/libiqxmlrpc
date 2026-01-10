@@ -122,8 +122,7 @@ Pool_executor_factory::Pool_executor_factory(unsigned numthreads):
   req_queue(),
   req_queue_lock(),
   req_queue_cond(),
-  in_destructor(false),
-  destructor_lock()
+  in_destructor(false)
 {
   add_threads(numthreads);
 }
@@ -174,18 +173,16 @@ void Pool_executor_factory::register_executor( Pool_executor* executor )
 
 void Pool_executor_factory::destruction_started()
 {
-  scoped_lock lk(destructor_lock);
-  in_destructor = true;
+  in_destructor.store(true, std::memory_order_release);
 
-  scoped_lock lk_(req_queue_lock);
+  scoped_lock lk(req_queue_lock);
   req_queue_cond.notify_all();
 }
 
 
 bool Pool_executor_factory::is_being_destructed()
 {
-  scoped_lock lk(destructor_lock);
-  return in_destructor;
+  return in_destructor.load(std::memory_order_acquire);
 }
 
 
