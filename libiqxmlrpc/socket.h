@@ -38,6 +38,10 @@ public:
   //! \note Does not disable non-blocking mode under UNIX.
   void set_non_blocking( bool );
 
+  //! Enable/disable TCP_NODELAY (Nagle's algorithm).
+  //! Recommended for RPC workloads to reduce latency.
+  void set_nodelay( bool enable );
+
   /*! \b Can \b not cause SIGPIPE signal. */
   virtual size_t send( const char*, size_t );
   virtual void send_shutdown( const char*, size_t );
