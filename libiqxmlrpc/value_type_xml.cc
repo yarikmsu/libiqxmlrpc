@@ -1,8 +1,7 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
-#include <boost/lexical_cast.hpp>
-
+#include "num_conv.h"
 #include "value.h"
 #include "value_type_xml.h"
 #include "xml_builder.h"
@@ -32,17 +31,17 @@ void Value_type_to_xml::do_visit_nil()
 
 void Value_type_to_xml::do_visit_int(int val)
 {
-  add_textnode("i4", boost::lexical_cast<std::string>(val));
+  add_textnode("i4", num_conv::to_string(val));
 }
 
 void Value_type_to_xml::do_visit_int64(int64_t val)
 {
-  add_textnode("i8", boost::lexical_cast<std::string>(val));
+  add_textnode("i8", num_conv::to_string(val));
 }
 
 void Value_type_to_xml::do_visit_double(double val)
 {
-  add_textnode("double", boost::lexical_cast<std::string>(val));
+  add_textnode("double", num_conv::double_to_string(val));
 }
 
 void Value_type_to_xml::do_visit_bool(bool val)

@@ -2,7 +2,6 @@
 //  Copyright (C) 2011 Anton Dedov
 
 #include <stdexcept>
-#include <boost/lexical_cast.hpp>
 #include "except.h"
 #include "request_parser.h"
 #include "value_parser.h"
