@@ -367,6 +367,33 @@ BOOST_FIXTURE_TEST_CASE(pool_executor_graceful_shutdown, IntegrationFixture)
   BOOST_CHECK(!is_running());
 }
 
+// Test Pool_executor's std::exception handling (covers executor.cc lines 220-222)
+BOOST_FIXTURE_TEST_CASE(pool_executor_std_exception_handling, IntegrationFixture)
+{
+  start_server(4, 34);  // Thread pool
+  auto client = create_client();
+
+  // Call method that throws std::runtime_error
+  Response r = client->execute("std_exception_method", Value(""));
+  BOOST_CHECK(r.is_fault());
+  BOOST_CHECK_EQUAL(r.fault_code(), -1);
+  BOOST_CHECK(r.fault_string().find("std::exception") != std::string::npos ||
+              r.fault_string().find("Test") != std::string::npos);
+}
+
+// Test Pool_executor's unknown exception handling (covers executor.cc lines 224-226)
+BOOST_FIXTURE_TEST_CASE(pool_executor_unknown_exception_handling, IntegrationFixture)
+{
+  start_server(4, 35);  // Thread pool
+  auto client = create_client();
+
+  // Call method that throws non-exception type (int)
+  Response r = client->execute("unknown_exception_method", Value(""));
+  BOOST_CHECK(r.is_fault());
+  BOOST_CHECK_EQUAL(r.fault_code(), -1);
+  BOOST_CHECK(r.fault_string().find("Unknown") != std::string::npos);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 //=============================================================================
