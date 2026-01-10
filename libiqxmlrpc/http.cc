@@ -9,7 +9,8 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/lexical_cast.hpp>
+
+#include "num_conv.h"
 
 #include <algorithm>
 #include <deque>
@@ -40,12 +41,12 @@ void unsigned_number(const std::string& val)
 {
   const char errmsg[] = "bad format of numeric option";
 
-  try {
-    if (!boost::all(val, boost::is_digit()))
-      throw Malformed_packet(errmsg);
+  if (!boost::all(val, boost::is_digit()))
+    throw Malformed_packet(errmsg);
 
-    boost::lexical_cast<unsigned>(val);
-  } catch (const boost::bad_lexical_cast&) {
+  try {
+    num_conv::from_string<unsigned>(val);
+  } catch (const num_conv::conversion_error&) {
     throw Malformed_packet(errmsg);
   }
 }
@@ -129,8 +130,12 @@ T Header::get_option(const std::string& name) const
   }
 
   try {
-    return boost::lexical_cast<T>(i->second);
-  } catch (boost::bad_lexical_cast&) {
+    if constexpr (std::is_same_v<T, std::string>) {
+      return i->second;
+    } else {
+      return num_conv::from_string<T>(i->second);
+    }
+  } catch (const num_conv::conversion_error&) {
     throw Malformed_packet("Header option '" + name + "' has wrong format.");
   }
 }
@@ -167,7 +172,7 @@ void Header::set_option(const std::string& name, const std::string& value)
 
 void Header::set_option(const std::string& name, size_t value)
 {
-  set_option(name, boost::lexical_cast<std::string>(value));
+  set_option(name, num_conv::to_string(value));
 }
 
 bool Header::option_exists(const std::string& name) const
@@ -347,8 +352,8 @@ Response_header::Response_header(Verification_level lev, const std::string& to_p
   }
 
   try {
-    code_ = boost::lexical_cast<int>(resp_line[1]);
-  } catch (const boost::bad_lexical_cast&) {
+    code_ = num_conv::from_string<int>(resp_line[1]);
+  } catch (const num_conv::conversion_error&) {
     code_ = 0;
   }
 
