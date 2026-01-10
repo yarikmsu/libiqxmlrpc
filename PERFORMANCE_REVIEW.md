@@ -6,7 +6,9 @@
 ### Changelog
 | Date | Change |
 |------|--------|
-| 2026-01-10 | Completed: Use atomic<bool> for thread pool destructor flag (PR #46) |
+| 2026-01-10 | Completed: Add benchmark for atomic vs mutex comparison (PR #50) |
+| 2026-01-10 | Completed: Optimize Value::cast<T>() with type tags (29% faster array access) (PR #48) |
+| 2026-01-10 | Completed: Use atomic<bool> for thread pool destructor flag (4.3x faster) (PR #46) |
 | 2026-01-10 | Completed: Enable TCP_NODELAY by default for RPC latency (PR #45) |
 | 2026-01-10 | Completed: Use unordered_map for Struct (53% faster access) (PR #44) |
 | 2026-01-10 | Completed: Optimize Base64 decoding with lookup table (PR #42) |
@@ -662,9 +664,24 @@ enum Verification_level { HTTP_CHECK_WEAK, HTTP_CHECK_STRICT };
 
 10. ~~**Use atomic<bool> for destructor flag**~~ ✅ **DONE (PR #46)**
     - Files: `executor.h`, `executor.cc`
+    - **Measured Results (PR #50 benchmark):**
+      | Operation | Mutex (before) | Atomic (after) | Speedup |
+      |-----------|----------------|----------------|---------|
+      | Bool read | 13.65 ns | 3.21 ns | **4.3x faster** |
+      | Bool write | 14.20 ns | 3.24 ns | **4.4x faster** |
     - Replaced mutex-protected bool with `std::atomic<bool>` for `in_destructor` flag
-    - Code clarity improvement (atomic flag better expresses intent)
-    - Minor efficiency gain (~50-200 cycles → ~1-5 cycles per check)
+    - Uses proper memory ordering (release/acquire) for synchronization
+
+11. ~~**Optimize Value::cast<T>() with type tags**~~ ✅ **DONE (PR #48)**
+    - Files: `value.cc`, `value_type.h`
+    - **Measured Results:**
+      | Operation | Before | After | Speedup |
+      |-----------|--------|-------|---------|
+      | array_access | 11,543 ns | 8,244 ns | **29% faster** |
+      | array_iterate | 19,745 ns | 16,869 ns | **15% faster** |
+    - Added `TypeTag<T>` trait to map Value_type subclasses to their ValueTypeTag
+    - Replaced `dynamic_cast` with type tag check + `static_cast` in `cast<T>()`
+    - Benefits all getter methods (`get_int()`, `get_string()`, etc.)
 
 ### Remaining Low Priority
 
