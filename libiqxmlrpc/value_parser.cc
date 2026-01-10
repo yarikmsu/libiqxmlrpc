@@ -232,6 +232,7 @@ ValueBuilder::do_visit_text(const std::string& text)
   switch (state_.get_state()) {
   case VALUE:
     want_exit();
+    [[fallthrough]];
   case STRING:
     retval.reset(new String(text));
     break;
