@@ -124,6 +124,9 @@ public:
   Pool_executor( Pool_executor_factory*, Method*, Server*, Server_connection* );
   ~Pool_executor() override;
 
+  Pool_executor(const Pool_executor&) = delete;
+  Pool_executor& operator=(const Pool_executor&) = delete;
+
   void execute( const Param_list& ) override;
   void process_actual_execution();
 };

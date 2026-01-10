@@ -30,6 +30,9 @@ public:
 
   Http_client_connection( const iqnet::Socket&, bool non_block );
 
+  Http_client_connection(const Http_client_connection&) = delete;
+  Http_client_connection& operator=(const Http_client_connection&) = delete;
+
   void handle_input( bool& ) override;
   void handle_output( bool& ) override;
 

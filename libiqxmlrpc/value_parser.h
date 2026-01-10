@@ -14,6 +14,7 @@ namespace iqxmlrpc {
 class ValueBuilderBase: public BuilderBase {
 public:
   explicit ValueBuilderBase(Parser& parser, bool expect_text = false);
+  ~ValueBuilderBase() override = default;
 
   Value_type*
   result()

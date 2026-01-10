@@ -8,7 +8,8 @@ using namespace iqnet;
 
 ssl::Connection::Connection( const Socket& s ):
   iqnet::Connection( s ),
-  ssl_ctx( ssl::ctx )
+  ssl_ctx( ssl::ctx ),
+  ssl(nullptr)
 {
   if( !ssl_ctx )
     throw ssl::not_initialized();

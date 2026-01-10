@@ -17,6 +17,8 @@ typedef Reactor_base::HandlerStateList HandlerStateList;
 struct Reactor_poll_impl::Impl {
   typedef std::vector<struct pollfd> Pollfd_vec;
   Pollfd_vec pfd;
+
+  Impl() : pfd() {}
 };
 
 Reactor_poll_impl::Reactor_poll_impl():

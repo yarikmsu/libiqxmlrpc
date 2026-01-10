@@ -78,7 +78,12 @@ protected:
 
 public:
   IntegrationFixture()
-    : server_ready_(false)
+    : server_()
+    , exec_factory_()
+    , server_thread_()
+    , ready_mutex_()
+    , ready_cond_()
+    , server_ready_(false)
     , server_running_(false)
     , port_(TEST_PORT) {}
 
@@ -1399,7 +1404,19 @@ protected:
   std::string temp_key_path_;
 
 public:
-  HttpsIntegrationFixture() : saved_ctx_(iqnet::ssl::ctx) {}
+  HttpsIntegrationFixture(const HttpsIntegrationFixture&) = delete;
+  HttpsIntegrationFixture& operator=(const HttpsIntegrationFixture&) = delete;
+
+  HttpsIntegrationFixture()
+    : server_()
+    , exec_factory_()
+    , server_thread_()
+    , ready_mutex_()
+    , ready_cond_()
+    , saved_ctx_(iqnet::ssl::ctx)
+    , temp_cert_path_()
+    , temp_key_path_()
+  {}
 
   ~HttpsIntegrationFixture() {
     stop_server();

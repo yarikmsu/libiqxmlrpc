@@ -48,11 +48,14 @@ dump_response( const Response& response )
 //
 
 Response::Response( Value* v ):
-  value_(v)
+  value_(v),
+  fault_code_(0),
+  fault_string_()
 {
 }
 
 Response::Response( int fcode, const std::string& fstring ):
+  value_(nullptr),
   fault_code_(fcode),
   fault_string_(fstring)
 {

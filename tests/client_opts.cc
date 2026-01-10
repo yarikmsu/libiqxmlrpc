@@ -10,11 +10,14 @@ namespace ssl = iqnet::ssl;
 using namespace boost::program_options;
 
 Client_opts::Client_opts():
+  host_(),
   port_(0),
+  proxy_host_(),
   proxy_port_(0),
   use_ssl_(false),
   stop_server_(false),
   timeout_(0),
+  server_fingerprint_(),
   opts_()
 {
   opts_.add_options()

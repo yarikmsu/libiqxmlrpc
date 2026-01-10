@@ -102,7 +102,8 @@ Test_server* test_server = nullptr;
 
 Test_server::Test_server(const Test_server_config& conf):
   ef_(nullptr),
-  impl_(nullptr)
+  impl_(nullptr),
+  auth_plugin_()
 {
   if (conf.numthreads > 1)
   {

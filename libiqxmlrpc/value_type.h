@@ -141,7 +141,7 @@ private:
 public:
   Array( const Array& );
   Array( Array&& other ) noexcept : Value_type(ValueTypeTag::Array), values(std::move(other.values)) {}
-  Array() : Value_type(ValueTypeTag::Array) {}
+  Array() : Value_type(ValueTypeTag::Array), values() {}
   ~Array() override;
 
   Array& operator =( const Array& );
@@ -263,7 +263,7 @@ public:
 
   Struct( const Struct& );
   Struct( Struct&& other ) noexcept : Value_type(ValueTypeTag::Struct), values(std::move(other.values)) {}
-  Struct() : Value_type(ValueTypeTag::Struct) {}
+  Struct() : Value_type(ValueTypeTag::Struct), values() {}
   ~Struct() override;
 
   Struct& operator =( const Struct& );

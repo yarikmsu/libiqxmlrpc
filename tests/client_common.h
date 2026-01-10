@@ -10,6 +10,9 @@ class Method_proxy {
   std::string method_name_;
 
 public:
+  Method_proxy(const Method_proxy&) = delete;
+  Method_proxy& operator=(const Method_proxy&) = delete;
+
   Method_proxy(iqxmlrpc::Client_base*, const std::string& name);
   virtual ~Method_proxy();
 

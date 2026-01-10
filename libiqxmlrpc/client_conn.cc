@@ -10,6 +10,7 @@
 namespace iqxmlrpc {
 
 Client_connection::Client_connection():
+  preader(),
   read_buf_(65536, '\0')
 {
 }

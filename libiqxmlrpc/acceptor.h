@@ -31,6 +31,9 @@ public:
   Acceptor( const iqnet::Inet_addr& bind_addr, Accepted_conn_factory*, Reactor_base* );
   ~Acceptor() override;
 
+  Acceptor(const Acceptor&) = delete;
+  Acceptor& operator=(const Acceptor&) = delete;
+
   void set_firewall( iqnet::Firewall_base* );
 
   void handle_input( bool& ) override;

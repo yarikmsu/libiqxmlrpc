@@ -17,7 +17,8 @@ struct Connect_processor: public Event_handler {
   Socket sock;
 
   explicit Connect_processor(Reactor_base& r):
-    reactor(r)
+    reactor(r),
+    sock()
   {
     sock.set_non_blocking(true);
   }

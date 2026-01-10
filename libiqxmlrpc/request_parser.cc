@@ -19,7 +19,9 @@ enum RequestBuilderState {
 
 RequestBuilder::RequestBuilder(Parser& parser):
   BuilderBase(parser),
-  state_(parser, NONE)
+  state_(parser, NONE),
+  method_name_(),
+  params_()
 {
   static const StateMachine::StateTransition trans[] = {
     { NONE, METHOD_CALL, "methodCall" },

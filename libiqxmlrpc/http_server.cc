@@ -21,6 +21,9 @@ class Http_server_connection:
 public:
   explicit Http_server_connection( const iqnet::Socket& );
 
+  Http_server_connection(const Http_server_connection&) = delete;
+  Http_server_connection& operator=(const Http_server_connection&) = delete;
+
   void set_reactor( iqnet::Reactor_base* r ) { reactor = r; }
 
   void post_accept() override;

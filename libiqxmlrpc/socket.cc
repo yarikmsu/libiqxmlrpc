@@ -12,7 +12,9 @@
 
 using namespace iqnet;
 
-Socket::Socket()
+Socket::Socket():
+  sock(-1),
+  peer()
 {
   if( (sock = socket( PF_INET, SOCK_STREAM, IPPROTO_TCP )) == -1 )
     throw network_error( "Socket::Socket" );
