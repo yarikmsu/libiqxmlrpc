@@ -364,7 +364,7 @@ Response_header::Response_header( int c, const std::string& p ):
   set_option(names::server, PACKAGE " " VERSION);
 }
 
-std::string Response_header::current_date() const
+std::string Response_header::current_date()
 {
   using namespace boost::posix_time;
   ptime p = second_clock::universal_time();

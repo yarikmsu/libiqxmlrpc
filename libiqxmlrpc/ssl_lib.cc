@@ -163,7 +163,7 @@ ConnectionVerifier::verify(bool prev_ok, X509_STORE_CTX* ctx) const
 }
 
 std::string
-ConnectionVerifier::cert_finger_sha256(X509_STORE_CTX* ctx) const
+ConnectionVerifier::cert_finger_sha256(X509_STORE_CTX* ctx)
 {
   X509* x = X509_STORE_CTX_get_current_cert(ctx);
   const EVP_MD* digest = EVP_get_digestbyname("sha256");

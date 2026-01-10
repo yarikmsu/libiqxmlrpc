@@ -456,7 +456,9 @@ inline void Binary_data::decode_four( const char* four )
 {
   char c1 = four[0];
   char c2 = four[1];
+  // cppcheck-suppress variableScope
   char c3 = four[2];
+  // cppcheck-suppress variableScope
   char c4 = four[3];
 
   if( c1 == '=' || c2 == '=' )
