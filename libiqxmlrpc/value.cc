@@ -161,52 +161,52 @@ const Value& Value::operator =( const Value& v )
 
 bool Value::is_nil() const
 {
-  return can_cast<Nil>();
+  return value && value->type_tag() == ValueTypeTag::Nil;
 }
 
 bool Value::is_int() const
 {
-  return can_cast<Int>();
+  return value && value->type_tag() == ValueTypeTag::Int;
 }
 
 bool Value::is_int64() const
 {
-  return can_cast<Int64>();
+  return value && value->type_tag() == ValueTypeTag::Int64;
 }
 
 bool Value::is_bool() const
 {
-  return can_cast<Bool>();
+  return value && value->type_tag() == ValueTypeTag::Bool;
 }
 
 bool Value::is_double() const
 {
-  return can_cast<Double>();
+  return value && value->type_tag() == ValueTypeTag::Double;
 }
 
 bool Value::is_string() const
 {
-  return can_cast<String>();
+  return value && value->type_tag() == ValueTypeTag::String;
 }
 
 bool Value::is_binary() const
 {
-  return can_cast<Binary_data>();
+  return value && value->type_tag() == ValueTypeTag::Binary;
 }
 
 bool Value::is_datetime() const
 {
-  return can_cast<Date_time>();
+  return value && value->type_tag() == ValueTypeTag::DateTime;
 }
 
 bool Value::is_array() const
 {
-  return can_cast<Array>();
+  return value && value->type_tag() == ValueTypeTag::Array;
 }
 
 bool Value::is_struct() const
 {
-  return can_cast<Struct>();
+  return value && value->type_tag() == ValueTypeTag::Struct;
 }
 const std::string& Value::type_name() const
 {
