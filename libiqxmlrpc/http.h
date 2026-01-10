@@ -190,6 +190,8 @@ public:
   Packet_reader& operator=(const Packet_reader&) = delete;
 
   Packet_reader():
+    header_cache(),
+    content_cache(),
     header(0),
     ver_level_(HTTP_CHECK_WEAK),
     constructed(false),

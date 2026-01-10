@@ -18,7 +18,8 @@ public:
     const std::string& uri,
     const std::string& vhost
   ):
-    opts(addr, uri, vhost) {}
+    opts(addr, uri, vhost),
+    conn_cache() {}
 
   Client_options opts;
   std::unique_ptr<Client_connection> conn_cache;
@@ -34,7 +35,9 @@ public:
   Auto_conn& operator=(const Auto_conn&) = delete;
 
   Auto_conn( Client_base::Impl& client_impl, Client_base& client ):
-    client_impl_(client_impl)
+    client_impl_(client_impl),
+    tmp_conn_(),
+    conn_ptr_(nullptr)
   {
     if (opts().keep_alive())
     {
