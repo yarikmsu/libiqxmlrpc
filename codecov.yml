@@ -1,11 +1,5 @@
 ignore:
-  - "tests/test_server.cc"
-  - "tests/client.cc"
-  - "tests/client_stress.cc"
-  - "tests/server_config.cc"
-  - "tests/client_common.cc"
-  - "tests/client_opts.cc"
-  - "tests/test_integration.cc"
+  - "tests/**/*"  # Exclude all test files from coverage report
 
 coverage:
   status:
