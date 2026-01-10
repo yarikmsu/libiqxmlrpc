@@ -6,8 +6,10 @@
 #include "socket.h"
 #include "net_except.h"
 
-#if _MSC_VER >= 1700
+#ifdef WIN32
 #include <ws2tcpip.h>
+#else
+#include <netinet/tcp.h>
 #endif
 
 using namespace iqnet;
@@ -32,6 +34,10 @@ Socket::Socket():
   setsockopt( sock, SOL_SOCKET, SO_NOSIGPIPE, &enable, sizeof(enable) );
   }
 #endif
+
+  // Enable TCP_NODELAY by default for RPC workloads.
+  // Disables Nagle's algorithm to reduce latency for small messages.
+  set_nodelay(true);
 }
 
 Socket::Socket( Socket::Handler h, const Inet_addr& addr ):
@@ -67,6 +73,13 @@ void Socket::set_non_blocking( bool flag )
   if( fcntl( sock, F_SETFL, O_NDELAY ) == -1 )
     throw network_error( "Socket::set_non_blocking" );
 #endif //WIN32
+}
+
+void Socket::set_nodelay( bool enable )
+{
+  int flag = enable ? 1 : 0;
+  setsockopt( sock, IPPROTO_TCP, TCP_NODELAY,
+              reinterpret_cast<const char*>(&flag), sizeof(flag) );
 }
 
 #if defined(MSG_NOSIGNAL)
@@ -126,7 +139,9 @@ Socket Socket::accept()
   if( new_sock == -1 )
     throw network_error( "Socket::accept" );
 
-  return Socket( new_sock, Inet_addr(addr) );
+  Socket accepted_socket( new_sock, Inet_addr(addr) );
+  accepted_socket.set_nodelay(true);  // Enable TCP_NODELAY for RPC workloads
+  return accepted_socket;
 }
 
 bool Socket::connect( const iqnet::Inet_addr& peer_addr )
