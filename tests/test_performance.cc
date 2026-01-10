@@ -546,7 +546,74 @@ void benchmark_parse_dump() {
 }
 
 // ============================================================================
-// H. Threading Primitives Benchmark
+// H. HTTP Header Parsing Benchmark (Low Priority)
+// Target: Single-pass parsing instead of 5 passes
+// ============================================================================
+
+void benchmark_http_header_parsing() {
+  perf::section("HTTP Header Parsing");
+
+  const size_t ITERS = 10000;
+
+  // Typical HTTP request header (8 options)
+  // Note: No trailing CRLF - the packet reader strips the \r\n\r\n separator
+  std::string request_header =
+      "POST /RPC2 HTTP/1.1\r\n"
+      "Host: localhost:8080\r\n"
+      "Content-Type: text/xml\r\n"
+      "Content-Length: 256\r\n"
+      "User-Agent: libiqxmlrpc/0.13.6\r\n"
+      "Connection: keep-alive\r\n"
+      "Accept: */*\r\n"
+      "Accept-Encoding: gzip, deflate\r\n"
+      "X-Custom-Header: some-value-here";
+
+  PERF_BENCHMARK("perf_http_request_parse", ITERS, {
+    http::Request_header hdr(http::HTTP_CHECK_WEAK, request_header);
+    perf::do_not_optimize(hdr);
+  });
+
+  // Typical HTTP response header (6 options)
+  std::string response_header =
+      "HTTP/1.1 200 OK\r\n"
+      "Server: libiqxmlrpc/0.13.6\r\n"
+      "Date: Fri, 10 Jan 2026 12:30:45 GMT\r\n"
+      "Content-Type: text/xml\r\n"
+      "Content-Length: 512\r\n"
+      "Connection: close\r\n"
+      "X-Request-Id: abc-123-def-456";
+
+  PERF_BENCHMARK("perf_http_response_parse", ITERS, {
+    http::Response_header hdr(http::HTTP_CHECK_WEAK, response_header);
+    perf::do_not_optimize(hdr);
+  });
+
+  // Large header (15 options) - stress test
+  std::string large_header =
+      "POST /RPC2 HTTP/1.1\r\n"
+      "Host: api.example.com:443\r\n"
+      "Content-Type: text/xml; charset=utf-8\r\n"
+      "Content-Length: 4096\r\n"
+      "User-Agent: Mozilla/5.0 (compatible; libiqxmlrpc/0.13.6)\r\n"
+      "Connection: keep-alive\r\n"
+      "Accept: text/xml, application/xml\r\n"
+      "Accept-Encoding: gzip, deflate, br\r\n"
+      "Accept-Language: en-US,en;q=0.9\r\n"
+      "Authorization: Basic dXNlcjpwYXNzd29yZA==\r\n"
+      "Cache-Control: no-cache\r\n"
+      "X-Forwarded-For: 192.168.1.1\r\n"
+      "X-Forwarded-Proto: https\r\n"
+      "X-Request-Id: 550e8400-e29b-41d4-a716-446655440000\r\n"
+      "X-Trace-Id: trace-abc-123-def-456-ghi-789";
+
+  PERF_BENCHMARK("perf_http_request_parse_large", ITERS, {
+    http::Request_header hdr(http::HTTP_CHECK_WEAK, large_header);
+    perf::do_not_optimize(hdr);
+  });
+}
+
+// ============================================================================
+// I. Threading Primitives Benchmark
 // Compare mutex-protected bool vs atomic<bool>
 // ============================================================================
 
@@ -624,6 +691,7 @@ int main(int /*argc*/, char* /*argv*/[]) {
   benchmark_number_conversions();
   benchmark_type_checking();
   benchmark_http_date();
+  benchmark_http_header_parsing();
   benchmark_datetime_parsing();
   benchmark_value_operations();
   benchmark_base64();
