@@ -21,6 +21,9 @@ public:
     reactor_->register_handler(this, Reactor_base::INPUT);
   }
 
+  Interrupter_connection(const Interrupter_connection&) = delete;
+  Interrupter_connection& operator=(const Interrupter_connection&) = delete;
+
   ~Interrupter_connection() override
   {
     reactor_->unregister_handler(this);
@@ -55,7 +58,10 @@ private:
 };
 
 
-Reactor_interrupter::Impl::Impl(Reactor_base* reactor)
+Reactor_interrupter::Impl::Impl(Reactor_base* reactor):
+  server_(),
+  client_(),
+  lock_()
 {
   Socket srv;
   srv.bind(Inet_addr("127.0.0.1", 0)); // bind to port 0, which means any port beyond 1024

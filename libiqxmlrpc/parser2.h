@@ -16,6 +16,7 @@ class Parser;
 class BuilderBase {
 public:
   BuilderBase(Parser&, bool expect_text = false);
+  virtual ~BuilderBase() = default;
 
   void
   visit_element(const std::string& tag);

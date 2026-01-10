@@ -95,7 +95,8 @@ public:
     const std::string& vhost = ""
   ):
     Client_base(addr, uri, vhost),
-    ctr(addr) {}
+    ctr(addr),
+    proxy_ctr() {}
 
 private:
   void do_set_proxy(const iqnet::Inet_addr& addr) override

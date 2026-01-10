@@ -51,6 +51,8 @@ public:
   {
   }
 
+  ExplicitPtr& operator=(const ExplicitPtr&) = delete;
+
   ~ExplicitPtr()
   {
     delete release();
@@ -85,10 +87,11 @@ public:
     return val;
   }
 
-  void operator =(bool b)
+  LockedBool& operator =(bool b)
   {
     typename Lock::scoped_lock lk(lock);
     val = b;
+    return *this;
   }
 };
 

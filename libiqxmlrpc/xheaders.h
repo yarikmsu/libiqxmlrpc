@@ -13,6 +13,7 @@ class LIBIQXMLRPC_API XHeaders {
 private:
   std::map<std::string, std::string> xheaders_;
 public:
+  XHeaders() : xheaders_() {}
   typedef std::map<std::string, std::string>::const_iterator const_iterator;
   virtual XHeaders& operator=(const std::map<std::string, std::string>& v);
   virtual std::string& operator[](const std::string& v);

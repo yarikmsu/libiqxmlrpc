@@ -21,6 +21,7 @@ class Default_method_dispatcher: public Method_dispatcher_base {
   Factory_map fs;
 
 public:
+  Default_method_dispatcher() : fs() {}
   ~Default_method_dispatcher() override;
 
   void register_method(const std::string& name, Method_factory_base*);
@@ -77,6 +78,9 @@ public:
   {
   }
 
+  System_method_factory(const System_method_factory&) = delete;
+  System_method_factory& operator=(const System_method_factory&) = delete;
+
 private:
   T* create() override
   {
@@ -98,6 +102,7 @@ public:
   Default_method_dispatcher* default_disp;
 
   Impl():
+    dispatchers(),
     default_disp(new Default_method_dispatcher)
   {
     dispatchers.push_back(default_disp);

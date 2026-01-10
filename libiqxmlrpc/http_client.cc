@@ -16,6 +16,7 @@ Http_client_connection::Http_client_connection( const iqnet::Socket& s, bool nb 
   Client_connection(),
   Connection( s ),
   reactor( new Reactor<Null_lock> ),
+  out_str(),
   resp_packet(0)
 {
   sock.set_non_blocking( nb );

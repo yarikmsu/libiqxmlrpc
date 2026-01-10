@@ -36,6 +36,9 @@ public:
   explicit Server_connection( const iqnet::Inet_addr& );
   virtual ~Server_connection() = 0;
 
+  Server_connection(const Server_connection&) = delete;
+  Server_connection& operator=(const Server_connection&) = delete;
+
   const iqnet::Inet_addr& get_peer_addr() const { return peer_addr; }
 
   void set_server( Server* s )
@@ -72,6 +75,9 @@ class Server_conn_factory: public iqnet::Serial_conn_factory<Transport>
 public:
   Server_conn_factory():
     server(nullptr), reactor(nullptr) {}
+
+  Server_conn_factory(const Server_conn_factory&) = delete;
+  Server_conn_factory& operator=(const Server_conn_factory&) = delete;
 
   void post_init( Server* s, iqnet::Reactor_base* r )
   {

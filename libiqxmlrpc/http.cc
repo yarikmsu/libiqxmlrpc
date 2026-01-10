@@ -73,6 +73,9 @@ void expect_continue(const std::string& val)
 
 
 Header::Header(Verification_level lev):
+  head_line_(),
+  options_(),
+  validators_(),
   ver_level_(lev)
 {
   set_option_default(names::connection, "close");
@@ -238,7 +241,8 @@ bool Header::expect_continue() const
 
 // ----------------------------------------------------------------------------
 Request_header::Request_header(Verification_level lev, const std::string& to_parse):
-  Header(lev)
+  Header(lev),
+  uri_()
 {
   parse(to_parse);
   set_option_default(names::host, "");
@@ -338,7 +342,9 @@ void Request_header::set_authinfo(const std::string& u, const std::string& p)
 
 // ---------------------------------------------------------------------------
 Response_header::Response_header(Verification_level lev, const std::string& to_parse):
-  Header(lev)
+  Header(lev),
+  code_(0),
+  phrase_()
 {
   parse(to_parse);
   set_option_default(names::server, "unknown");

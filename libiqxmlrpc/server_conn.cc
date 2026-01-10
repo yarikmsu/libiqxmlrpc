@@ -13,6 +13,8 @@ using namespace iqxmlrpc;
 Server_connection::Server_connection( const iqnet::Inet_addr& a ):
   peer_addr(a),
   server(nullptr),
+  preader(),
+  response(),
   keep_alive(false),
   read_buf_(65536, '\0')
 {

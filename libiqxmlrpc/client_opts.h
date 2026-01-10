@@ -22,7 +22,10 @@ public:
     vhost_(vhost.empty() ? addr.get_host_name() : vhost),
     keep_alive_(false),
     timeout_(-1),
-    non_blocking_flag_(false)
+    non_blocking_flag_(false),
+    auth_user_(),
+    auth_passwd_(),
+    xheaders_()
   {
   }
 

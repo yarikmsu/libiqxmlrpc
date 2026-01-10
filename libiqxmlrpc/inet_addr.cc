@@ -83,10 +83,10 @@ Inet_addr::Impl::Impl( int p ):
 }
 
 Inet_addr::Impl::Impl( const SystemSockAddrIn& s ):
-  sa(s)
+  sa(s),
+  host(inet_ntoa( sa->sin_addr )),
+  port(ntohs( sa->sin_port ))
 {
-  host = inet_ntoa( sa->sin_addr );
-  port = ntohs( sa->sin_port );
 }
 
 void

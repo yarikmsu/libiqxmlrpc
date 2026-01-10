@@ -32,7 +32,7 @@ class LIBIQXMLRPC_API Inet_addr {
 
 public:
   //! Does nothing.
-  Inet_addr() {}
+  Inet_addr(): impl_() {}
 
   explicit Inet_addr( const struct sockaddr_in& );
   // cppcheck-suppress noExplicitConstructor
