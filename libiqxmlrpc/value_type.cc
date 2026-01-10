@@ -324,6 +324,27 @@ const char Binary_data::base64_alpha[64] = {
   'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
   '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/' };
 
+// Decode lookup table: -1 = invalid, -2 = padding ('='), -3 = whitespace
+// Values 0-63 are valid base64 character indices
+const signed char Binary_data::base64_decode[256] = {
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-3,-3,-1,-1,-3,-1,-1,  // 0-15 (9,10,13 = whitespace)
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  // 16-31
+  -3,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,62,-1,-1,-1,63,  // 32-47 (32=space, 43='+', 47='/')
+  52,53,54,55,56,57,58,59,60,61,-1,-1,-1,-2,-1,-1,  // 48-63 ('0'-'9', 61='=')
+  -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,  // 64-79 ('A'-'O')
+  15,16,17,18,19,20,21,22,23,24,25,-1,-1,-1,-1,-1,  // 80-95 ('P'-'Z')
+  -1,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,  // 96-111 ('a'-'o')
+  41,42,43,44,45,46,47,48,49,50,51,-1,-1,-1,-1,-1,  // 112-127 ('p'-'z')
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  // 128-143
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  // 144-159
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  // 160-175
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  // 176-191
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  // 192-207
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  // 208-223
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  // 224-239
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1   // 240-255
+};
+
 
 Binary_data* Binary_data::from_base64( const std::string& s )
 {
@@ -418,85 +439,59 @@ void Binary_data::encode() const
 }
 
 
-/*static*/ inline char Binary_data::get_idx( char c )
-{
-  if( c == '=' )
-    throw End_of_data();
-
-  if( c >= 'A' && c <= 'Z' )
-    return c - 'A';
-
-  if( c >= 'a' && c <= 'z' )
-    return 26 + c - 'a';
-
-  if( c >= '0' && c <= '9' )
-    return 52 + c - '0';
-
-  if( c == '+' )
-    return 62;
-
-  if( c == '/' )
-    return 63;
-
-  throw Malformed_base64();
-}
-
-
-inline void Binary_data::decode_four( const char* four )
-{
-  char c1 = four[0];
-  char c2 = four[1];
-  // cppcheck-suppress variableScope
-  char c3 = four[2];
-  // cppcheck-suppress variableScope
-  char c4 = four[3];
-
-  if( c1 == '=' || c2 == '=' )
-    throw Malformed_base64();
-
-  try {
-    unsigned pair = get_idx(c1) << 6 | get_idx(c2);
-    data += char(pair >> 4 & 0xff);
-
-    pair = get_idx(c2) << 6 | get_idx(c3);
-    data += char(pair >> 2);
-
-    pair = get_idx(c3) << 6 | get_idx(c4);
-    data += char(pair & 0xff);
-  }
-  catch( const End_of_data& )
-  {
-  }
-}
-
-
+// Optimized decode using lookup table - no exceptions, direct buffer write
 void Binary_data::decode()
 {
-  const char* d = base64.data();
-  size_t dsz = base64.length();
+  const unsigned char* src = reinterpret_cast<const unsigned char*>(base64.data());
+  const size_t src_len = base64.length();
 
-  // Pre-allocate: decoded is 3/4 of base64 size
-  data.reserve((dsz * 3) / 4);
+  // Reserve space (decoded is at most 3/4 of base64 size)
+  data.reserve((src_len * 3) / 4 + 1);
 
-  // Use fixed-size buffer instead of string accumulator
-  char four[4];
-  size_t four_idx = 0;
+  // Collect 4 valid base64 characters at a time
+  unsigned char vals[4];
+  size_t val_idx = 0;
+  bool done = false;
 
-  for( size_t i = 0; i < dsz; i++ )
-  {
-    if( isspace( d[i] ) )
+  for (size_t i = 0; i < src_len && !done; ++i) {
+    const signed char v = base64_decode[src[i]];
+
+    if (v >= 0) {
+      // Valid base64 character (0-63)
+      vals[val_idx++] = static_cast<unsigned char>(v);
+
+      if (val_idx == 4) {
+        // Decode 4 chars -> 3 bytes
+        data.push_back(static_cast<char>((vals[0] << 2) | (vals[1] >> 4)));
+        data.push_back(static_cast<char>((vals[1] << 4) | (vals[2] >> 2)));
+        data.push_back(static_cast<char>((vals[2] << 6) | vals[3]));
+        val_idx = 0;
+      }
+    } else if (v == -3) {
+      // Whitespace - skip
       continue;
-
-    four[four_idx++] = d[i];
-    if( four_idx == 4 )
-    {
-      decode_four( four );
-      four_idx = 0;
+    } else if (v == -2) {
+      // Padding '=' - handle end of data
+      if (val_idx == 2) {
+        data.push_back(static_cast<char>((vals[0] << 2) | (vals[1] >> 4)));
+      } else if (val_idx == 3) {
+        data.push_back(static_cast<char>((vals[0] << 2) | (vals[1] >> 4)));
+        data.push_back(static_cast<char>((vals[1] << 4) | (vals[2] >> 2)));
+      } else {
+        throw Malformed_base64();
+      }
+      done = true;
+      val_idx = 0;
+    } else {
+      // Invalid character
+      throw Malformed_base64();
     }
   }
 
-  if( four_idx != 0 )
+  // Incomplete group without padding is malformed (strict mode)
+  if (val_idx != 0) {
     throw Malformed_base64();
+  }
 }
 
 
