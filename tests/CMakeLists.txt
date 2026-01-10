@@ -57,3 +57,14 @@ add_custom_target(check ALL
 )
 
 # TODO: server-stop-test
+
+# Performance benchmark (separate from unit tests - run with make perf-test)
+add_executable(performance-test test_performance.cc)
+target_link_libraries(performance-test iqxmlrpc ${Boost_LIBRARIES} ${LIBXML2_LIBRARIES})
+
+add_custom_target(perf-test
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/performance-test
+    DEPENDS performance-test
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Running performance benchmarks..."
+)
