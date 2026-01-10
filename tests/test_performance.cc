@@ -549,7 +549,7 @@ void benchmark_parse_dump() {
 // Main
 // ============================================================================
 
-int main(int argc, char* argv[]) {
+int main(int /*argc*/, char* /*argv*/[]) {
   std::cout << "============================================================\n";
   std::cout << "libiqxmlrpc2 Performance Benchmark\n";
 
