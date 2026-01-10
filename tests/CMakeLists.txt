@@ -43,6 +43,7 @@ iqxmlrpc_test(inet-addr-test test_inet_addr.cc)
 iqxmlrpc_test(value-types-extended-test test_value_types_extended.cc)
 iqxmlrpc_test(method-dispatch-test test_method_dispatch.cc)
 iqxmlrpc_test(exceptions-test test_exceptions.cc)
+iqxmlrpc_test(socket-test test_socket.cc)
 
 # Integration test (in-process server/client testing)
 iqxmlrpc_test(integration-test test_integration.cc methods.cc)

@@ -14,6 +14,8 @@ void register_user_methods(iqxmlrpc::Server& s)
   register_method(s, "echo", echo_method);
   register_method(s, "echo_user", echo_user);
   register_method(s, "error_method", error_method);
+  register_method(s, "std_exception_method", std_exception_method);
+  register_method(s, "unknown_exception_method", unknown_exception_method);
   register_method(s, "trace", trace_method);
   register_method<Get_file>(s, "get_file");
 }
@@ -70,6 +72,24 @@ void error_method(
 {
   BOOST_TEST_MESSAGE("error_method method invoked.");
   throw iqxmlrpc::Fault(123, "My fault");
+}
+
+void std_exception_method(
+  iqxmlrpc::Method* /*m*/,
+  const iqxmlrpc::Param_list&,
+  iqxmlrpc::Value& /*retval*/ )
+{
+  BOOST_TEST_MESSAGE("std_exception_method invoked.");
+  throw std::runtime_error("Test std::exception");
+}
+
+void unknown_exception_method(
+  iqxmlrpc::Method* /*m*/,
+  const iqxmlrpc::Param_list&,
+  iqxmlrpc::Value& /*retval*/ )
+{
+  BOOST_TEST_MESSAGE("unknown_exception_method invoked.");
+  throw 42;  // Throw a non-exception type
 }
 
 namespace 

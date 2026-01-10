@@ -985,6 +985,117 @@ BOOST_AUTO_TEST_CASE(datetime_to_string)
     BOOST_CHECK(str.find("12:30:45") != std::string::npos);
 }
 
+// Additional datetime boundary tests to cover validation branches (lines 562-568)
+BOOST_AUTO_TEST_CASE(datetime_invalid_month_zero)
+{
+    BOOST_CHECK_THROW(Date_time(std::string("20260008T12:30:45")), Date_time::Malformed_iso8601);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_invalid_month_thirteen)
+{
+    BOOST_CHECK_THROW(Date_time(std::string("20261308T12:30:45")), Date_time::Malformed_iso8601);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_valid_december)
+{
+    Date_time dt(std::string("20261231T12:30:45"));
+    BOOST_CHECK_EQUAL(dt.get_tm().tm_mon, 11);  // December = 11 (0-indexed)
+}
+
+BOOST_AUTO_TEST_CASE(datetime_valid_january)
+{
+    Date_time dt(std::string("20260101T12:30:45"));
+    BOOST_CHECK_EQUAL(dt.get_tm().tm_mon, 0);  // January = 0 (0-indexed)
+}
+
+BOOST_AUTO_TEST_CASE(datetime_invalid_day_zero)
+{
+    BOOST_CHECK_THROW(Date_time(std::string("20260100T12:30:45")), Date_time::Malformed_iso8601);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_valid_day_one)
+{
+    Date_time dt(std::string("20260101T12:30:45"));
+    BOOST_CHECK_EQUAL(dt.get_tm().tm_mday, 1);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_valid_day_31)
+{
+    Date_time dt(std::string("20260131T12:30:45"));
+    BOOST_CHECK_EQUAL(dt.get_tm().tm_mday, 31);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_invalid_hour_24)
+{
+    BOOST_CHECK_THROW(Date_time(std::string("20260108T24:30:45")), Date_time::Malformed_iso8601);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_valid_hour_23)
+{
+    Date_time dt(std::string("20260108T23:30:45"));
+    BOOST_CHECK_EQUAL(dt.get_tm().tm_hour, 23);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_valid_hour_zero)
+{
+    Date_time dt(std::string("20260108T00:30:45"));
+    BOOST_CHECK_EQUAL(dt.get_tm().tm_hour, 0);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_invalid_minute_60)
+{
+    BOOST_CHECK_THROW(Date_time(std::string("20260108T12:60:45")), Date_time::Malformed_iso8601);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_valid_minute_59)
+{
+    Date_time dt(std::string("20260108T12:59:45"));
+    BOOST_CHECK_EQUAL(dt.get_tm().tm_min, 59);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_valid_second_59)
+{
+    Date_time dt(std::string("20260108T12:30:59"));
+    BOOST_CHECK_EQUAL(dt.get_tm().tm_sec, 59);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_valid_second_60_leap)
+{
+    // Seconds 60-61 are allowed for leap seconds (lines 565-566)
+    Date_time dt(std::string("20151231T23:59:60"));
+    BOOST_CHECK_EQUAL(dt.get_tm().tm_sec, 60);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_valid_second_61_leap)
+{
+    Date_time dt(std::string("20151231T23:59:61"));
+    BOOST_CHECK_EQUAL(dt.get_tm().tm_sec, 61);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_invalid_second_62)
+{
+    BOOST_CHECK_THROW(Date_time(std::string("20260108T12:30:62")), Date_time::Malformed_iso8601);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_invalid_non_digit_chars)
+{
+    // Contains non-digit characters (line 552-553)
+    BOOST_CHECK_THROW(Date_time(std::string("2026X108T12:30:45")), Date_time::Malformed_iso8601);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_missing_t_separator)
+{
+    // Missing T separator (line 548)
+    BOOST_CHECK_THROW(Date_time(std::string("20260108X12:30:45")), Date_time::Malformed_iso8601);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_wrong_length)
+{
+    // Wrong length (line 548)
+    BOOST_CHECK_THROW(Date_time(std::string("20260108T12:30:4")), Date_time::Malformed_iso8601);  // 16 chars
+    BOOST_CHECK_THROW(Date_time(std::string("20260108T12:30:450")), Date_time::Malformed_iso8601);  // 18 chars
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE(binary_data_extended_tests)
@@ -1023,6 +1134,103 @@ BOOST_AUTO_TEST_CASE(binary_roundtrip_extended)
     std::string base64 = bin1->get_base64();
     std::unique_ptr<Binary_data> bin2(Binary_data::from_base64(base64));
     BOOST_CHECK_EQUAL(bin2->get_data(), original);
+}
+
+// Tests for get_idx branches in value_type.cc lines 433-451
+BOOST_AUTO_TEST_CASE(binary_decode_all_uppercase)
+{
+    // Tests uppercase A-Z branch (lines 436-437)
+    std::unique_ptr<Binary_data> bin(Binary_data::from_base64("QUJDREVG"));
+    BOOST_CHECK_EQUAL(bin->get_data(), "ABCDEF");
+}
+
+BOOST_AUTO_TEST_CASE(binary_decode_all_lowercase)
+{
+    // Tests lowercase a-z branch (lines 439-440)
+    std::unique_ptr<Binary_data> bin(Binary_data::from_base64("YWJjZGVm"));
+    BOOST_CHECK_EQUAL(bin->get_data(), "abcdef");
+}
+
+BOOST_AUTO_TEST_CASE(binary_decode_digits)
+{
+    // Tests digits 0-9 branch (lines 442-443)
+    std::unique_ptr<Binary_data> bin(Binary_data::from_base64("MDEyMzQ1"));
+    BOOST_CHECK_EQUAL(bin->get_data(), "012345");
+}
+
+BOOST_AUTO_TEST_CASE(binary_decode_plus_char)
+{
+    // Tests + character branch (lines 445-446)
+    // '+' is character 62 in base64
+    std::unique_ptr<Binary_data> bin(Binary_data::from_base64("++++"));
+    // + at index 62 encodes specific bits
+    BOOST_CHECK(!bin->get_data().empty());
+}
+
+BOOST_AUTO_TEST_CASE(binary_decode_slash_char)
+{
+    // Tests / character branch (lines 448-449)
+    // '/' is character 63 in base64
+    std::unique_ptr<Binary_data> bin(Binary_data::from_base64("////"));
+    BOOST_CHECK(!bin->get_data().empty());
+}
+
+BOOST_AUTO_TEST_CASE(binary_encode_padding_one_byte)
+{
+    // Tests single byte input which needs == padding (lines 408-413)
+    std::unique_ptr<Binary_data> bin(Binary_data::from_data("A"));
+    std::string base64 = bin->get_base64();
+    BOOST_CHECK_EQUAL(base64.substr(base64.length() - 2), "==");
+}
+
+BOOST_AUTO_TEST_CASE(binary_encode_padding_two_bytes)
+{
+    // Tests two byte input which needs = padding (lines 421-425)
+    std::unique_ptr<Binary_data> bin(Binary_data::from_data("AB"));
+    std::string base64 = bin->get_base64();
+    BOOST_CHECK_EQUAL(base64.back(), '=');
+    BOOST_CHECK_NE(base64[base64.length() - 2], '=');
+}
+
+BOOST_AUTO_TEST_CASE(binary_encode_no_padding)
+{
+    // Tests three byte input with no padding (lines 415-420)
+    std::unique_ptr<Binary_data> bin(Binary_data::from_data("ABC"));
+    std::string base64 = bin->get_base64();
+    BOOST_CHECK(base64.find('=') == std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(binary_decode_with_tabs)
+{
+    // Tests whitespace handling in decode (line 497)
+    std::unique_ptr<Binary_data> bin(Binary_data::from_base64("TW\tFu"));
+    BOOST_CHECK_EQUAL(bin->get_data(), "Man");
+}
+
+BOOST_AUTO_TEST_CASE(binary_decode_with_newlines)
+{
+    // Tests whitespace handling with different whitespace types
+    std::unique_ptr<Binary_data> bin(Binary_data::from_base64("TW\n\rFu"));
+    BOOST_CHECK_EQUAL(bin->get_data(), "Man");
+}
+
+BOOST_AUTO_TEST_CASE(binary_malformed_equals_at_position_one)
+{
+    // Tests malformed base64 with = at position 1 (line 464)
+    BOOST_CHECK_THROW(Binary_data::from_base64("T=Fu"), Binary_data::Malformed_base64);
+}
+
+BOOST_AUTO_TEST_CASE(binary_malformed_equals_at_position_zero)
+{
+    // Tests malformed base64 with = at position 0 (line 464)
+    BOOST_CHECK_THROW(Binary_data::from_base64("=WFu"), Binary_data::Malformed_base64);
+}
+
+BOOST_AUTO_TEST_CASE(binary_decode_mixed_case)
+{
+    // Tests mixed uppercase and lowercase
+    std::unique_ptr<Binary_data> bin(Binary_data::from_base64("QWJDZEVm"));
+    BOOST_CHECK(!bin->get_data().empty());
 }
 
 BOOST_AUTO_TEST_SUITE_END()
