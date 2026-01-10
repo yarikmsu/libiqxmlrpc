@@ -687,20 +687,13 @@ enum Verification_level { HTTP_CHECK_WEAK, HTTP_CHECK_STRICT };
 
 1. **Reduce per-connection buffer allocation**
    - File: `server_conn.cc`
-   - Current: 65KB per connection (4MB for 64 connections)
+   - Current: 65KB per connection (2MB for 32 connections)
    - Consider smaller initial size with dynamic growth
 
 2. **Single-pass HTTP header parsing**
    - File: `http.cc`
    - Current: 5 passes (split, find, trim×2, lowercase)
    - Could parse in one pass with no intermediate allocations
-
-3. **Optimize handler state lookup in reactor**
-   - File: `reactor_impl.h`
-   - For 16-64 connections: ~50ns savings - negligible
-   - Only matters at 500+ connections
-
-4. **Lock-free work queue for thread pool**
 
 ---
 
