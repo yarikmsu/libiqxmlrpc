@@ -546,6 +546,64 @@ void benchmark_parse_dump() {
 }
 
 // ============================================================================
+// H. Threading Primitives Benchmark
+// Compare mutex-protected bool vs atomic<bool>
+// ============================================================================
+
+#include <atomic>
+#include <boost/thread/mutex.hpp>
+
+void benchmark_threading_primitives() {
+  perf::section("Threading Primitives (mutex vs atomic)");
+
+  const size_t ITERS = 1000000;
+
+  // Mutex-protected bool read (simulates old is_being_destructed())
+  {
+    bool flag = false;
+    boost::mutex mtx;
+
+    PERF_BENCHMARK("perf_mutex_bool_read", ITERS, {
+      boost::mutex::scoped_lock lk(mtx);
+      bool val = flag;
+      perf::do_not_optimize(val);
+    });
+  }
+
+  // Atomic bool read (simulates new is_being_destructed())
+  {
+    std::atomic<bool> flag{false};
+
+    PERF_BENCHMARK("perf_atomic_bool_read", ITERS, {
+      bool val = flag.load(std::memory_order_acquire);
+      perf::do_not_optimize(val);
+    });
+  }
+
+  // Mutex-protected bool write (simulates old destruction_started())
+  {
+    bool flag = false;
+    boost::mutex mtx;
+
+    PERF_BENCHMARK("perf_mutex_bool_write", ITERS, {
+      boost::mutex::scoped_lock lk(mtx);
+      flag = true;
+      perf::do_not_optimize(flag);
+    });
+  }
+
+  // Atomic bool write (simulates new destruction_started())
+  {
+    std::atomic<bool> flag{false};
+
+    PERF_BENCHMARK("perf_atomic_bool_write", ITERS, {
+      flag.store(true, std::memory_order_release);
+      perf::do_not_optimize(flag);
+    });
+  }
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 
@@ -570,6 +628,7 @@ int main(int /*argc*/, char* /*argv*/[]) {
   benchmark_value_operations();
   benchmark_base64();
   benchmark_parse_dump();
+  benchmark_threading_primitives();
 
   // Save baseline
   std::strftime(time_buf, sizeof(time_buf), "%Y%m%d_%H%M%S", std::localtime(&now));
