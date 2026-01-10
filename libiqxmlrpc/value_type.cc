@@ -125,7 +125,8 @@ public:
 
 
 Array::Array( const Array& other ):
-  Value_type(ValueTypeTag::Array)
+  Value_type(ValueTypeTag::Array),
+  values()
 {
   std::for_each( other.begin(), other.end(), Array_inserter(&values) );
 }
@@ -220,7 +221,8 @@ public:
 
 
 Struct::Struct( const Struct& other ):
-  Value_type(ValueTypeTag::Struct)
+  Value_type(ValueTypeTag::Struct),
+  values()
 {
   std::for_each( other.begin(), other.end(), Struct_inserter(&values) );
 }
@@ -369,7 +371,9 @@ Binary_data* Binary_data::from_data( const char* s, size_t size )
 
 
 Binary_data::Binary_data( const std::string& s, bool raw ):
-  Value_type(ValueTypeTag::Binary)
+  Value_type(ValueTypeTag::Binary),
+  data(),
+  base64()
 {
   if( raw )
     data = s;
@@ -546,13 +550,16 @@ void Binary_data::apply_visitor(Value_type_visitor& v) const
 // ----------------------------------------------------------------------------
 Date_time::Date_time( const struct tm* t ):
   Value_type(ValueTypeTag::DateTime),
-  tm_(*t)
+  tm_(*t),
+  cache()
 {
 }
 
 
 Date_time::Date_time( bool use_lt ):
-  Value_type(ValueTypeTag::DateTime)
+  Value_type(ValueTypeTag::DateTime),
+  tm_(),
+  cache()
 {
   using namespace boost::posix_time;
   ptime p = use_lt ? second_clock::local_time() : second_clock::universal_time();
@@ -561,7 +568,9 @@ Date_time::Date_time( bool use_lt ):
 
 
 Date_time::Date_time( const std::string& s ):
-  Value_type(ValueTypeTag::DateTime)
+  Value_type(ValueTypeTag::DateTime),
+  tm_(),
+  cache()
 {
   if( s.length() != 17 || s[8] != 'T' )
     throw Malformed_iso8601();

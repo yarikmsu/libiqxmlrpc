@@ -20,7 +20,9 @@ enum ResponseBuilderState {
 
 ResponseBuilder::ResponseBuilder(Parser& parser):
   BuilderBase(parser),
-  state_(parser, NONE)
+  state_(parser, NONE),
+  ok_(),
+  fault_str_()
 {
   static const StateMachine::StateTransition trans[] = {
     { NONE, RESPONSE, "methodResponse" },

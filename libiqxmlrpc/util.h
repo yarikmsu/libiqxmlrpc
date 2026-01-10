@@ -51,6 +51,8 @@ public:
   {
   }
 
+  ExplicitPtr& operator=(const ExplicitPtr&) = delete;
+
   ~ExplicitPtr()
   {
     delete release();

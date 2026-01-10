@@ -9,7 +9,8 @@
 namespace iqxmlrpc {
 
 ValueBuilderBase::ValueBuilderBase(Parser& parser, bool expect_text):
-  BuilderBase(parser, expect_text)
+  BuilderBase(parser, expect_text),
+  retval()
 {
 }
 
@@ -23,7 +24,9 @@ public:
   explicit StructBuilder(Parser& parser):
     ValueBuilderBase(parser),
     state_(parser, NONE),
-    value_(0)
+    name_(),
+    value_(0),
+    proxy_(nullptr)
   {
     static const StateMachine::StateTransition trans[] = {
       { NONE, MEMBER, "member" },

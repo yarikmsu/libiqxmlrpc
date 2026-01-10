@@ -102,7 +102,7 @@ private:
  */
 class LIBIQXMLRPC_API Interceptor {
 public:
-  Interceptor() = default;
+  Interceptor(): nested() {}
   Interceptor(const Interceptor&) = delete;
   Interceptor& operator=(const Interceptor&) = delete;
 

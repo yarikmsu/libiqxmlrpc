@@ -45,7 +45,8 @@ Https_proxy_client_connection::Https_proxy_client_connection(
   Connection( s ),
   reactor( new Reactor<Null_lock> ),
   resp_packet(nullptr),
-  non_blocking(nb)
+  non_blocking(nb),
+  out_str()
 {
   sock.set_non_blocking( nb );
 }
@@ -118,6 +119,7 @@ Https_client_connection::Https_client_connection( const iqnet::Socket& s, bool n
   iqnet::ssl::Reaction_connection( s ),
   reactor( new Reactor<Null_lock> ),
   resp_packet(nullptr),
+  out_str(),
   established(false)
 {
   iqnet::ssl::Reaction_connection::sock.set_non_blocking( nb );

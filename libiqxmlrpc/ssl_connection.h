@@ -24,6 +24,9 @@ public:
   explicit Connection( const Socket& sock );
   ~Connection() override;
 
+  Connection(const Connection&) = delete;
+  Connection& operator=(const Connection&) = delete;
+
   void shutdown();
   size_t send( const char*, size_t ) override;
   size_t recv( char*, size_t ) override;
@@ -57,6 +60,9 @@ class LIBIQXMLRPC_API Reaction_connection: public ssl::Connection {
 
 public:
   Reaction_connection( const Socket&, Reactor_base* = 0 );
+
+  Reaction_connection(const Reaction_connection&) = delete;
+  Reaction_connection& operator=(const Reaction_connection&) = delete;
 
   //! A trick for supporting generic factory.
   void set_reactor( Reactor_base* r )

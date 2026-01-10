@@ -24,6 +24,9 @@ class LIBIQXMLRPC_API Https_proxy_client_connection:
 public:
   Https_proxy_client_connection( const iqnet::Socket&, bool non_block_flag );
 
+  Https_proxy_client_connection(const Https_proxy_client_connection&) = delete;
+  Https_proxy_client_connection& operator=(const Https_proxy_client_connection&) = delete;
+
   void handle_input( bool& ) override;
   void handle_output( bool& ) override;
 
@@ -52,6 +55,9 @@ public:
   typedef Https_proxy_client_connection Proxy_connection;
 
   Https_client_connection( const iqnet::Socket&, bool non_block_flag );
+
+  Https_client_connection(const Https_client_connection&) = delete;
+  Https_client_connection& operator=(const Https_client_connection&) = delete;
 
   void post_connect() override
   {

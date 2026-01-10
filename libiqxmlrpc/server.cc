@@ -52,10 +52,14 @@ public:
       log(nullptr),
       max_req_sz(0),
       ver_level(http::HTTP_CHECK_WEAK),
+      disp_manager(),
       interceptors(nullptr),
       auth_plugin(nullptr)
   {
   }
+
+  Impl(const Impl&) = delete;
+  Impl& operator=(const Impl&) = delete;
 };
 
 // ---------------------------------------------------------------------------
