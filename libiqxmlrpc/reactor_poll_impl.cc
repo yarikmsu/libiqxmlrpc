@@ -35,8 +35,8 @@ void Reactor_poll_impl::reset(const HandlerStateList& in)
 
   for (const auto& h : in)
   {
-    short events = h.mask & Reactor_base::INPUT ? POLLIN : 0;
-    events |= h.mask & Reactor_base::OUTPUT ? POLLOUT : 0;
+    short events = (h.mask & Reactor_base::INPUT) ? POLLIN : 0;
+    events |= (h.mask & Reactor_base::OUTPUT) ? POLLOUT : 0;
     struct pollfd sfd = { h.fd, events, 0 };
     impl->pfd.push_back(sfd);
   }

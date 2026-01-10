@@ -107,6 +107,7 @@ public:
 
   virtual ~Interceptor() {}
 
+  // cppcheck-suppress constParameterPointer
   void nest(Interceptor* ic)
   {
     nested.reset(ic);
