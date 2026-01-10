@@ -113,8 +113,12 @@ BOOST_AUTO_TEST_CASE( get_file_test )
   typedef const char strchar;
   unsigned char md5[16];
 
+  // MD5 is deprecated in OpenSSL 3.0 but still works; suppress warning for test code
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   MD5(reinterpret_cast<md5char*>(d.get_data().data()),
     d.get_data().length(), md5);
+#pragma GCC diagnostic pop
   std::unique_ptr<Binary_data> gen_md5( Binary_data::from_data(
     reinterpret_cast<strchar*>(md5), sizeof(md5)) );
 

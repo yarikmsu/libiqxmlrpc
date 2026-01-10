@@ -28,7 +28,10 @@ namespace ssl {
 
 //
 // Mutli-threading support stuff
+// Note: OpenSSL 1.1.0+ handles threading internally, these callbacks are only needed for 1.0.x
 //
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 
 class LockContainer {
 public:
@@ -71,17 +74,21 @@ openssl_id_function()
 
 LockContainer::~LockContainer()
 {
-   if (CRYPTO_get_locking_callback() == &openssl_lock_callback)
+  if (CRYPTO_get_locking_callback() == &openssl_lock_callback) {
     CRYPTO_set_locking_callback(0);
+  }
 
 #ifndef _WIN32
-  if (CRYPTO_get_id_callback() == &openssl_id_function)
+  if (CRYPTO_get_id_callback() == &openssl_id_function) {
     CRYPTO_set_id_callback(0);
+  }
 #endif
 
   // do not try to unlock locks
   delete[] locks;
 }
+
+#endif // OPENSSL_VERSION_NUMBER < 0x10100000L
 
 Ctx* ctx = nullptr;
 boost::once_flag ssl_init;
@@ -90,15 +97,22 @@ int iqxmlrpc_ssl_data_idx = 0;
 void
 init_library()
 {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
   SSL_load_error_strings();
   SSL_library_init();
 
-  if (!CRYPTO_get_locking_callback())
+  if (!CRYPTO_get_locking_callback()) {
     CRYPTO_set_locking_callback(&openssl_lock_callback);
+  }
 
 #ifndef _WIN32
-  if (!CRYPTO_get_id_callback())
+  if (!CRYPTO_get_id_callback()) {
     CRYPTO_set_id_callback(&openssl_id_function);
+  }
+#endif
+#else
+  // OpenSSL 1.1.0+ initializes automatically
+  OPENSSL_init_ssl(0, NULL);
 #endif
 
   iqxmlrpc_ssl_data_idx = SSL_get_ex_new_index(0, const_cast<void*>(static_cast<const void*>("iqxmlrpc verifier")), NULL, NULL, NULL);
