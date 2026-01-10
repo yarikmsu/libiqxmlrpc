@@ -13,6 +13,7 @@
 #include <map>
 #include <string>
 #include <time.h>
+#include <unordered_map>
 #include <vector>
 
 #ifdef _MSC_VER
@@ -254,7 +255,7 @@ public:
   };
 
 private:
-  typedef std::map<std::string, std::unique_ptr<Value>> Value_stor;
+  typedef std::unordered_map<std::string, std::unique_ptr<Value>> Value_stor;
   Value_stor values;
 
 public:
