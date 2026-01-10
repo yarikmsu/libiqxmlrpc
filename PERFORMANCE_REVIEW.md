@@ -24,6 +24,32 @@ This performance review analyzes the libiqxmlrpc library, an object-oriented XML
 
 ---
 
+## Performance Improvement Guidelines
+
+**Every performance improvement MUST include:**
+
+1. **Performance test** - Add or use existing benchmark in `tests/test_performance.cc`
+2. **Before/after measurements** - Run benchmarks before and after the change
+3. **Documented comparison** - Include measured results in PR description and this document
+4. **Reproducible results** - Ensure benchmarks can be re-run with `make perf-test`
+
+**PR Template for Performance Changes:**
+```
+## Performance Results
+| Operation | Before | After | Improvement |
+|-----------|--------|-------|-------------|
+| benchmark_name | X ns | Y ns | Z% faster |
+
+## How to reproduce
+1. Checkout commit before change
+2. Run: make perf-test
+3. Apply change
+4. Run: make perf-test
+5. Compare results
+```
+
+---
+
 ## Table of Contents
 
 1. [XML Parsing Performance](#1-xml-parsing-performance)
@@ -687,20 +713,13 @@ enum Verification_level { HTTP_CHECK_WEAK, HTTP_CHECK_STRICT };
 
 1. **Reduce per-connection buffer allocation**
    - File: `server_conn.cc`
-   - Current: 65KB per connection (4MB for 64 connections)
+   - Current: 65KB per connection (2MB for 32 connections)
    - Consider smaller initial size with dynamic growth
 
 2. **Single-pass HTTP header parsing**
    - File: `http.cc`
    - Current: 5 passes (split, find, trim×2, lowercase)
    - Could parse in one pass with no intermediate allocations
-
-3. **Optimize handler state lookup in reactor**
-   - File: `reactor_impl.h`
-   - For 16-64 connections: ~50ns savings - negligible
-   - Only matters at 500+ connections
-
-4. **Lock-free work queue for thread pool**
 
 ---
 
