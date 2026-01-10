@@ -24,6 +24,32 @@ This performance review analyzes the libiqxmlrpc library, an object-oriented XML
 
 ---
 
+## Performance Improvement Guidelines
+
+**Every performance improvement MUST include:**
+
+1. **Performance test** - Add or use existing benchmark in `tests/test_performance.cc`
+2. **Before/after measurements** - Run benchmarks before and after the change
+3. **Documented comparison** - Include measured results in PR description and this document
+4. **Reproducible results** - Ensure benchmarks can be re-run with `make perf-test`
+
+**PR Template for Performance Changes:**
+```
+## Performance Results
+| Operation | Before | After | Improvement |
+|-----------|--------|-------|-------------|
+| benchmark_name | X ns | Y ns | Z% faster |
+
+## How to reproduce
+1. Checkout commit before change
+2. Run: make perf-test
+3. Apply change
+4. Run: make perf-test
+5. Compare results
+```
+
+---
+
 ## Table of Contents
 
 1. [XML Parsing Performance](#1-xml-parsing-performance)
