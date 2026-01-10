@@ -10,6 +10,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <algorithm>
+#include <charconv>
 #include <string.h>
 
 namespace iqxmlrpc {
@@ -195,6 +196,11 @@ void Array::push_back( const Value& v )
   values.push_back(new Value(v));
 }
 
+void Array::push_back( Value&& v )
+{
+  values.push_back(new Value(std::move(v)));
+}
+
 
 // --------------------------------------------------------------------------
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
@@ -315,6 +321,13 @@ void Struct::insert( const std::string& f, const Value& val )
 {
   Value_ptr p(new Value(val));
   insert(f, p);
+}
+
+void Struct::insert( const std::string& f, Value&& val )
+{
+  Value*& tmp = values[f];
+  delete tmp;
+  tmp = new Value(std::move(val));
 }
 
 
@@ -553,16 +566,35 @@ Date_time::Date_time( const std::string& s ):
   if( s.length() != 17 || s[8] != 'T' )
     throw Malformed_iso8601();
 
-  char alpha[] = "0123456789T:";
-  if( s.substr(0, 16).find_first_not_of(alpha) != std::string::npos )
-    throw Malformed_iso8601();
+  // Validate format: YYYYMMDDThh:mm:ss
+  // Position 8 is 'T' (already checked above), positions 11 and 14 are ':'
+  const char* p = s.c_str();
+  for (size_t i = 0; i < 17; ++i) {
+    if (i == 8) {
+      continue;  // Already validated T above
+    } else if (i == 11 || i == 14) {
+      if (p[i] != ':') throw Malformed_iso8601();
+    } else {
+      if (p[i] < '0' || p[i] > '9') throw Malformed_iso8601();
+    }
+  }
 
-  tm_.tm_year = atoi( s.substr(0, 4).c_str() ) - 1900;
-  tm_.tm_mon  = atoi( s.substr(4, 2).c_str() ) - 1;
-  tm_.tm_mday = atoi( s.substr(6, 2).c_str() );
-  tm_.tm_hour = atoi( s.substr(9, 2).c_str() );
-  tm_.tm_min  = atoi( s.substr(12, 2).c_str() );
-  tm_.tm_sec  = atoi( s.substr(15, 2).c_str() );
+  // Parse fields directly using std::from_chars (no allocations)
+  auto parse_field = [&p](int start, int len) -> int {
+    int val = 0;
+    auto [ptr, ec] = std::from_chars(p + start, p + start + len, val);
+    if (ec != std::errc{} || ptr != p + start + len) {
+      throw Malformed_iso8601();
+    }
+    return val;
+  };
+
+  tm_.tm_year = parse_field(0, 4) - 1900;   // YYYY
+  tm_.tm_mon  = parse_field(4, 2) - 1;      // MM
+  tm_.tm_mday = parse_field(6, 2);          // DD
+  tm_.tm_hour = parse_field(9, 2);          // hh
+  tm_.tm_min  = parse_field(12, 2);         // mm
+  tm_.tm_sec  = parse_field(15, 2);         // ss
 
   if( (tm_.tm_year < 0) || !(tm_.tm_mon >= 0 && tm_.tm_mon <= 11) ||
       !(tm_.tm_mday >= 1 && tm_.tm_mday <= 31) ||
