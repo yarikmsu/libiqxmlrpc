@@ -72,8 +72,7 @@ private:
         throw XML_RPC_violation(parser_.context());
       }
 
-      Value_ptr v(new Value(value_));
-      proxy_->insert(name_, v);
+      proxy_->insert(name_, std::make_unique<Value>(value_));
       state_.set_state(NONE);
     }
   }
@@ -117,8 +116,7 @@ private:
     if (state_.change(tagname) == VALUES) {
       Value_type* tmp = sub_build<Value_type*, ValueBuilder>();
       tmp = tmp ? tmp : new String("");
-      Value_ptr v(new Value(tmp));
-      proxy_->push_back(v);
+      proxy_->push_back(std::make_unique<Value>(tmp));
     }
   }
 
