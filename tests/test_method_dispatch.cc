@@ -477,4 +477,50 @@ BOOST_AUTO_TEST_CASE(function_adapter_empty_params)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+//=============================================================================
+// Server_feedback tests - covers method.cc null pointer error paths
+//=============================================================================
+
+BOOST_AUTO_TEST_SUITE(server_feedback_tests)
+
+// Test Server_feedback::set_exit_flag with null server
+// Covers method.cc lines 16-17: null pointer exception in set_exit_flag
+BOOST_AUTO_TEST_CASE(server_feedback_null_set_exit_flag)
+{
+    // Create Server_feedback with default constructor (null server)
+    Server_feedback feedback;
+
+    // Calling set_exit_flag should throw Exception
+    BOOST_CHECK_THROW(feedback.set_exit_flag(), Exception);
+
+    // Verify the exception message
+    try {
+        feedback.set_exit_flag();
+        BOOST_FAIL("Expected Exception to be thrown");
+    } catch (const Exception& e) {
+        BOOST_CHECK(std::string(e.what()).find("null pointer") != std::string::npos);
+    }
+}
+
+// Test Server_feedback::log_message with null server
+// Covers method.cc lines 24-25: null pointer exception in log_message
+BOOST_AUTO_TEST_CASE(server_feedback_null_log_message)
+{
+    // Create Server_feedback with default constructor (null server)
+    Server_feedback feedback;
+
+    // Calling log_message should throw Exception
+    BOOST_CHECK_THROW(feedback.log_message("test message"), Exception);
+
+    // Verify the exception message
+    try {
+        feedback.log_message("test message");
+        BOOST_FAIL("Expected Exception to be thrown");
+    } catch (const Exception& e) {
+        BOOST_CHECK(std::string(e.what()).find("null pointer") != std::string::npos);
+    }
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
 // vim:ts=2:sw=2:et
