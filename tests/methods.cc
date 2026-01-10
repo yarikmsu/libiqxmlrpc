@@ -122,7 +122,11 @@ void Get_file::execute(
   typedef const char strchar;
 
   unsigned char md5[16];
+  // MD5 is deprecated in OpenSSL 3.0 but still works; suppress warning for test code
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   MD5(reinterpret_cast<md5char*>(s.data()), s.length(), md5);
+#pragma GCC diagnostic pop
   
   retval.insert("md5", Binary_data::from_data(
     reinterpret_cast<strchar*>(md5), sizeof(md5)));
