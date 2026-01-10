@@ -4,9 +4,8 @@
 #include "https_client.h"
 
 #include "client_opts.h"
+#include "num_conv.h"
 #include "reactor_impl.h"
-
-#include <boost/lexical_cast.hpp>
 
 using namespace iqnet;
 
@@ -27,7 +26,7 @@ private:
     return
       "CONNECT "
       + addr_.get_host_name() + ":"
-      + boost::lexical_cast<std::string>(addr_.get_port())
+      + num_conv::to_string(addr_.get_port())
       + " HTTP/1.0\r\n";
   }
 

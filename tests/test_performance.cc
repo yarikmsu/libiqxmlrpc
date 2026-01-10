@@ -16,6 +16,8 @@
 #include <memory>
 #include <cstring>
 
+#include "libiqxmlrpc/num_conv.h"
+
 using namespace iqxmlrpc;
 
 // ============================================================================
@@ -73,6 +75,57 @@ void benchmark_number_conversions() {
   PERF_BENCHMARK("perf_string_to_double", ITERS, {
     std::string s = "3.141592653589793";
     double val = boost::lexical_cast<double>(s);
+    perf::do_not_optimize(val);
+  });
+
+  // Now test the new num_conv functions
+  perf::section("Number Conversion (std::to_chars/from_chars)");
+
+  // int -> string (num_conv)
+  {
+    int val = 123456;
+    PERF_BENCHMARK("perf_int_to_string_new", ITERS, {
+      std::string s = num_conv::to_string(val);
+      perf::do_not_optimize(s);
+    });
+  }
+
+  // string -> int (num_conv)
+  PERF_BENCHMARK("perf_string_to_int_new", ITERS, {
+    std::string s = "123456";
+    int val = num_conv::from_string<int>(s);
+    perf::do_not_optimize(val);
+  });
+
+  // int64_t -> string (num_conv)
+  {
+    int64_t val = 9223372036854775807LL;
+    PERF_BENCHMARK("perf_int64_to_string_new", ITERS, {
+      std::string s = num_conv::to_string(val);
+      perf::do_not_optimize(s);
+    });
+  }
+
+  // string -> int64_t (num_conv)
+  PERF_BENCHMARK("perf_string_to_int64_new", ITERS, {
+    std::string s = "9223372036854775807";
+    int64_t val = num_conv::from_string<int64_t>(s);
+    perf::do_not_optimize(val);
+  });
+
+  // double -> string (num_conv)
+  {
+    double val = 3.141592653589793;
+    PERF_BENCHMARK("perf_double_to_string_new", ITERS, {
+      std::string s = num_conv::double_to_string(val);
+      perf::do_not_optimize(s);
+    });
+  }
+
+  // string -> double (num_conv)
+  PERF_BENCHMARK("perf_string_to_double_new", ITERS, {
+    std::string s = "3.141592653589793";
+    double val = num_conv::string_to_double(s);
     perf::do_not_optimize(val);
   });
 }
