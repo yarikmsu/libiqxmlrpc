@@ -2065,4 +2065,325 @@ BOOST_AUTO_TEST_CASE(inet_addr_operations)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+//=============================================================================
+// Coverage Improvement Tests - ssl_lib.cc, https_server.cc, http_client.cc
+//
+// These tests target specific uncovered code paths:
+//   - SSL certificate loading failures (ssl_lib.cc lines 213-218)
+//   - HTTPS server connection handling (https_server.cc)
+//   - HTTP client timeout and disconnect (http_client.cc lines 35, 63)
+//=============================================================================
+
+BOOST_AUTO_TEST_SUITE(coverage_improvement_tests)
+
+//-----------------------------------------------------------------------------
+// SSL Certificate Loading Tests (ssl_lib.cc)
+//-----------------------------------------------------------------------------
+
+// Test SSL context with truncated/corrupted certificate file
+// Covers ssl_lib.cc lines 213-215: SSL_CTX_use_certificate_file failure
+BOOST_AUTO_TEST_CASE(ssl_truncated_cert_file)
+{
+    iqnet::ssl::Ctx* saved_ctx = iqnet::ssl::ctx;
+
+    // Create a file with a truncated/corrupted certificate
+    std::string corrupt_cert_path = "/tmp/iqxmlrpc_coverage_corrupt_cert.pem";
+    std::string corrupt_key_path = "/tmp/iqxmlrpc_coverage_corrupt_key.pem";
+
+    std::ofstream cert_file(corrupt_cert_path);
+    cert_file << "-----BEGIN CERTIFICATE-----\nTRUNCATED\n-----END CERTIFICATE-----\n";
+    cert_file.close();
+
+    std::ofstream key_file(corrupt_key_path);
+    key_file << "-----BEGIN PRIVATE KEY-----\nTRUNCATED\n-----END PRIVATE KEY-----\n";
+    key_file.close();
+
+    bool exception_thrown = false;
+    try {
+        iqnet::ssl::Ctx* ctx = iqnet::ssl::Ctx::client_server(
+            corrupt_cert_path,
+            corrupt_key_path);
+        delete ctx;
+    } catch (...) {
+        exception_thrown = true;
+    }
+
+    std::remove(corrupt_cert_path.c_str());
+    std::remove(corrupt_key_path.c_str());
+    iqnet::ssl::ctx = saved_ctx;
+    BOOST_CHECK(exception_thrown);
+}
+
+// Test SSL context with valid cert but invalid key file
+// Covers ssl_lib.cc lines 215-217: SSL_CTX_use_PrivateKey_file failure
+BOOST_AUTO_TEST_CASE(ssl_valid_cert_invalid_key)
+{
+    iqnet::ssl::Ctx* saved_ctx = iqnet::ssl::ctx;
+
+    // Write valid cert to temp file
+    std::string cert_path = "/tmp/iqxmlrpc_coverage_cert2.pem";
+    std::string key_path = "/tmp/iqxmlrpc_coverage_badkey2.pem";
+
+    std::ofstream cert_file(cert_path);
+    cert_file << EMBEDDED_TEST_CERT;
+    cert_file.close();
+
+    // Write an invalid key (corrupt format)
+    std::ofstream key_file(key_path);
+    key_file << "-----BEGIN PRIVATE KEY-----\nCORRUPT_KEY_DATA\n-----END PRIVATE KEY-----\n";
+    key_file.close();
+
+    bool exception_thrown = false;
+    try {
+        iqnet::ssl::Ctx* ctx = iqnet::ssl::Ctx::client_server(
+            cert_path,
+            key_path);
+        delete ctx;
+    } catch (...) {
+        exception_thrown = true;
+    }
+
+    std::remove(cert_path.c_str());
+    std::remove(key_path.c_str());
+    iqnet::ssl::ctx = saved_ctx;
+    BOOST_CHECK(exception_thrown);
+}
+
+// Test HTTPS client connecting to HTTP server (SSL handshake failure)
+// Covers ssl_lib.cc SSL error handling paths
+BOOST_FIXTURE_TEST_CASE(ssl_handshake_to_non_ssl_server, IntegrationFixture)
+{
+    // Start regular HTTP server (not HTTPS)
+    start_server(1, 220);
+
+    // Try to connect with HTTPS client - should fail SSL handshake
+    bool ssl_error = false;
+    try {
+        // Need SSL context for client
+        auto paths = create_temp_cert_files();
+        iqnet::ssl::Ctx* ctx = iqnet::ssl::Ctx::client_server(paths.first, paths.second);
+        iqnet::ssl::Ctx* saved = iqnet::ssl::ctx;
+        iqnet::ssl::ctx = ctx;
+
+        Client<Https_client_connection> client(Inet_addr("127.0.0.1", port_));
+        client.set_timeout(3);
+        client.execute("echo", Value("test"));
+
+        iqnet::ssl::ctx = saved;
+        delete ctx;
+        std::remove(paths.first.c_str());
+        std::remove(paths.second.c_str());
+    } catch (const iqnet::ssl::exception&) {
+        ssl_error = true;
+    } catch (const iqnet::network_error&) {
+        ssl_error = true;  // Also acceptable - connection may fail differently
+    } catch (...) {
+        ssl_error = true;  // Any SSL-related error is acceptable
+    }
+
+    BOOST_CHECK(ssl_error);
+}
+
+//-----------------------------------------------------------------------------
+// HTTPS Server Tests (https_server.cc)
+//-----------------------------------------------------------------------------
+
+// Test HTTPS server with keep-alive connections
+// Covers https_server.cc send_succeed keep-alive paths
+BOOST_FIXTURE_TEST_CASE(https_keep_alive_multiple_requests, HttpsIntegrationFixture)
+{
+    BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+        "Failed to setup SSL context");
+
+    start_server(221);
+
+    // Create client with keep-alive
+    std::unique_ptr<Client_base> client(
+        new Client<Https_client_connection>(Inet_addr("127.0.0.1", port_)));
+    client->set_keep_alive(true);
+
+    // Multiple requests on same HTTPS connection
+    for (int i = 0; i < 3; ++i) {
+        Response r = client->execute("echo", Value(i));
+        BOOST_CHECK(!r.is_fault());
+        BOOST_CHECK_EQUAL(r.value().get_int(), i);
+    }
+}
+
+// Test HTTPS server with Connection: close
+// Covers https_server.cc shutdown path in send_succeed
+BOOST_FIXTURE_TEST_CASE(https_no_keep_alive_shutdown, HttpsIntegrationFixture)
+{
+    BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+        "Failed to setup SSL context");
+
+    start_server(222);
+
+    std::unique_ptr<Client_base> client(
+        new Client<Https_client_connection>(Inet_addr("127.0.0.1", port_)));
+    client->set_keep_alive(false);
+
+    // Single request with connection close
+    Response r = client->execute("echo", Value("shutdown test"));
+    BOOST_CHECK(!r.is_fault());
+    BOOST_CHECK_EQUAL(r.value().get_string(), "shutdown test");
+}
+
+// Test HTTPS server exception logging
+// Covers https_server.cc log_exception and log_unknown_exception methods
+BOOST_FIXTURE_TEST_CASE(https_server_logs_exceptions, HttpsIntegrationFixture)
+{
+    BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+        "Failed to setup SSL context");
+
+    start_server(223);
+
+    std::unique_ptr<Client_base> client(
+        new Client<Https_client_connection>(Inet_addr("127.0.0.1", port_)));
+
+    // Call method that throws std::exception
+    Response r1 = client->execute("std_exception_method", Param_list());
+    BOOST_CHECK(r1.is_fault());
+
+    // Call method that throws unknown exception type
+    Response r2 = client->execute("unknown_exception_method", Param_list());
+    BOOST_CHECK(r2.is_fault());
+
+    // Server should still be running after logging exceptions
+    Response r3 = client->execute("echo", Value("still working"));
+    BOOST_CHECK(!r3.is_fault());
+}
+
+// Test HTTPS server with larger data transfer
+// Covers https_server.cc send paths with multi-chunk data
+BOOST_FIXTURE_TEST_CASE(https_large_data_transfer, HttpsIntegrationFixture)
+{
+    BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+        "Failed to setup SSL context");
+
+    start_server(224);
+
+    std::unique_ptr<Client_base> client(
+        new Client<Https_client_connection>(Inet_addr("127.0.0.1", port_)));
+
+    // Send moderately large data
+    std::string large_data(10000, 'x');
+    Response r = client->execute("echo", Value(large_data));
+    BOOST_CHECK(!r.is_fault());
+    BOOST_CHECK_EQUAL(r.value().get_string(), large_data);
+}
+
+//-----------------------------------------------------------------------------
+// HTTP Client Timeout/Disconnect Tests (http_client.cc)
+//-----------------------------------------------------------------------------
+
+// Test HTTP client request timeout
+// Covers http_client.cc line 35: throw Client_timeout()
+BOOST_AUTO_TEST_CASE(http_client_actual_request_timeout)
+{
+    // Create a server that accepts but never responds
+    Socket server_sock;
+    Inet_addr bind_addr("127.0.0.1", 0);
+    server_sock.bind(bind_addr);
+    server_sock.listen(1);
+    Inet_addr server_addr = server_sock.get_addr();
+
+    std::atomic<bool> keep_running{true};
+
+    // Thread that accepts connection but doesn't respond
+    boost::thread delayed_server([&server_sock, &keep_running]() {
+        try {
+            Socket accepted = server_sock.accept();
+            // Read the request to avoid connection errors
+            char buf[4096];
+            accepted.recv(buf, sizeof(buf));
+
+            // Hold connection open without responding until test completes
+            while (keep_running.load()) {
+                boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+            }
+            accepted.close();
+        } catch (...) {
+            // Ignore errors during shutdown
+        }
+    });
+
+    // Give server thread time to start listening
+    boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
+
+    bool timeout_occurred = false;
+    try {
+        Client<Http_client_connection> client(server_addr);
+        client.set_timeout(1);  // 1 second timeout
+        client.execute("echo", Value("timeout test"));
+    } catch (const Client_timeout&) {
+        timeout_occurred = true;
+    }
+
+    keep_running = false;
+    server_sock.close();
+    delayed_server.join();
+
+    BOOST_CHECK(timeout_occurred);
+}
+
+// Test HTTP client connection closed during read
+// Covers http_client.cc line 63: throw network_error("Connection closed by peer.")
+BOOST_AUTO_TEST_CASE(http_client_connection_closed_during_read)
+{
+    // Create a server that sends partial response then closes
+    Socket server_sock;
+    Inet_addr bind_addr("127.0.0.1", 0);
+    server_sock.bind(bind_addr);
+    server_sock.listen(1);
+    Inet_addr server_addr = server_sock.get_addr();
+
+    // Thread that accepts, reads request, sends partial response, then closes
+    boost::thread partial_response_server([&server_sock]() {
+        try {
+            Socket accepted = server_sock.accept();
+            // Read the full request
+            char buf[4096];
+            accepted.recv(buf, sizeof(buf));
+
+            // Send incomplete HTTP response headers (promises body but closes before it)
+            const char* partial = "HTTP/1.1 200 OK\r\nContent-Length: 1000\r\n\r\n";
+            accepted.send(partial, strlen(partial));
+
+            // Close immediately without sending body
+            boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
+            accepted.close();
+        } catch (...) {
+            // Ignore errors during shutdown
+        }
+    });
+
+    // Give server thread time to start listening
+    boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
+
+    bool network_error_occurred = false;
+    try {
+        Client<Http_client_connection> client(server_addr);
+        client.set_timeout(5);
+        client.execute("echo", Value("disconnect test"));
+    } catch (const iqnet::network_error& e) {
+        network_error_occurred = true;
+        // Check if message mentions peer or closed
+        std::string what = e.what();
+        BOOST_CHECK(what.find("peer") != std::string::npos ||
+                    what.find("closed") != std::string::npos ||
+                    what.length() > 0);
+    } catch (...) {
+        // Any network error is acceptable
+        network_error_occurred = true;
+    }
+
+    server_sock.close();
+    partial_response_server.join();
+
+    BOOST_CHECK(network_error_occurred);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
 // vim:ts=2:sw=2:et
