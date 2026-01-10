@@ -78,7 +78,7 @@ BOOST_AUTO_TEST_CASE( array_test )
 
   {
     Array a;
-    a.push_back(0);
+    a.push_back(Value(0));
     BOOST_TEST_CHECKPOINT("Suspicious Array cloning");
     std::unique_ptr<Array> a1(a.clone());
     BOOST_CHECK_EQUAL((*a1.get())[0].get_int(), 0);
@@ -126,7 +126,7 @@ BOOST_AUTO_TEST_CASE( struct_test )
     BOOST_CHECK_EQUAL( (*it->second).get_string(), "D.D.Salinger" );
     BOOST_CHECK( s.find("nonexistent") == s.end() );
 
-    s.insert( "nonexistent", 0 );
+    s.insert( "nonexistent", Value(0) );
     BOOST_CHECK( s.find("nonexistent") != s.end() );
     s.erase( "nonexistent" );
     BOOST_CHECK( s.find("nonexistent") == s.end() );
@@ -156,7 +156,7 @@ BOOST_AUTO_TEST_CASE( struct_test )
 
   {
     Struct s;
-    s.insert("pages", 0);
+    s.insert("pages", Value(0));
 
     BOOST_TEST_CHECKPOINT("Inserting 0 into struct");
     BOOST_CHECK(s["pages"].is_int());
