@@ -310,6 +310,7 @@ public:
 
 private:
   static const char base64_alpha[64];
+  static const signed char base64_decode[256];
 
   std::string data;
   mutable std::string base64;
@@ -332,15 +333,10 @@ public:
   void apply_visitor( Value_type_visitor& ) const override;
 
 private:
-  class End_of_data {};
-
   Binary_data( const std::string&, bool raw );
 
   void add_base64_char( int idx ) const;
   void encode() const;
-
-  static char get_idx( char );
-  void decode_four( const char* four );
   void decode();
 };
 
