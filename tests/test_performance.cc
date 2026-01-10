@@ -331,6 +331,92 @@ void benchmark_value_operations() {
     }
     perf::do_not_optimize(s);
   });
+
+  // --- Element Access Benchmarks (for smart pointer impact measurement) ---
+
+  // Array element access - random access pattern
+  {
+    Array arr;
+    for (int i = 0; i < 1000; i++) arr.push_back(i);
+
+    PERF_BENCHMARK("perf_array_access", ITERS_SIMPLE, {
+      int sum = 0;
+      for (unsigned i = 0; i < arr.size(); i++) {
+        sum += arr[i].get_int();
+      }
+      perf::do_not_optimize(sum);
+    });
+  }
+
+  // Struct element access - key lookup
+  {
+    Struct s;
+    for (int i = 0; i < 20; i++) {
+      s.insert("field_" + std::to_string(i), i * 10);
+    }
+
+    PERF_BENCHMARK("perf_struct_access", ITERS_SIMPLE, {
+      int sum = 0;
+      sum += s["field_0"].get_int();
+      sum += s["field_5"].get_int();
+      sum += s["field_10"].get_int();
+      sum += s["field_15"].get_int();
+      sum += s["field_19"].get_int();
+      perf::do_not_optimize(sum);
+    });
+  }
+
+  // --- Iteration Benchmarks ---
+
+  // Array iteration using const_iterator
+  {
+    Array arr;
+    for (int i = 0; i < 1000; i++) arr.push_back(i);
+
+    PERF_BENCHMARK("perf_array_iterate", ITERS_SIMPLE, {
+      int sum = 0;
+      for (auto it = arr.begin(); it != arr.end(); ++it) {
+        sum += (*it).get_int();
+      }
+      perf::do_not_optimize(sum);
+    });
+  }
+
+  // Struct iteration using const_iterator
+  {
+    Struct s;
+    for (int i = 0; i < 20; i++) {
+      s.insert("field_" + std::to_string(i), i * 10);
+    }
+
+    PERF_BENCHMARK("perf_struct_iterate", ITERS_SIMPLE, {
+      int sum = 0;
+      for (auto it = s.begin(); it != s.end(); ++it) {
+        sum += it->second->get_int();
+      }
+      perf::do_not_optimize(sum);
+    });
+  }
+
+  // --- Destruction Benchmarks ---
+
+  // Array destruction (measures delete overhead)
+  PERF_BENCHMARK("perf_array_destroy", ITERS_COMPLEX, {
+    Array* arr = new Array();
+    for (int i = 0; i < 100; i++) {
+      arr->push_back(i);
+    }
+    delete arr;  // Triggers destructor chain
+  });
+
+  // Struct destruction
+  PERF_BENCHMARK("perf_struct_destroy", ITERS_COMPLEX, {
+    Struct* s = new Struct();
+    for (int i = 0; i < 20; i++) {
+      s->insert("field_" + std::to_string(i), i);
+    }
+    delete s;  // Triggers destructor chain
+  });
 }
 
 // ============================================================================
