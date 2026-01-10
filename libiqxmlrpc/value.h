@@ -32,6 +32,7 @@ public:
   // cppcheck-suppress noExplicitConstructor
   Value( Value_type* );
   Value( const Value& );
+  Value( Value&& ) noexcept;
   // cppcheck-suppress noExplicitConstructor
   Value( Nil );
   // cppcheck-suppress noExplicitConstructor
@@ -60,6 +61,7 @@ public:
   virtual ~Value();
 
   const Value& operator =( const Value& );
+  Value& operator =( Value&& ) noexcept;
 
   //! \name Type identification
   //! \{
