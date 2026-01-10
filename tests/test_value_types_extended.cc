@@ -1392,6 +1392,111 @@ BOOST_AUTO_TEST_CASE(array_move_assignment)
     BOOST_CHECK_EQUAL(a[0].get_int(), 100);
 }
 
+// ============================================================================
+// Value Move Semantics Tests
+// ============================================================================
+
+BOOST_AUTO_TEST_CASE(value_move_constructor_int)
+{
+    Value a(42);
+    Value b(std::move(a));
+
+    // Moved-to value should have the value
+    BOOST_CHECK(b.is_int());
+    BOOST_CHECK_EQUAL(b.get_int(), 42);
+}
+
+BOOST_AUTO_TEST_CASE(value_move_constructor_string)
+{
+    Value a(std::string("hello world"));
+    Value b(std::move(a));
+
+    // Moved-to value should have the value
+    BOOST_CHECK(b.is_string());
+    BOOST_CHECK_EQUAL(b.get_string(), "hello world");
+}
+
+BOOST_AUTO_TEST_CASE(value_move_constructor_array)
+{
+    Array arr;
+    arr.push_back(1);
+    arr.push_back(2);
+    arr.push_back(3);
+    Value a(arr);
+    Value b(std::move(a));
+
+    // Moved-to value should have the array
+    BOOST_CHECK(b.is_array());
+    BOOST_CHECK_EQUAL(b.size(), 3u);
+    BOOST_CHECK_EQUAL(b[0].get_int(), 1);
+    BOOST_CHECK_EQUAL(b[2].get_int(), 3);
+}
+
+BOOST_AUTO_TEST_CASE(value_move_assignment_int)
+{
+    Value a(100);
+    Value b(999);
+
+    b = std::move(a);
+
+    // Moved-to value should have a's value
+    BOOST_CHECK(b.is_int());
+    BOOST_CHECK_EQUAL(b.get_int(), 100);
+}
+
+BOOST_AUTO_TEST_CASE(value_move_assignment_struct)
+{
+    Struct s;
+    s.insert("key", Value(42));
+    Value a(s);
+    Value b(std::string("old value"));
+
+    b = std::move(a);
+
+    // Moved-to value should have the struct
+    BOOST_CHECK(b.is_struct());
+    BOOST_CHECK_EQUAL(b["key"].get_int(), 42);
+}
+
+BOOST_AUTO_TEST_CASE(value_move_self_assignment)
+{
+    Value a(123);
+    Value* ptr = &a;
+
+    // Self-assignment via move should be safe
+    *ptr = std::move(a);
+
+    // Value should still be valid (though possibly in moved-from state)
+    // The important thing is that it doesn't crash
+    BOOST_CHECK(true);
+}
+
+BOOST_AUTO_TEST_CASE(array_push_back_rvalue)
+{
+    Array arr;
+
+    // Push rvalue - should use move overload
+    arr.push_back(Value(42));
+    arr.push_back(Value(std::string("test")));
+
+    BOOST_CHECK_EQUAL(arr.size(), 2u);
+    BOOST_CHECK_EQUAL(arr[0].get_int(), 42);
+    BOOST_CHECK_EQUAL(arr[1].get_string(), "test");
+}
+
+BOOST_AUTO_TEST_CASE(struct_insert_rvalue)
+{
+    Struct s;
+
+    // Insert rvalue - should use move overload
+    s.insert("num", Value(42));
+    s.insert("str", Value(std::string("hello")));
+
+    BOOST_CHECK_EQUAL(s.size(), 2u);
+    BOOST_CHECK_EQUAL(s["num"].get_int(), 42);
+    BOOST_CHECK_EQUAL(s["str"].get_string(), "hello");
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 // vim:ts=2:sw=2:et

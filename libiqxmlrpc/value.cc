@@ -71,6 +71,12 @@ Value::Value( const Value& v ):
 {
 }
 
+Value::Value( Value&& v ) noexcept :
+  value( v.value )
+{
+  v.value = nullptr;
+}
+
 Value::Value( Nil n ):
   value( n.clone() )
 {
@@ -156,6 +162,16 @@ const Value& Value::operator =( const Value& v )
   Value_type* tmp = v.value->clone();
   delete value;
   value = tmp;
+  return *this;
+}
+
+Value& Value::operator =( Value&& v ) noexcept
+{
+  if (this != &v) {
+    delete value;
+    value = v.value;
+    v.value = nullptr;
+  }
   return *this;
 }
 

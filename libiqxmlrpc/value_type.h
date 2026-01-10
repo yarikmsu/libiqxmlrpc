@@ -177,6 +177,7 @@ public:
   }
 
   void push_back( const Value& );
+  void push_back( Value&& );
   void push_back( Value_ptr );
 
   void clear();
@@ -285,6 +286,7 @@ public:
   void clear();
   void insert( const std::string&, Value_ptr );
   void insert( const std::string&, const Value& );
+  void insert( const std::string&, Value&& );
 
   const_iterator begin() const { return values.begin(); }
   const_iterator end()   const { return values.end(); }
