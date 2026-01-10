@@ -174,10 +174,9 @@ void Array::apply_visitor(Value_type_visitor& v) const
 
 void Array::clear()
 {
-  util::delete_ptrs(values.begin(), values.end());
-
-  // Clear and free memory
-  std::vector<Value*>().swap( values );
+  util::delete_ptrs( values.begin(), values.end() );
+  values.clear();
+  values.shrink_to_fit();
 }
 
 
@@ -203,26 +202,12 @@ void Array::push_back( Value&& v )
 
 
 // --------------------------------------------------------------------------
-#ifndef DOXYGEN_SHOULD_SKIP_THIS
-class Struct::Struct_inserter
-{
-  Struct::Value_stor* vs;
-
-public:
-  explicit Struct_inserter( Struct::Value_stor* v ): vs(v) {}
-
-  void operator ()( const std::pair<std::string, Value*>& vp )
-  {
-    vs->insert( std::make_pair(vp.first, new Value(*vp.second)) );
-  }
-};
-#endif
-
-
 Struct::Struct( const Struct& other ):
   Value_type(ValueTypeTag::Struct)
 {
-  std::for_each( other.begin(), other.end(), Struct_inserter(&values) );
+  for (const auto& vp : other.values) {
+    values.emplace(vp.first, std::make_unique<Value>(*vp.second));
+  }
 }
 
 
@@ -239,7 +224,7 @@ Struct& Struct::operator =( const Struct& other )
 
 Struct::~Struct()
 {
-  clear();
+  // unique_ptr elements are automatically destroyed by map destructor
 }
 
 
@@ -303,41 +288,31 @@ Value& Struct::operator []( const std::string& f )
 
 void Struct::clear()
 {
-  util::delete_ptrs(values.begin(), values.end(),
-    util::Select2nd<Value_stor>());
-
+  // unique_ptr handles cleanup automatically
   values.clear();
 }
 
 void Struct::insert( const std::string& f, Value_ptr val )
 {
-  Value*& tmp = values[f];
-  delete tmp;
-  tmp = val.release();
+  values[f] = std::move(val);
 }
 
 
 void Struct::insert( const std::string& f, const Value& val )
 {
-  Value_ptr p(new Value(val));
-  insert(f, p);
+  values[f] = std::make_unique<Value>(val);
 }
 
 void Struct::insert( const std::string& f, Value&& val )
 {
-  Value*& tmp = values[f];
-  delete tmp;
-  tmp = new Value(std::move(val));
+  values[f] = std::make_unique<Value>(std::move(val));
 }
 
 
 void Struct::erase( const std::string& key )
 {
-  iterator i = values.find(key);
-  if (i != values.end()) {
-    delete i->second;
-    values.erase(i);
-  }
+  // unique_ptr handles cleanup automatically when erased from map
+  values.erase(key);
 }
 
 
