@@ -1,5 +1,6 @@
 ignore:
-  - "tests/**/*"  # Exclude all test files from coverage report
+  - "tests/**"  # Exclude all test files from coverage report
+  - "tests/*"   # Also match files directly in tests/
 
 coverage:
   status:
