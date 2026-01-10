@@ -146,4 +146,5 @@ jobs:
         cppcheck --enable=warning,style,performance \
           --suppress=missingIncludeSystem \
           --inline-suppr \
+          --error-exitcode=1 \
           libiqxmlrpc/
