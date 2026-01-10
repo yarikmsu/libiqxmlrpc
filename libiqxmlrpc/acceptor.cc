@@ -13,6 +13,7 @@ using namespace iqnet;
 
 
 Acceptor::Acceptor( const iqnet::Inet_addr& bind_addr, Accepted_conn_factory* factory_, Reactor_base* reactor_ ):
+  sock(),
   factory(factory_),
   reactor(reactor_),
   firewall(0)

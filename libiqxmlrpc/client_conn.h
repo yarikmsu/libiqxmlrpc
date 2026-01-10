@@ -20,6 +20,9 @@ public:
   Client_connection();
   virtual ~Client_connection();
 
+  Client_connection(const Client_connection&) = delete;
+  Client_connection& operator=(const Client_connection&) = delete;
+
   void set_options(const Client_options& o) { options = &o; }
 
   Response process_session(const Request&, const XHeaders& xheaders = XHeaders());

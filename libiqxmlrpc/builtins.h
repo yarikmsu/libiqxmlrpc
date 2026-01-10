@@ -20,6 +20,9 @@ class LIBIQXMLRPC_API List_methods: public Method {
 public:
   explicit List_methods(Method_dispatcher_manager*);
 
+  List_methods(const List_methods&) = delete;
+  List_methods& operator=(const List_methods&) = delete;
+
 private:
   void execute( const Param_list& params, Value& response ) override;
 };

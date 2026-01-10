@@ -38,7 +38,7 @@ jobs:
     - name: Configure
       run: |
         mkdir build && cd build
-        cmake -Dbuild_tests=ON -DCMAKE_CXX_FLAGS="-DBOOST_TIMER_ENABLE_DEPRECATED -Wall -Wextra -Werror" ..
+        cmake -Dbuild_tests=ON -DCMAKE_CXX_FLAGS="-DBOOST_TIMER_ENABLE_DEPRECATED -Wall -Wextra -Weffc++ -Werror" ..
 
     - name: Build
       run: cmake --build build

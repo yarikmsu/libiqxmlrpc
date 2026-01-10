@@ -20,9 +20,8 @@ struct BenchmarkResult {
   double ns_per_op;
 
   BenchmarkResult(const std::string& n, double ms, size_t iters)
-    : name(n), total_ms(ms), iterations(iters)
+    : name(n), total_ms(ms), iterations(iters), ns_per_op((ms * 1000000.0) / static_cast<double>(iters))
   {
-    ns_per_op = (ms * 1000000.0) / static_cast<double>(iters);
   }
 };
 
@@ -88,7 +87,7 @@ public:
   void clear() { results_.clear(); }
 
 private:
-  ResultCollector() = default;
+  ResultCollector(): results_(), suite_start_() {}
 };
 
 // Timer class - measures elapsed time on destruction

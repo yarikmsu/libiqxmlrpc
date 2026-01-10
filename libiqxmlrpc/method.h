@@ -48,9 +48,9 @@ public:
 class LIBIQXMLRPC_API Method {
 public:
   struct Data {
-    std::string      method_name;
-    iqnet::Inet_addr peer_addr;
-    Server_feedback  server_face;
+    std::string      method_name{};
+    iqnet::Inet_addr peer_addr{};
+    Server_feedback  server_face{};
   };
 
 private:
@@ -60,6 +60,7 @@ private:
   XHeaders xheaders_;
 
 public:
+  Method() : data_(), authname_(), xheaders_() {}
   virtual ~Method() {}
 
   //! Calls customized execute() and optionally wraps it with interceptors.
@@ -101,7 +102,7 @@ private:
  */
 class LIBIQXMLRPC_API Interceptor {
 public:
-  Interceptor() = default;
+  Interceptor(): nested() {}
   Interceptor(const Interceptor&) = delete;
   Interceptor& operator=(const Interceptor&) = delete;
 

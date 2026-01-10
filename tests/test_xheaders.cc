@@ -13,7 +13,10 @@ public:
   Headers opt;
   XHeaders h;
 public:
-  XHeaders_fixture() {
+  XHeaders_fixture():
+    opt(),
+    h()
+  {
     opt["X-id"] = "1";
     opt["x-cmd"] = "2";
     opt["Xcmd"] = "3";

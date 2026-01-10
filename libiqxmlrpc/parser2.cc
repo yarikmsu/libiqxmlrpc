@@ -101,6 +101,8 @@ class Parser::Impl {
 public:
   explicit Impl(const std::string& str):
     buf(str),
+    reader(nullptr),
+    curr(),
     pushed_back(false)
   {
     const char* buf2 = str.data();
@@ -111,6 +113,9 @@ public:
     reader = xmlReaderForMemory(buf2, sz, 0, 0, XML_PARSE_NONET | XML_PARSE_HUGE);
     xmlTextReaderSetParserProp(reader, XML_PARSER_SUBST_ENTITIES, 0); // No XXE
   }
+
+  Impl(const Impl&) = delete;
+  Impl& operator=(const Impl&) = delete;
 
   ~Impl()
   {

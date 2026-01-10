@@ -209,6 +209,9 @@ struct Ctx::Impl {
   {
   }
 
+  Impl(const Impl&) = delete;
+  Impl& operator=(const Impl&) = delete;
+
   ~Impl()
   {
     if (ctx) {

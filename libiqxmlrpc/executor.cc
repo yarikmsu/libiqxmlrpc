@@ -117,7 +117,13 @@ void Pool_executor_factory::Pool_thread::operator ()()
 
 // ----------------------------------------------------------------------------
 Pool_executor_factory::Pool_executor_factory(unsigned numthreads):
-  in_destructor(false)
+  threads(),
+  pool(),
+  req_queue(),
+  req_queue_lock(),
+  req_queue_cond(),
+  in_destructor(false),
+  destructor_lock()
 {
   add_threads(numthreads);
 }
@@ -188,7 +194,8 @@ Pool_executor::Pool_executor(
     Pool_executor_factory* p, Method* m, Server* s, Server_connection* c
   ):
     Executor( m, s, c ),
-    pool(p)
+    pool(p),
+    params()
 {
 }
 

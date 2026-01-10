@@ -15,6 +15,8 @@ public:
     int call_count = 0;
     Param_list last_params;
 
+    TestMethod(): Method(), call_count(0), last_params() {}
+
     void execute(const Param_list& params, Value& result) override {
         call_count++;
         last_params = params;
@@ -48,6 +50,8 @@ public:
     int process_count = 0;
     bool should_yield = true;
     std::string method_name;
+
+    TrackingInterceptor(): Interceptor(), process_count(0), should_yield(true), method_name() {}
 
     void process(Method* m, const Param_list& params, Value& result) override {
         process_count++;
