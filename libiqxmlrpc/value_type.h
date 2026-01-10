@@ -89,6 +89,22 @@ template<> struct ScalarTypeTag<bool> { static constexpr ValueTypeTag value = Va
 template<> struct ScalarTypeTag<double> { static constexpr ValueTypeTag value = ValueTypeTag::Double; };
 template<> struct ScalarTypeTag<std::string> { static constexpr ValueTypeTag value = ValueTypeTag::String; };
 
+// Forward declarations for TypeTag
+class Array;
+class Struct;
+class Binary_data;
+class Date_time;
+
+//! Type trait to map Value_type subclasses to their ValueTypeTag.
+//! Used by Value::cast<T>() for fast type checking with static_cast.
+template<typename T> struct TypeTag;
+template<> struct TypeTag<Nil> { static constexpr ValueTypeTag value = ValueTypeTag::Nil; };
+template<typename U> struct TypeTag<Scalar<U>> { static constexpr ValueTypeTag value = ScalarTypeTag<U>::value; };
+template<> struct TypeTag<Array> { static constexpr ValueTypeTag value = ValueTypeTag::Array; };
+template<> struct TypeTag<Struct> { static constexpr ValueTypeTag value = ValueTypeTag::Struct; };
+template<> struct TypeTag<Binary_data> { static constexpr ValueTypeTag value = ValueTypeTag::Binary; };
+template<> struct TypeTag<Date_time> { static constexpr ValueTypeTag value = ValueTypeTag::DateTime; };
+
 //! Template for scalar types based on Value_type (e.g. Int, String, etc.)
 template <class T>
 class LIBIQXMLRPC_API Scalar: public Value_type {
