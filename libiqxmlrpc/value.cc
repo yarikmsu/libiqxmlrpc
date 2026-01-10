@@ -151,12 +151,6 @@ T* Value::cast() const
   return t;
 }
 
-template <class T>
-bool Value::can_cast() const
-{
-  return dynamic_cast<T*>( value ) != nullptr;
-}
-
 const Value& Value::operator =( const Value& v )
 {
   Value_type* tmp = v.value->clone();
