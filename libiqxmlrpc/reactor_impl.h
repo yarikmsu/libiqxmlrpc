@@ -85,6 +85,10 @@ private:
 
 template <class Lock>
 Reactor<Lock>::Reactor():
+  lock(),
+  impl(),
+  handlers(),
+  handlers_states(),
   num_stoppers(0)
 {
 }
