@@ -1,0 +1,38 @@
+# Performance Baseline - libiqxmlrpc2
+# Run date: 2026-01-09 19:10:00
+# Total benchmarks: 31
+# Total time: 3.11 seconds
+#
+# Format: benchmark_name: ns_per_op
+#
+perf_int_to_string: 82.38
+perf_string_to_int: 83.35
+perf_int64_to_string: 169.79
+perf_string_to_int64: 159.96
+perf_double_to_string: 282.67
+perf_string_to_double: 266.88
+perf_type_check_int_true: 7.46
+perf_type_check_int_false: 42.38
+perf_type_check_string_true: 7.83
+perf_type_check_mixed: 317.79
+perf_http_response_header: 8544.40
+perf_http_response_dump: 10161.35
+perf_datetime_parse: 776.80
+perf_datetime_to_string: 5.44
+perf_value_clone_int: 22.08
+perf_value_clone_string: 45.51
+perf_value_clone_array_10: 1161.69
+perf_value_clone_array_100: 6586.92
+perf_value_clone_array_1000: 56718.34
+perf_value_clone_struct_5: 2142.67
+perf_value_clone_struct_20: 12228.12
+perf_array_push_back: 8011.12
+perf_struct_insert: 11223.50
+perf_base64_encode_1kb: 6.98
+perf_base64_decode_1kb: 18098.26
+perf_base64_encode_64kb: 6.46
+perf_base64_decode_64kb: 970158.46
+perf_parse_response_10: 83640.75
+perf_parse_response_1000: 7763318.33
+perf_dump_response_10: 25340.38
+perf_dump_response_1000: 2434397.08
