@@ -6,6 +6,7 @@
 ### Changelog
 | Date | Change |
 |------|--------|
+| 2026-01-10 | Completed: Optimize Base64 decoding with lookup table (PR #42) |
 | 2026-01-10 | Completed: Migrate Struct to unique_ptr for memory safety (PR #40) |
 | 2026-01-09 | Completed: Add move semantics and optimize DateTime parsing (PR #35) |
 | 2026-01-09 | Completed: Use strftime for HTTP date formatting (PR #34) |
@@ -625,6 +626,17 @@ enum Verification_level { HTTP_CHECK_WEAK, HTTP_CHECK_STRICT };
    - Simplified `clear()`, `insert()`, `erase()` - no more manual `delete` calls
    - Removed `Struct_inserter` helper class
    - **Note:** Array keeps raw pointers as unique_ptr showed ~15-20% regression there due to vector reallocation overhead
+
+7. ~~**Optimize Base64 decoding with lookup table**~~ ✅ **DONE (PR #42)**
+   - Files: `value_type.h`, `value_type.cc`
+   - **Measured Results:**
+     | Operation | Before | After | Speedup |
+     |-----------|--------|-------|---------|
+     | base64_decode_1kb | 25,073 ns | 5,361 ns | **4.7x** |
+     | base64_decode_64kb | 1,339,331 ns | 328,213 ns | **4.1x** |
+   - Added 256-byte decode lookup table for O(1) character-to-value conversion
+   - Replaced exception-based padding detection with if-statement checks
+   - Used `reserve()` + `push_back()` instead of `resize()` to avoid zero-initialization
 
 ### High Priority
 
