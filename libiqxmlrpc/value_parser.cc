@@ -2,8 +2,8 @@
 //  Copyright (C) 2011 Anton Dedov
 
 #include <stdexcept>
-#include <boost/lexical_cast.hpp>
 #include "except.h"
+#include "num_conv.h"
 #include "value_parser.h"
 
 namespace iqxmlrpc {
@@ -229,8 +229,6 @@ ValueBuilder::do_visit_element_end(const std::string&)
 void
 ValueBuilder::do_visit_text(const std::string& text)
 {
-  using boost::lexical_cast;
-
   switch (state_.get_state()) {
   case VALUE:
     want_exit();
@@ -239,19 +237,19 @@ ValueBuilder::do_visit_text(const std::string& text)
     break;
 
   case INT:
-    retval.reset(new Int(lexical_cast<int>(text)));
+    retval.reset(new Int(num_conv::from_string<int>(text)));
     break;
 
   case INT64:
-    retval.reset(new Int64(lexical_cast<int64_t>(text)));
+    retval.reset(new Int64(num_conv::from_string<int64_t>(text)));
     break;
 
   case BOOL:
-    retval.reset(new Bool(lexical_cast<int>(text) != 0));
+    retval.reset(new Bool(num_conv::from_string<int>(text) != 0));
     break;
 
   case DOUBLE:
-    retval.reset(new Double(lexical_cast<double>(text)));
+    retval.reset(new Double(num_conv::string_to_double(text)));
     break;
 
   case BINARY:
