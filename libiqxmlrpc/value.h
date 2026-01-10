@@ -145,7 +145,6 @@ public:
 
 private:
   template <class T> T* cast() const;
-  template <class T> bool can_cast() const;
 };
 
 class XmlBuilder;

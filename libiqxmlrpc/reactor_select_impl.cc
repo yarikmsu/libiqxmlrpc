@@ -10,7 +10,8 @@ using namespace iqnet;
 
 typedef Reactor_base::HandlerStateList HandlerStateList;
 
-Reactor_select_impl::Reactor_select_impl()
+Reactor_select_impl::Reactor_select_impl():
+  max_fd(0)
 {
 }
 
