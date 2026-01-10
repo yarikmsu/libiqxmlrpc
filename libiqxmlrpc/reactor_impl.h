@@ -66,10 +66,8 @@ private:
   void handle_user_events();
   bool handle_system_events( Timeout );
 
-  // cppcheck-suppress functionStatic
-  void invoke_clients_handler( Event_handler*, const HandlerState&, bool& terminate );
-  // cppcheck-suppress functionStatic
-  void invoke_servers_handler( Event_handler*, const HandlerState&, bool& terminate );
+  static void invoke_clients_handler( Event_handler*, const HandlerState&, bool& terminate );
+  static void invoke_servers_handler( Event_handler*, const HandlerState&, bool& terminate );
   void invoke_event_handler( const HandlerState& );
 
 private:
@@ -176,7 +174,6 @@ void Reactor<Lock>::fake_event( Event_handler* eh, Event_mask mask )
 }
 
 template <class Lock>
-// cppcheck-suppress functionStatic
 void Reactor<Lock>::invoke_clients_handler(
   Event_handler* handler, const HandlerState& hs, bool& terminate )
 {
