@@ -172,6 +172,7 @@ private:
   Array::Val_vector::const_iterator i;
 
 public:
+  // cppcheck-suppress noExplicitConstructor
   const_iterator( Array::Val_vector::const_iterator i_ ):  // NOLINT(google-explicit-constructor)
     i(i_) {}
   ~const_iterator() {}
