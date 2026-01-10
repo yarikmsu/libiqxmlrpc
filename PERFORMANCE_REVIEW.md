@@ -6,6 +6,9 @@
 ### Changelog
 | Date | Change |
 |------|--------|
+| 2026-01-10 | Completed: Use atomic<bool> for thread pool destructor flag (PR #46) |
+| 2026-01-10 | Completed: Enable TCP_NODELAY by default for RPC latency (PR #45) |
+| 2026-01-10 | Completed: Use unordered_map for Struct (53% faster access) (PR #44) |
 | 2026-01-10 | Completed: Optimize Base64 decoding with lookup table (PR #42) |
 | 2026-01-10 | Completed: Migrate Struct to unique_ptr for memory safety (PR #40) |
 | 2026-01-09 | Completed: Add move semantics and optimize DateTime parsing (PR #35) |
@@ -638,41 +641,49 @@ enum Verification_level { HTTP_CHECK_WEAK, HTTP_CHECK_STRICT };
    - Replaced exception-based padding detection with if-statement checks
    - Used `reserve()` + `push_back()` instead of `resize()` to avoid zero-initialization
 
-### High Priority
+8. ~~**Use unordered_map for Struct**~~ ✅ **DONE (PR #44)**
+   - Files: `value_type.h`
+   - **Measured Results:**
+     | Operation | Before | After | Speedup |
+     |-----------|--------|-------|---------|
+     | struct_access | 1,340 ns | 623 ns | **53% faster** |
+     | struct_insert | 11,003 ns | 5,417 ns | **51% faster** |
+     | clone_struct_20 | 11,607 ns | 5,090 ns | **56% faster** |
+     | struct_destroy | 9,448 ns | 5,764 ns | **39% faster** |
+   - Replaced `std::map` with `std::unordered_map` for O(1) average lookup
+   - Trade-off: Iteration order no longer alphabetical (not important for XML-RPC)
 
-1. **Add TCP_NODELAY configuration option**
-   - File: `socket.cc`
-   - Impact: **40-400ms latency reduction per RPC call**
-   - Nagle's algorithm + delayed ACK severely impacts request-response patterns
-   - Simple fix: one `setsockopt()` call
+9. ~~**Enable TCP_NODELAY by default**~~ ✅ **DONE (PR #45)**
+   - Files: `socket.h`, `socket.cc`
+   - **Impact:** 40-400ms latency reduction per RPC call
+   - Disables Nagle's algorithm to eliminate buffering delays for small messages
+   - Added `set_nodelay(bool)` method to Socket class
+   - Enabled by default in constructor and `accept()`
 
-### Medium Priority
+10. ~~**Use atomic<bool> for destructor flag**~~ ✅ **DONE (PR #46)**
+    - Files: `executor.h`, `executor.cc`
+    - Replaced mutex-protected bool with `std::atomic<bool>` for `in_destructor` flag
+    - Code clarity improvement (atomic flag better expresses intent)
+    - Minor efficiency gain (~50-200 cycles → ~1-5 cycles per check)
 
-2. ~~**Replace raw pointers with smart pointers in value containers**~~ ✅ **PARTIAL (PR #40)**
-   - **Struct:** Migrated to `std::unique_ptr<Value>` - negligible overhead (~1-2%)
-   - **Array:** Intentionally kept raw pointers - `unique_ptr` showed 15-20% regression due to vector reallocation overhead
-   - This hybrid approach provides memory safety for Struct while preserving Array performance
+### Remaining Low Priority
 
-### Low Priority
-
-3. **Reduce per-connection buffer allocation**
+1. **Reduce per-connection buffer allocation**
    - File: `server_conn.cc`
    - Current: 65KB per connection (4MB for 64 connections)
    - Consider smaller initial size with dynamic growth
 
-4. **Single-pass HTTP header parsing**
+2. **Single-pass HTTP header parsing**
    - File: `http.cc`
    - Current: 5 passes (split, find, trim×2, lowercase)
    - Could parse in one pass with no intermediate allocations
 
-5. **Optimize handler state lookup in reactor**
+3. **Optimize handler state lookup in reactor**
    - File: `reactor_impl.h`
    - For 16-64 connections: ~50ns savings - negligible
    - Only matters at 500+ connections
 
-6. **Consider `std::unordered_map` for Struct type**
-7. **Lock-free work queue for thread pool**
-8. **Use `std::atomic<bool>` for destructor flag** (code clarity)
+4. **Lock-free work queue for thread pool**
 
 ---
 
