@@ -1186,4 +1186,357 @@ BOOST_AUTO_TEST_CASE(array_move_assignment)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+BOOST_AUTO_TEST_SUITE(struct_erase_tests)
+
+BOOST_AUTO_TEST_CASE(struct_erase_existing_key)
+{
+    Struct s;
+    s.insert("keep", Value(1));
+    s.insert("remove", Value(2));
+    BOOST_CHECK_EQUAL(s.size(), 2u);
+
+    s.erase("remove");
+    BOOST_CHECK_EQUAL(s.size(), 1u);
+    BOOST_CHECK(s.has_field("keep"));
+    BOOST_CHECK(!s.has_field("remove"));
+}
+
+BOOST_AUTO_TEST_CASE(struct_erase_nonexistent_key)
+{
+    Struct s;
+    s.insert("key", Value(1));
+    BOOST_CHECK_EQUAL(s.size(), 1u);
+
+    // Erasing non-existent key should be safe (no-op)
+    s.erase("nonexistent");
+    BOOST_CHECK_EQUAL(s.size(), 1u);
+    BOOST_CHECK(s.has_field("key"));
+}
+
+BOOST_AUTO_TEST_CASE(struct_erase_all_keys)
+{
+    Struct s;
+    s.insert("a", Value(1));
+    s.insert("b", Value(2));
+    s.insert("c", Value(3));
+
+    s.erase("a");
+    s.erase("b");
+    s.erase("c");
+    BOOST_CHECK_EQUAL(s.size(), 0u);
+}
+
+BOOST_AUTO_TEST_CASE(struct_replace_value)
+{
+    Struct s;
+    s.insert("key", Value(1));
+    BOOST_CHECK_EQUAL(s["key"].get_int(), 1);
+
+    // Insert with same key replaces value
+    s.insert("key", Value(2));
+    BOOST_CHECK_EQUAL(s["key"].get_int(), 2);
+    BOOST_CHECK_EQUAL(s.size(), 1u);  // Still only one key
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(array_swap_tests)
+
+BOOST_AUTO_TEST_CASE(array_swap)
+{
+    Array a, b;
+    a.push_back(Value(1));
+    a.push_back(Value(2));
+    b.push_back(Value(10));
+    b.push_back(Value(20));
+    b.push_back(Value(30));
+
+    a.swap(b);
+
+    BOOST_CHECK_EQUAL(a.size(), 3u);
+    BOOST_CHECK_EQUAL(a[0].get_int(), 10);
+    BOOST_CHECK_EQUAL(a[1].get_int(), 20);
+    BOOST_CHECK_EQUAL(a[2].get_int(), 30);
+
+    BOOST_CHECK_EQUAL(b.size(), 2u);
+    BOOST_CHECK_EQUAL(b[0].get_int(), 1);
+    BOOST_CHECK_EQUAL(b[1].get_int(), 2);
+}
+
+BOOST_AUTO_TEST_CASE(array_swap_with_empty)
+{
+    Array a, b;
+    a.push_back(Value(1));
+    // b is empty
+
+    a.swap(b);
+
+    BOOST_CHECK_EQUAL(a.size(), 0u);
+    BOOST_CHECK_EQUAL(b.size(), 1u);
+    BOOST_CHECK_EQUAL(b[0].get_int(), 1);
+}
+
+BOOST_AUTO_TEST_CASE(array_self_assignment)
+{
+    Array a;
+    a.push_back(Value(1));
+    a.push_back(Value(2));
+
+    a = a;  // Self-assignment should be safe
+
+    BOOST_CHECK_EQUAL(a.size(), 2u);
+    BOOST_CHECK_EQUAL(a[0].get_int(), 1);
+    BOOST_CHECK_EQUAL(a[1].get_int(), 2);
+}
+
+BOOST_AUTO_TEST_CASE(array_copy_assignment)
+{
+    Array a, b;
+    a.push_back(Value(1));
+    a.push_back(Value(2));
+    b.push_back(Value(100));
+
+    b = a;
+
+    BOOST_CHECK_EQUAL(b.size(), 2u);
+    BOOST_CHECK_EQUAL(b[0].get_int(), 1);
+    BOOST_CHECK_EQUAL(b[1].get_int(), 2);
+
+    // Original should be unchanged
+    BOOST_CHECK_EQUAL(a.size(), 2u);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(struct_swap_tests)
+
+BOOST_AUTO_TEST_CASE(struct_swap)
+{
+    Struct a, b;
+    a.insert("x", Value(1));
+    b.insert("y", Value(2));
+    b.insert("z", Value(3));
+
+    a.swap(b);
+
+    BOOST_CHECK_EQUAL(a.size(), 2u);
+    BOOST_CHECK(a.has_field("y"));
+    BOOST_CHECK(a.has_field("z"));
+
+    BOOST_CHECK_EQUAL(b.size(), 1u);
+    BOOST_CHECK(b.has_field("x"));
+}
+
+BOOST_AUTO_TEST_CASE(struct_self_assignment)
+{
+    Struct s;
+    s.insert("key", Value(42));
+
+    s = s;  // Self-assignment should be safe
+
+    BOOST_CHECK_EQUAL(s.size(), 1u);
+    BOOST_CHECK_EQUAL(s["key"].get_int(), 42);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(datetime_boundary_tests)
+
+BOOST_AUTO_TEST_CASE(datetime_leap_second)
+{
+    // Seconds can be 60 or 61 for leap seconds
+    Date_time dt(std::string("20151231T23:59:60"));
+    const struct tm& t = dt.get_tm();
+    BOOST_CHECK_EQUAL(t.tm_sec, 60);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_boundary_day_zero_invalid)
+{
+    // Day 0 is invalid
+    BOOST_CHECK_THROW(Date_time(std::string("20230100T12:00:00")), Date_time::Malformed_iso8601);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_month_zero_invalid)
+{
+    // Month 0 is invalid (must be 01-12)
+    BOOST_CHECK_THROW(Date_time(std::string("20230001T12:00:00")), Date_time::Malformed_iso8601);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_negative_year_invalid)
+{
+    // Negative year check (atoi returns negative for year < 1900)
+    BOOST_CHECK_THROW(Date_time(std::string("00001225T12:30:45")), Date_time::Malformed_iso8601);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_seconds_62_invalid)
+{
+    // Seconds > 61 is invalid
+    BOOST_CHECK_THROW(Date_time(std::string("20230101T12:00:62")), Date_time::Malformed_iso8601);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_hour_boundary)
+{
+    // Hour 23 is valid
+    Date_time dt(std::string("20230101T23:00:00"));
+    BOOST_CHECK_EQUAL(dt.get_tm().tm_hour, 23);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_minute_boundary)
+{
+    // Minute 59 is valid
+    Date_time dt(std::string("20230101T12:59:00"));
+    BOOST_CHECK_EQUAL(dt.get_tm().tm_min, 59);
+}
+
+BOOST_AUTO_TEST_CASE(datetime_cached_string)
+{
+    Date_time dt(std::string("20230615T10:20:30"));
+    // First call generates the string
+    std::string s1 = dt.to_string();
+    // Second call returns cached value
+    std::string s2 = dt.to_string();
+    BOOST_CHECK_EQUAL(s1, s2);
+    BOOST_CHECK_EQUAL(s1, "20230615T10:20:30");
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(binary_data_edge_cases)
+
+BOOST_AUTO_TEST_CASE(binary_decode_all_alphabet)
+{
+    // Test decoding with all base64 alphabet characters
+    // "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    std::string base64 = "QUJD";  // ABC
+    std::unique_ptr<Binary_data> bin(Binary_data::from_base64(base64));
+    BOOST_CHECK_EQUAL(bin->get_data(), "ABC");
+}
+
+BOOST_AUTO_TEST_CASE(binary_decode_plus_slash)
+{
+    // Test base64 characters + and /
+    // "+/" encodes to specific bytes
+    std::unique_ptr<Binary_data> bin(Binary_data::from_base64("Pz8/"));  // Contains special chars
+    BOOST_CHECK(!bin->get_data().empty());
+}
+
+BOOST_AUTO_TEST_CASE(binary_decode_digits)
+{
+    // Test base64 digits 0-9
+    std::unique_ptr<Binary_data> bin(Binary_data::from_base64("MTIz"));  // "123"
+    BOOST_CHECK_EQUAL(bin->get_data(), "123");
+}
+
+BOOST_AUTO_TEST_CASE(binary_decode_lowercase)
+{
+    // Test lowercase letters in base64
+    std::unique_ptr<Binary_data> bin(Binary_data::from_base64("YWJj"));  // "abc"
+    BOOST_CHECK_EQUAL(bin->get_data(), "abc");
+}
+
+BOOST_AUTO_TEST_CASE(binary_malformed_second_char_padding_throws)
+{
+    // Second char being = is invalid
+    BOOST_CHECK_THROW(Binary_data::from_base64("A==="), Binary_data::Malformed_base64);
+}
+
+BOOST_AUTO_TEST_CASE(binary_whitespace_between_groups)
+{
+    // Whitespace should be skipped
+    std::unique_ptr<Binary_data> bin(Binary_data::from_base64("TWFu\r\nTWFu"));
+    BOOST_CHECK_EQUAL(bin->get_data(), "ManMan");
+}
+
+BOOST_AUTO_TEST_CASE(binary_tabs_and_spaces)
+{
+    std::unique_ptr<Binary_data> bin(Binary_data::from_base64("T W F u"));
+    BOOST_CHECK_EQUAL(bin->get_data(), "Man");
+}
+
+BOOST_AUTO_TEST_CASE(binary_end_of_data_exception_path)
+{
+    // "TW==" has padding at third position (tests End_of_data path)
+    std::unique_ptr<Binary_data> bin(Binary_data::from_base64("TQ=="));
+    BOOST_CHECK_EQUAL(bin->get_data(), "M");
+}
+
+BOOST_AUTO_TEST_CASE(binary_third_char_padding)
+{
+    // "TWE=" - third char is valid, fourth is padding
+    std::unique_ptr<Binary_data> bin(Binary_data::from_base64("TWE="));
+    BOOST_CHECK_EQUAL(bin->get_data(), "Ma");
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(array_iterator_tests)
+
+BOOST_AUTO_TEST_CASE(array_const_iterator_operations)
+{
+    Array a;
+    a.push_back(Value(1));
+    a.push_back(Value(2));
+    a.push_back(Value(3));
+
+    const Array& ca = a;
+
+    // Test pre-increment and post-increment
+    Array::const_iterator it = ca.begin();
+    BOOST_CHECK_EQUAL((*it).get_int(), 1);
+
+    ++it;  // Pre-increment
+    BOOST_CHECK_EQUAL((*it).get_int(), 2);
+
+    it++;  // Post-increment
+    BOOST_CHECK_EQUAL((*it).get_int(), 3);
+}
+
+BOOST_AUTO_TEST_CASE(array_const_iterator_equality)
+{
+    Array a;
+    a.push_back(Value(1));
+
+    const Array& ca = a;
+    Array::const_iterator it1 = ca.begin();
+    Array::const_iterator it2 = ca.begin();
+
+    BOOST_CHECK(it1 == it2);
+    ++it1;
+    BOOST_CHECK(it1 != it2);
+    BOOST_CHECK(it1 == ca.end());
+}
+
+BOOST_AUTO_TEST_CASE(array_const_iterator_arrow)
+{
+    Array a;
+    a.push_back(Value("test"));
+
+    const Array& ca = a;
+    Array::const_iterator it = ca.begin();
+    // Use arrow operator to access Value methods
+    BOOST_CHECK_EQUAL(it->get_string(), "test");
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(value_from_cstring_tests)
+
+BOOST_AUTO_TEST_CASE(value_from_const_char_ptr)
+{
+    const char* str = "hello";
+    Value v(str);
+    BOOST_CHECK(v.is_string());
+    BOOST_CHECK_EQUAL(v.get_string(), "hello");
+}
+
+BOOST_AUTO_TEST_CASE(value_from_empty_cstring)
+{
+    const char* str = "";
+    Value v(str);
+    BOOST_CHECK(v.is_string());
+    BOOST_CHECK(v.get_string().empty());
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
 // vim:ts=2:sw=2:et

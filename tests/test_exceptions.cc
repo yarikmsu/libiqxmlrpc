@@ -8,6 +8,9 @@
 using namespace boost::unit_test;
 using namespace iqxmlrpc;
 
+// Include SSL library for SSL exception tests
+#include "libiqxmlrpc/ssl_lib.h"
+
 BOOST_AUTO_TEST_SUITE(exception_base_tests)
 
 BOOST_AUTO_TEST_CASE(exception_with_default_code)
@@ -190,6 +193,95 @@ BOOST_AUTO_TEST_CASE(network_error_inheritance)
     iqnet::network_error ex("Test", false);
     std::runtime_error& ref = ex;
     BOOST_CHECK_EQUAL(std::string(ref.what()), "Test");
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(ssl_exception_tests)
+
+// Note: ssl::exception default constructor is not tested directly because
+// ERR_reason_error_string(0) returns NULL when there's no SSL error queued,
+// and the constructor passes that directly to std::string which is UB.
+// The constructors with explicit error code or message are tested instead.
+
+BOOST_AUTO_TEST_CASE(ssl_exception_with_error_code)
+{
+    // Constructor with explicit error code
+    iqnet::ssl::exception ex(0);
+    BOOST_CHECK(ex.what() != nullptr);
+    BOOST_CHECK_EQUAL(ex.code(), 0UL);
+}
+
+BOOST_AUTO_TEST_CASE(ssl_exception_with_string_message)
+{
+    iqnet::ssl::exception ex("Custom SSL error message");
+    std::string msg = ex.what();
+    BOOST_CHECK(msg.find("SSL:") != std::string::npos);
+    BOOST_CHECK(msg.find("Custom SSL error message") != std::string::npos);
+    BOOST_CHECK_EQUAL(ex.code(), 0UL);
+}
+
+BOOST_AUTO_TEST_CASE(ssl_not_initialized_exception)
+{
+    iqnet::ssl::not_initialized ex;
+    std::string msg = ex.what();
+    BOOST_CHECK(msg.find("not initialized") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(ssl_connection_close_clean)
+{
+    iqnet::ssl::connection_close ex(true);
+    std::string msg = ex.what();
+    BOOST_CHECK(msg.find("Connection") != std::string::npos);
+    BOOST_CHECK(ex.is_clean());
+}
+
+BOOST_AUTO_TEST_CASE(ssl_connection_close_unclean)
+{
+    iqnet::ssl::connection_close ex(false);
+    std::string msg = ex.what();
+    BOOST_CHECK(msg.find("Connection") != std::string::npos);
+    BOOST_CHECK(!ex.is_clean());
+}
+
+BOOST_AUTO_TEST_CASE(ssl_io_error_exception)
+{
+    iqnet::ssl::io_error ex(SSL_ERROR_SYSCALL);
+    BOOST_CHECK(ex.what() != nullptr);
+}
+
+BOOST_AUTO_TEST_CASE(ssl_need_write_exception)
+{
+    iqnet::ssl::need_write ex;
+    BOOST_CHECK(ex.what() != nullptr);
+}
+
+BOOST_AUTO_TEST_CASE(ssl_need_read_exception)
+{
+    iqnet::ssl::need_read ex;
+    BOOST_CHECK(ex.what() != nullptr);
+}
+
+BOOST_AUTO_TEST_CASE(ssl_exception_inheritance)
+{
+    // All SSL exceptions should be catchable as std::exception
+    try {
+        throw iqnet::ssl::not_initialized();
+    } catch (const std::exception& e) {
+        BOOST_CHECK(e.what() != nullptr);
+    }
+
+    try {
+        throw iqnet::ssl::connection_close(true);
+    } catch (const iqnet::ssl::exception& e) {
+        BOOST_CHECK(e.what() != nullptr);
+    }
+
+    try {
+        throw iqnet::ssl::need_read();
+    } catch (const iqnet::ssl::io_error& e) {
+        BOOST_CHECK(e.what() != nullptr);
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()
