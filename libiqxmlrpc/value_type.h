@@ -34,6 +34,20 @@ typedef Scalar<bool> Bool;
 typedef Scalar<double> Double;
 typedef Scalar<std::string> String;
 
+//! Type tag for fast runtime type identification without RTTI.
+//! Used by Value::is_*() methods for O(1) type checking.
+enum class ValueTypeTag : unsigned char {
+  Nil,
+  Int,
+  Int64,
+  Bool,
+  Double,
+  String,
+  Array,
+  Struct,
+  Binary,
+  DateTime
+};
 
 //! Base type for XML-RPC types.
 class LIBIQXMLRPC_API Value_type {
@@ -43,6 +57,15 @@ public:
   virtual Value_type*  clone()  const = 0;
   virtual const std::string& type_name() const = 0;
   virtual void apply_visitor(Value_type_visitor&) const = 0;
+
+  //! Returns the type tag for fast type identification.
+  ValueTypeTag type_tag() const { return tag_; }
+
+protected:
+  explicit Value_type(ValueTypeTag tag) : tag_(tag) {}
+
+private:
+  ValueTypeTag tag_;
 };
 
 
@@ -50,11 +73,20 @@ public:
 /*! \see http://ontosys.com/xml-rpc/extensions.html */
 class LIBIQXMLRPC_API Nil: public Value_type {
 public:
+  Nil() : Value_type(ValueTypeTag::Nil) {}
   Value_type* clone() const override;
   const std::string& type_name() const override;
   void apply_visitor(Value_type_visitor&) const override;
 };
 
+
+//! Type trait to map scalar types to their ValueTypeTag
+template<typename T> struct ScalarTypeTag;
+template<> struct ScalarTypeTag<int> { static constexpr ValueTypeTag value = ValueTypeTag::Int; };
+template<> struct ScalarTypeTag<int64_t> { static constexpr ValueTypeTag value = ValueTypeTag::Int64; };
+template<> struct ScalarTypeTag<bool> { static constexpr ValueTypeTag value = ValueTypeTag::Bool; };
+template<> struct ScalarTypeTag<double> { static constexpr ValueTypeTag value = ValueTypeTag::Double; };
+template<> struct ScalarTypeTag<std::string> { static constexpr ValueTypeTag value = ValueTypeTag::String; };
 
 //! Template for scalar types based on Value_type (e.g. Int, String, etc.)
 template <class T>
@@ -63,7 +95,7 @@ protected:
   T value_;
 
 public:
-  explicit Scalar( const T& t ): value_(t) {}
+  explicit Scalar( const T& t ): Value_type(ScalarTypeTag<T>::value), value_(t) {}
   Scalar<T>* clone() const override { return new Scalar<T>(value_); }
 
   void apply_visitor(Value_type_visitor&) const override;
@@ -108,8 +140,8 @@ private:
 
 public:
   Array( const Array& );
-  Array( Array&& other ) noexcept : values(std::move(other.values)) {}
-  Array() {}
+  Array( Array&& other ) noexcept : Value_type(ValueTypeTag::Array), values(std::move(other.values)) {}
+  Array() : Value_type(ValueTypeTag::Array) {}
   ~Array() override;
 
   Array& operator =( const Array& );
@@ -232,8 +264,8 @@ public:
   typedef Value_stor::iterator iterator;
 
   Struct( const Struct& );
-  Struct( Struct&& other ) noexcept : values(std::move(other.values)) {}
-  Struct() {}
+  Struct( Struct&& other ) noexcept : Value_type(ValueTypeTag::Struct), values(std::move(other.values)) {}
+  Struct() : Value_type(ValueTypeTag::Struct) {}
   ~Struct() override;
 
   Struct& operator =( const Struct& );
