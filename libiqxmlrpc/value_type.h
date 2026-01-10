@@ -25,7 +25,7 @@ namespace iqxmlrpc {
 
 class Value;
 class Value_type_visitor;
-typedef util::ExplicitPtr<Value*> Value_ptr;
+typedef std::unique_ptr<Value> Value_ptr;
 
 template <class T> class Scalar;
 typedef Scalar<int> Int;
@@ -157,7 +157,7 @@ public:
   const Value& operator []( unsigned i ) const
   {
     try {
-      return (*values.at(i));
+      return *values.at(i);
     }
     catch( const std::out_of_range& )
     {
@@ -168,7 +168,7 @@ public:
   Value& operator []( unsigned i )
   {
     try {
-      return (*values.at(i));
+      return *values.at(i);
     }
     catch( const std::out_of_range& )
     {
@@ -254,10 +254,7 @@ public:
   };
 
 private:
-  typedef std::map<std::string, Value*> Value_stor;
-  class Struct_inserter;
-  friend class Struct_inserter;
-
+  typedef std::map<std::string, std::unique_ptr<Value>> Value_stor;
   Value_stor values;
 
 public:
