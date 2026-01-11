@@ -145,16 +145,38 @@ void
 set_common_options(SSL_CTX* ctx)
 {
   SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+}
 
+// Server-only cipher configuration for optimal performance
+// Not applied to client contexts to avoid restricting outbound connections
+void
+set_server_cipher_options(SSL_CTX* ctx)
+{
   // Prefer hardware-accelerated AES-GCM ciphers (uses AES-NI on modern CPUs)
-  // This provides 10-30% faster TLS encryption/decryption
-  SSL_CTX_set_cipher_list(ctx,
+  // Can provide significant speedup on CPUs with hardware AES support
+  // TLS 1.2 cipher list
+  int ret = SSL_CTX_set_cipher_list(ctx,
       "ECDHE-ECDSA-AES128-GCM-SHA256:"
       "ECDHE-RSA-AES128-GCM-SHA256:"
       "ECDHE-ECDSA-AES256-GCM-SHA384:"
       "ECDHE-RSA-AES256-GCM-SHA384:"
       "ECDHE-ECDSA-CHACHA20-POLY1305:"
       "ECDHE-RSA-CHACHA20-POLY1305");
+
+  if (ret == 0) {
+    // Cipher list rejected (FIPS mode, old OpenSSL, etc.)
+    // Fall back to OpenSSL defaults rather than failing
+    ERR_clear_error();
+  }
+
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+  // TLS 1.3 ciphersuites (OpenSSL 1.1.1+)
+  // Default order already prefers AES-GCM, but be explicit
+  SSL_CTX_set_ciphersuites(ctx,
+      "TLS_AES_128_GCM_SHA256:"
+      "TLS_AES_256_GCM_SHA384:"
+      "TLS_CHACHA20_POLY1305_SHA256");
+#endif
 
   // Server prefers its own cipher order (for consistent performance)
   SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
@@ -240,8 +262,12 @@ Ctx::Ctx( const std::string& cert_path, const std::string& key_path, bool client
   impl_->ctx = SSL_CTX_new( client ? SSLv23_method() : SSLv23_server_method() );
   set_common_options(impl_->ctx);
 
+  // Server cipher optimization (applies to both client_server and server_only contexts
+  // since both can act as servers; does not apply to client_only contexts)
+  set_server_cipher_options(impl_->ctx);
+
   // Enable TLS session caching for faster reconnects from returning clients
-  // Server-side session cache reduces handshake time by ~20-30%
+  // Server-side session cache can reduce handshake time for returning clients
   SSL_CTX_set_session_cache_mode(impl_->ctx, SSL_SESS_CACHE_SERVER);
   SSL_CTX_sess_set_cache_size(impl_->ctx, 1024);  // Cache up to 1024 sessions
   SSL_CTX_set_timeout(impl_->ctx, 300);           // 5 minute session lifetime
