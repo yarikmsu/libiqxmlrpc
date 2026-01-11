@@ -1,4 +1,11 @@
-# Code Coverage Guide
+# Testing & Coverage Guide
+
+## General Testing Rules
+
+- Add tests for new functionality
+- Run existing tests before committing
+- Fix broken tests immediately
+- Prefer unit tests over integration tests when possible
 
 ## Coverage Targets
 - **Lines:** 95%
