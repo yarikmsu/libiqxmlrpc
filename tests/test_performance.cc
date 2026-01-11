@@ -880,43 +880,18 @@ void benchmark_ssl_context() {
   // Fewer iterations because SSL context creation is expensive
   const size_t ITERS_SSL = 100;
 
-  // Baseline: SSL context creation
-  // This measures how long it takes to create an SSL context
-  // that can act as both client and server
-  PERF_BENCHMARK("perf_ssl_ctx_create", ITERS_SSL, {
+  // Server context creation (includes P1a session caching + P1b cipher optimization)
+  // This is what Https_server uses
+  PERF_BENCHMARK("perf_ssl_ctx_server", ITERS_SSL, {
     iqnet::ssl::Ctx* ctx = iqnet::ssl::Ctx::client_server(cert_path, key_path);
     perf::do_not_optimize(ctx);
     delete ctx;
   });
 
-  // With session caching configured (P1a optimization - now default)
-  // This benchmark shows session caching is now built-in
-  PERF_BENCHMARK("perf_ssl_ctx_with_session_cache", ITERS_SSL, {
-    iqnet::ssl::Ctx* ctx = iqnet::ssl::Ctx::client_server(cert_path, key_path);
-    SSL_CTX* ssl_ctx = ctx->context();
-    // P1a optimization: Enable server-side session caching (now default)
-    SSL_CTX_set_session_cache_mode(ssl_ctx, SSL_SESS_CACHE_SERVER);
-    SSL_CTX_sess_set_cache_size(ssl_ctx, 1024);
-    SSL_CTX_set_timeout(ssl_ctx, 300);
-    perf::do_not_optimize(ctx);
-    delete ctx;
-  });
-
-  // With optimized cipher list (P1b optimization)
-  // Configures AES-GCM ciphers that leverage AES-NI hardware acceleration
-  // Real benefit: 10-30% faster TLS encryption/decryption on modern CPUs
-  PERF_BENCHMARK("perf_ssl_ctx_with_cipher_list", ITERS_SSL, {
-    iqnet::ssl::Ctx* ctx = iqnet::ssl::Ctx::client_server(cert_path, key_path);
-    SSL_CTX* ssl_ctx = ctx->context();
-    // P1b optimization: Prefer hardware-accelerated AES-GCM ciphers
-    SSL_CTX_set_cipher_list(ssl_ctx,
-        "ECDHE-ECDSA-AES128-GCM-SHA256:"
-        "ECDHE-RSA-AES128-GCM-SHA256:"
-        "ECDHE-ECDSA-AES256-GCM-SHA384:"
-        "ECDHE-RSA-AES256-GCM-SHA384:"
-        "ECDHE-ECDSA-CHACHA20-POLY1305:"
-        "ECDHE-RSA-CHACHA20-POLY1305");
-    SSL_CTX_set_options(ssl_ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
+  // Client-only context creation (no server optimizations)
+  // This is what Https_client uses - no cipher restrictions
+  PERF_BENCHMARK("perf_ssl_ctx_client_only", ITERS_SSL, {
+    iqnet::ssl::Ctx* ctx = iqnet::ssl::Ctx::client_only();
     perf::do_not_optimize(ctx);
     delete ctx;
   });
