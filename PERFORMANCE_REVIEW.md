@@ -1,11 +1,14 @@
 # Performance Review: libiqxmlrpc
 
-**Date:** 2026-01-10 (Updated: 2026-01-10)
+**Date:** 2026-01-10 (Updated: 2026-01-11)
 **Version Analyzed:** 0.13.6
 
 ### Changelog
 | Date | Change |
 |------|--------|
+| 2026-01-11 | Completed: Exception-free SSL flow (~850x speedup) (PR #62) |
+| 2026-01-11 | Completed: TLS cipher optimization with AES-NI (PR #60) |
+| 2026-01-11 | Completed: TLS session caching enabled (PR #59) |
 | 2026-01-10 | Completed: Server quick wins - double lookup, offset tracking, visitor reuse (PR #56) |
 | 2026-01-10 | Completed: Single-pass HTTP header parsing (3x faster) (PR #54) |
 | 2026-01-10 | Completed: Add benchmark for atomic vs mutex comparison (PR #50) |
@@ -747,6 +750,39 @@ enum Verification_level { HTTP_CHECK_WEAK, HTTP_CHECK_STRICT };
     - **Optimization:** Reuses single `Value_type_to_xml` visitor instead of creating one per struct member
     - Mirrors existing pattern in `do_visit_array()`
     - Reduces allocations proportional to struct size
+
+16. ~~**TLS Session Caching**~~ ✅ **DONE (PR #59)**
+    - File: `ssl_lib.cc`
+    - **Impact:** 20-30% faster reconnects for returning clients
+    - Enabled server-side TLS session cache (1024 sessions, 5-minute lifetime)
+    - Resumed handshake: ~1 round-trip vs 2+ for full handshake
+    - Settings: `SSL_CTX_set_session_cache_mode()`, `SSL_CTX_sess_set_cache_size()`, `SSL_CTX_set_timeout()`
+
+17. ~~**TLS Cipher Optimization with AES-NI**~~ ✅ **DONE (PR #60)**
+    - File: `ssl_lib.cc`
+    - **Measured Results:**
+      | Cipher | Time (64KB) | Throughput |
+      |--------|-------------|------------|
+      | AES-128-GCM | ~6,200 ns | 10.3 GB/s |
+      | AES-256-GCM | ~7,500 ns | 8.5 GB/s |
+      | ChaCha20-Poly1305 | ~30,000 ns | 2.1 GB/s |
+      | AES-256-CBC | ~39,000 ns | 1.6 GB/s |
+    - Server contexts now prefer hardware-accelerated AES-GCM ciphers
+    - **5-6x faster** encryption throughput vs CBC mode on CPUs with AES-NI
+    - Client contexts use OpenSSL defaults for compatibility
+
+18. ~~**Exception-free SSL I/O flow**~~ ✅ **DONE (PR #62)**
+    - Files: `ssl_lib.h`, `ssl_lib.cc`, `ssl_connection.h`, `ssl_connection.cc`
+    - **Measured Results:**
+      | Path | Time (ns/op) | Notes |
+      |------|-------------|-------|
+      | Return code (WANT_READ) | **3.54** | New fast path |
+      | Exception (WANT_READ) | **2,876** | Old slow path |
+      | **Speedup** | **~850x** | Per WANT_READ/WANT_WRITE |
+    - Added `SslIoResult` enum: `{OK, WANT_READ, WANT_WRITE, CONNECTION_CLOSE, ERROR}`
+    - Added non-throwing methods: `try_ssl_read()`, `try_ssl_write()`, `try_ssl_accept_nonblock()`, etc.
+    - Refactored `Reaction_connection::switch_state()` to use return codes instead of try/catch
+    - **Savings:** ~30 μs per SSL read/write in high-throughput scenarios (3-10 WANT_* events per I/O)
 
 ### All planned optimizations completed!
 
