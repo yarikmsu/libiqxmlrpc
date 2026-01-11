@@ -30,6 +30,7 @@ protected:
   Server *server;
   http::Packet_reader preader;
   std::string response;
+  size_t response_offset;  // Track send position instead of erasing
   bool keep_alive;
 
 public:

@@ -108,10 +108,16 @@ void Http_server_connection::handle_input( bool& terminate )
 
 void Http_server_connection::handle_output( bool& terminate )
 {
-  size_t sz = send( response.c_str(), response.length() );
+  // Use offset tracking instead of O(n) string erase for partial sends
+  size_t remaining = response.length() - response_offset;
+  size_t sz = send( response.c_str() + response_offset, remaining );
 
-  if( sz == response.length() )
+  if( sz == remaining )
   {
+    // Response fully sent - clear for potential reuse
+    response.clear();
+    response_offset = 0;
+
     if( keep_alive )
     {
       reactor->unregister_handler( this, Reactor_base::OUTPUT );
@@ -123,7 +129,8 @@ void Http_server_connection::handle_output( bool& terminate )
     return;
   }
 
-  response.erase( 0, sz );
+  // Partial send - just advance offset (O(1) instead of O(n) erase)
+  response_offset += sz;
 }
 
 
