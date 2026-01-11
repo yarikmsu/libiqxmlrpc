@@ -97,29 +97,85 @@ void Header::register_validator(
   validators_.insert(std::make_pair(name, v));
 }
 
+// Single-pass HTTP header parser
+// Replaces 5-pass approach (split, find, trim×2, lowercase) with one scan
 void Header::parse(const std::string& s)
 {
-  typedef std::deque<std::string> Tokens;
-  Tokens lines;
-  boost::split(lines, s, boost::is_any_of(names::crlf), boost::token_compress_on);
+  const char* data = s.data();
+  const char* end = data + s.size();
+  const char* pos = data;
 
-  if (!lines.empty()) {
-    head_line_ = lines.front();
-    lines.pop_front();
-  }
+  // Helper: find end of current line (returns pointer to \r or \n, or end)
+  auto find_line_end = [end](const char* p) {
+    while (p < end && *p != '\r' && *p != '\n') ++p;
+    return p;
+  };
 
-  for (auto& line : lines) {
-    boost::iterator_range<std::string::iterator> j = boost::find_first(line, ":");
-    if (j.begin() == line.end())
+  // Helper: skip \r\n or \n
+  auto skip_newline = [end](const char* p) {
+    if (p < end && *p == '\r') ++p;
+    if (p < end && *p == '\n') ++p;
+    return p;
+  };
+
+  // Helper: check if character is whitespace (space or tab)
+  auto is_ws = [](char c) { return c == ' ' || c == '\t'; };
+
+  // Parse first line (request/response line)
+  const char* line_end = find_line_end(pos);
+  head_line_.assign(pos, line_end);
+  pos = skip_newline(line_end);
+
+  // Parse header options
+  while (pos < end) {
+    line_end = find_line_end(pos);
+
+    // Skip empty lines (can occur with \r\n\r\n sequences)
+    if (pos == line_end) {
+      pos = skip_newline(line_end);
+      continue;
+    }
+
+    // Find colon separator
+    const char* colon = pos;
+    while (colon < line_end && *colon != ':') ++colon;
+
+    if (colon == line_end)
       throw Malformed_packet("option line does not contain a colon symbol");
 
-    std::string opt_name(line.begin(), j.begin());
-    std::string opt_value(j.end(), line.end());
+    // Extract option name: trim whitespace and convert to lowercase in one pass
+    const char* name_start = pos;
+    const char* name_end = colon;
 
-    boost::trim(opt_name);
-    boost::trim(opt_value);
-    boost::to_lower(opt_name);
+    // Skip leading whitespace
+    while (name_start < name_end && is_ws(*name_start)) ++name_start;
+    // Skip trailing whitespace
+    while (name_end > name_start && is_ws(*(name_end - 1))) --name_end;
+
+    // Build lowercase name
+    std::string opt_name;
+    opt_name.reserve(name_end - name_start);
+    for (const char* p = name_start; p < name_end; ++p) {
+      char c = *p;
+      // Fast ASCII lowercase: 'A'-'Z' have bit 5 clear, 'a'-'z' have it set
+      if (c >= 'A' && c <= 'Z') c |= 0x20;
+      opt_name.push_back(c);
+    }
+
+    // Extract option value: trim whitespace
+    const char* value_start = colon + 1;
+    const char* value_end = line_end;
+
+    // Skip leading whitespace
+    while (value_start < value_end && is_ws(*value_start)) ++value_start;
+    // Skip trailing whitespace
+    while (value_end > value_start && is_ws(*(value_end - 1))) --value_end;
+
+    std::string opt_value(value_start, value_end);
+
     set_option_checked(opt_name, opt_value);
+
+    pos = skip_newline(line_end);
   }
 }
 
