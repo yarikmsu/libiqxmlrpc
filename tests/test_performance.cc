@@ -988,6 +988,123 @@ void benchmark_cipher_throughput() {
 }
 
 // ============================================================================
+// M. Exception vs Return Code Benchmark (P3)
+// Measures the overhead of using exceptions for normal SSL I/O flow control
+// Current code throws need_read()/need_write() exceptions for SSL_ERROR_WANT_*
+// ============================================================================
+
+// Simulate the SSL I/O result codes (for benchmark purposes)
+enum class BenchSslResult { OK, WANT_READ, WANT_WRITE, ERROR, CONNECTION_CLOSE };
+
+// Simulate checking SSL result with return code (proposed P3 implementation)
+__attribute__((noinline))
+BenchSslResult check_ssl_result_return_code(int ssl_error) {
+  switch (ssl_error) {
+    case SSL_ERROR_NONE: return BenchSslResult::OK;
+    case SSL_ERROR_WANT_READ: return BenchSslResult::WANT_READ;
+    case SSL_ERROR_WANT_WRITE: return BenchSslResult::WANT_WRITE;
+    case SSL_ERROR_ZERO_RETURN: return BenchSslResult::CONNECTION_CLOSE;
+    default: return BenchSslResult::ERROR;
+  }
+}
+
+// Simulate checking SSL result with exceptions (current implementation)
+__attribute__((noinline))
+void check_ssl_result_exception(int ssl_error) {
+  switch (ssl_error) {
+    case SSL_ERROR_NONE: return;
+    case SSL_ERROR_WANT_READ: throw iqnet::ssl::need_read();
+    case SSL_ERROR_WANT_WRITE: throw iqnet::ssl::need_write();
+    case SSL_ERROR_ZERO_RETURN: throw iqnet::ssl::connection_close(true);
+    default: throw iqnet::ssl::io_error(ssl_error);
+  }
+}
+
+void benchmark_exception_vs_return_code() {
+  perf::section("Exception vs Return Code (P3 optimization)");
+
+  // High iterations to measure the difference clearly
+  const size_t ITERS = 100000;
+
+  // Benchmark return code path for WANT_READ (most common case in non-blocking I/O)
+  PERF_BENCHMARK("perf_ssl_result_return_code", ITERS, {
+    BenchSslResult result = check_ssl_result_return_code(SSL_ERROR_WANT_READ);
+    if (result == BenchSslResult::WANT_READ) {
+      // Would register for read - just do a simple operation
+      volatile int x = 1;
+      perf::do_not_optimize(x);
+    }
+  });
+
+  // Benchmark exception path for WANT_READ (current implementation)
+  PERF_BENCHMARK("perf_ssl_result_exception", ITERS, {
+    try {
+      check_ssl_result_exception(SSL_ERROR_WANT_READ);
+    } catch (const iqnet::ssl::need_read&) {
+      // Would register for read - just do a simple operation
+      volatile int x = 1;
+      perf::do_not_optimize(x);
+    }
+  });
+
+  // Benchmark return code path for OK (no error case)
+  PERF_BENCHMARK("perf_ssl_result_ok_return", ITERS, {
+    BenchSslResult result = check_ssl_result_return_code(SSL_ERROR_NONE);
+    if (result == BenchSslResult::OK) {
+      volatile int x = 1;
+      perf::do_not_optimize(x);
+    }
+  });
+
+  // Benchmark exception path for OK (no exception thrown)
+  PERF_BENCHMARK("perf_ssl_result_ok_exception", ITERS, {
+    try {
+      check_ssl_result_exception(SSL_ERROR_NONE);
+      volatile int x = 1;
+      perf::do_not_optimize(x);
+    } catch (...) {
+      // Should not reach here
+    }
+  });
+
+  // Benchmark the actual reactor registration simulation
+  // This simulates the full switch_state() logic
+  {
+    volatile int registered_input = 0;
+    volatile int registered_output = 0;
+
+    // Return code version
+    PERF_BENCHMARK("perf_ssl_switch_state_return", ITERS, {
+      BenchSslResult result = check_ssl_result_return_code(SSL_ERROR_WANT_READ);
+      switch (result) {
+        case BenchSslResult::WANT_READ:
+          registered_input++;
+          break;
+        case BenchSslResult::WANT_WRITE:
+          registered_output++;
+          break;
+        default:
+          break;
+      }
+      perf::do_not_optimize(registered_input);
+    });
+
+    // Exception version
+    PERF_BENCHMARK("perf_ssl_switch_state_exception", ITERS, {
+      try {
+        check_ssl_result_exception(SSL_ERROR_WANT_READ);
+      } catch (const iqnet::ssl::need_read&) {
+        registered_input++;
+      } catch (const iqnet::ssl::need_write&) {
+        registered_output++;
+      } catch (...) {
+      }
+      perf::do_not_optimize(registered_input);
+    });
+  }
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 
@@ -1017,6 +1134,7 @@ int main(int /*argc*/, char* /*argv*/[]) {
   benchmark_threading_primitives();
   benchmark_ssl_context();
   benchmark_cipher_throughput();
+  benchmark_exception_vs_return_code();
 
   // Save baseline
   std::strftime(time_buf, sizeof(time_buf), "%Y%m%d_%H%M%S", std::localtime(&now));
