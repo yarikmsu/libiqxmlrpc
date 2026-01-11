@@ -43,14 +43,14 @@ trap cleanup EXIT
 
 log_pass() {
     echo -e "${GREEN}[PASS]${NC} $1"
-    ((PASSED++))
-    ((TESTS_RUN++))
+    ((++PASSED))
+    ((++TESTS_RUN))
 }
 
 log_fail() {
     echo -e "${RED}[FAIL]${NC} $1"
-    ((FAILED++))
-    ((TESTS_RUN++))
+    ((++FAILED))
+    ((++TESTS_RUN))
 }
 
 log_info() {
@@ -72,8 +72,8 @@ check_prerequisites() {
     fi
 
     # Check if test binary exists
-    if [ ! -f "$BUILD_DIR/tests/test_integration" ]; then
-        echo "ERROR: test_integration binary not found in $BUILD_DIR/tests/"
+    if [ ! -f "$BUILD_DIR/tests/wire-compatibility-test" ]; then
+        echo "ERROR: wire-compatibility-test binary not found in $BUILD_DIR/tests/"
         echo "Please build the project first: cmake --build $BUILD_DIR"
         exit 1
     fi
@@ -91,7 +91,7 @@ start_server() {
     # Wait for server to start
     local retries=10
     while [ $retries -gt 0 ]; do
-        if curl -s -o /dev/null -w "%{http_code}" "http://$HOST:$PORT/" 2>/dev/null | grep -q "405\|200"; then
+        if curl -s -o /dev/null -w "%{http_code}" "http://$HOST:$PORT/" 2>/dev/null | grep -q "405\|200\|501"; then
             log_info "Server started successfully (PID: $SERVER_PID)"
             return 0
         fi
