@@ -15,11 +15,15 @@ make perf-test                                     # Run benchmarks
 ```
 
 ## Git Workflow
-- Commit to feature branches, not master
+
+- Create feature branches for all changes
+- Write descriptive commit messages explaining "why" not just "what"
 - Create PRs and merge after CI passes
+- Never force push to main/master
 - Check CI: `gh pr view <PR> --json statusCheckRollup`
 
 ## CI Checks
+
 PRs must pass: ubuntu-24.04, ubi8, macos builds | ASan/UBSan | coverage | cppcheck | CodeQL
 
 ## Architecture
@@ -37,24 +41,12 @@ PRs must pass: ubuntu-24.04, ubi8, macos builds | ASan/UBSan | coverage | cppche
 - `Method` — base class for RPC methods; register via `register_method()`
 - `Executor_factory_base` — threading model (Serial or Pool)
 
-## Testing
-
-- **Framework**: Boost.Test
-- **Unit tests**: `tests/test_*.cc`
-- **Coverage targets**: 95% lines, 60% branches
-- **Detailed guide**: `docs/COVERAGE_GUIDE.md`
-
-## Performance
-
-- **Benchmarks**: `make perf-test`
-- **Guidelines**: `docs/PERFORMANCE_GUIDE.md`
-
 ## Reference Docs
 
 | Topic | File |
 |-------|------|
-| Performance rules & hot paths | `docs/PERFORMANCE_GUIDE.md` |
-| Coverage patterns & pitfalls | `docs/COVERAGE_GUIDE.md` |
+| Coding standards | `docs/CODING_STANDARDS.md` |
+| Testing & coverage | `docs/COVERAGE_GUIDE.md` |
+| Performance rules | `docs/PERFORMANCE_GUIDE.md` |
 | SSL/HTTPS testing | `docs/SSL_TESTING.md` |
 | Debugging tips | `docs/DEBUGGING.md` |
-| Wire compatibility | `COMPATIBILITY_TESTING_PLAN.md` |
