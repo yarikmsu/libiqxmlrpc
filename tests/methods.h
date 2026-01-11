@@ -11,6 +11,11 @@ public:
   void execute( const iqxmlrpc::Param_list&, iqxmlrpc::Value& );
 };
 
+class serverctl_log: public iqxmlrpc::Method {
+public:
+  void execute( const iqxmlrpc::Param_list&, iqxmlrpc::Value& );
+};
+
 void echo_method(iqxmlrpc::Method*, const iqxmlrpc::Param_list&, iqxmlrpc::Value&);
 void echo_user(iqxmlrpc::Method*, const iqxmlrpc::Param_list&, iqxmlrpc::Value&);
 void trace_method(iqxmlrpc::Method*, const iqxmlrpc::Param_list&, iqxmlrpc::Value&);
