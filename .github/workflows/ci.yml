@@ -46,6 +46,11 @@ jobs:
     - name: Test
       run: ctest --test-dir build --output-on-failure
 
+    - name: Interop Test
+      run: |
+        cd build
+        make interop-test
+
   sanitizers:
     name: ASan/UBSan
     runs-on: ubuntu-24.04
