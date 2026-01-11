@@ -197,8 +197,8 @@ typedef std::map<std::string, Value*> Value_stor;
 
 | Priority | Issue | Recommendation | Impact |
 |----------|-------|----------------|--------|
-| High | Raw pointer storage | Consider `std::unique_ptr<Value>` in containers | Safety (primary), enables optimization patterns |
-| Medium | Clone overhead | Add move constructors to Value, use COW or shared_ptr where appropriate | Significant for large values |
+| ~~High~~ | ~~Raw pointer storage~~ | ~~Consider `std::unique_ptr<Value>` in containers~~ | ~~Safety (primary), enables optimization patterns~~ ✅ Struct done (PR #40), Array kept raw (regression) |
+| ~~Medium~~ | ~~Clone overhead~~ | ~~Add move constructors to Value~~ | ~~Significant for large values~~ ✅ Done (PR #35) |
 
 #### Note on Smart Pointers and Performance
 
@@ -235,6 +235,11 @@ The recommendation to use smart pointers is **primarily about safety** (preventi
 | `shared_ptr` ref counting | Adds atomic operations |
 | Very tight loops | Cache effects dominate |
 | Construction | `make_unique` ≈ `new` |
+
+**Remaining recommendations:**
+
+| Priority | Issue | Recommendation | Impact |
+|----------|-------|----------------|--------|
 | Medium | Replace ExplicitPtr | Use `std::unique_ptr` throughout | Code clarity, no runtime impact |
 | Low | Allocation pooling | Consider memory pool for Value allocations in hot paths | High-throughput scenarios |
 
@@ -295,7 +300,7 @@ The recommendation to use smart pointers is **primarily about safety** (preventi
 
 | Priority | Issue | Recommendation | Impact |
 |----------|-------|----------------|--------|
-| High | TCP_NODELAY | Add option to disable Nagle's algorithm (default on for RPC) | **40-400ms latency reduction per call** |
+| ~~High~~ | ~~TCP_NODELAY~~ | ~~Add option to disable Nagle's algorithm (default on for RPC)~~ | ~~**40-400ms latency reduction per call**~~ ✅ Done (PR #45) |
 | Medium | Handler list copy | Use copy-on-write or version counter for handler updates | High connection scalability |
 | Low | Buffer tuning | Add socket buffer size configuration | Throughput optimization |
 | Low | Vectored I/O | Consider `writev` for header+body transmission | Minor efficiency gain |
@@ -376,7 +381,7 @@ void Pool_executor_factory::Pool_thread::operator ()() {
 | Priority | Issue | Recommendation | Impact |
 |----------|-------|----------------|--------|
 | Medium | Queue contention | Consider lock-free queue (boost::lockfree or moodycamel) | Better multi-core scaling |
-| Low | Destructor flag | Use `std::atomic<bool>` | Code clarity (primary), minor overhead reduction |
+| ~~Low~~ | ~~Destructor flag~~ | ~~Use `std::atomic<bool>`~~ | ~~Code clarity (primary), minor overhead reduction~~ ✅ Done (PR #46) |
 | Low | Work stealing | Implement work-stealing for better load balance | Complex workload scenarios |
 | Low | Thread naming | Add thread naming for debugging (`pthread_setname_np`) | Debugging ease |
 
@@ -460,7 +465,7 @@ The library uses `std::string` throughout, with several areas of concern:
 | Priority | Issue | Recommendation | Impact |
 |----------|-------|----------------|--------|
 | Medium | substr allocations | Use `std::string_view` for parsing operations | Reduced allocations |
-| Medium | HTTP header parsing | Single-pass parser with pre-allocated buffers | Parsing performance |
+| ~~Medium~~ | ~~HTTP header parsing~~ | ~~Single-pass parser with pre-allocated buffers~~ | ~~Parsing performance~~ ✅ Done (PR #54) |
 | Low | Multiple string passes | Combine trim+lowercase in single pass | Minor improvement |
 | Low | Consider SSO | Ensure strings under 15-22 chars benefit from SSO | Already automatic |
 
@@ -515,7 +520,7 @@ The library uses `std::string` throughout, with several areas of concern:
 
 | Priority | Issue | Recommendation | Impact |
 |----------|-------|----------------|--------|
-| Medium | Struct map type | Benchmark `unordered_map` vs `map` for typical sizes | Lookup performance |
+| ~~Medium~~ | ~~Struct map type~~ | ~~Benchmark `unordered_map` vs `map` for typical sizes~~ | ~~Lookup performance~~ ✅ Done (PR #44) |
 | Medium | Handler state search | Add map indexed by socket descriptor | O(1) lookup |
 | Low | Array bounds check | Use assert in debug, raw access in release | Minor |
 | Low | Small struct optimization | Consider flat_map for structs < 10 members | Cache efficiency |
@@ -582,7 +587,7 @@ enum Verification_level { HTTP_CHECK_WEAK, HTTP_CHECK_STRICT };
 
 | Priority | Issue | Recommendation | Impact |
 |----------|-------|----------------|--------|
-| Medium | Date formatting | Cache locale/facet, or use `strftime` directly | Response latency |
+| ~~Medium~~ | ~~Date formatting~~ | ~~Cache locale/facet, or use `strftime` directly~~ | ~~Response latency~~ ✅ Done (PR #34) |
 | Low | HTTP version | Make consistent (1.1) or configurable | Correctness |
 | Low | Auth caching | Brief credential cache to avoid repeated decoding | Auth-heavy workloads |
 
