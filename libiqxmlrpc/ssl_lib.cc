@@ -227,6 +227,12 @@ Ctx::Ctx( const std::string& cert_path, const std::string& key_path, bool client
   impl_->ctx = SSL_CTX_new( client ? SSLv23_method() : SSLv23_server_method() );
   set_common_options(impl_->ctx);
 
+  // Enable TLS session caching for faster reconnects from returning clients
+  // Server-side session cache reduces handshake time by ~20-30%
+  SSL_CTX_set_session_cache_mode(impl_->ctx, SSL_SESS_CACHE_SERVER);
+  SSL_CTX_sess_set_cache_size(impl_->ctx, 1024);  // Cache up to 1024 sessions
+  SSL_CTX_set_timeout(impl_->ctx, 300);           // 5 minute session lifetime
+
   if(
     !SSL_CTX_use_certificate_file( impl_->ctx, cert_path.c_str(), SSL_FILETYPE_PEM ) ||
     !SSL_CTX_use_PrivateKey_file( impl_->ctx, key_path.c_str(), SSL_FILETYPE_PEM ) ||
