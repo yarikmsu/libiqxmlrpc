@@ -1,6 +1,7 @@
 #include <sstream>
+#include <algorithm>
+#include <cctype>
 #include <boost/program_options.hpp>
-#include <boost/algorithm/string.hpp>
 #include <libiqxmlrpc/http_client.h>
 #include <libiqxmlrpc/https_client.h>
 #include "client_opts.h"
@@ -50,8 +51,11 @@ public:
   FingerprintVerifier(const std::string& finger):
     finger_(finger)
   {
-    boost::erase_all(finger_, ":");
-    boost::to_lower(finger_);
+    // Remove colons
+    finger_.erase(std::remove(finger_.begin(), finger_.end(), ':'), finger_.end());
+    // Convert to lowercase
+    std::transform(finger_.begin(), finger_.end(), finger_.begin(),
+      [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
   }
 
 private:
@@ -63,7 +67,7 @@ private:
   mutable std::string finger_;
 };
 
-boost::optional<FingerprintVerifier> server_verifier;
+std::optional<FingerprintVerifier> server_verifier;
 
 iqxmlrpc::Client_base*
 Client_opts::create_instance() const
@@ -90,7 +94,7 @@ Client_opts::create_instance() const
 
   if (use_ssl_ && server_fingerprint_.size()) {
     server_verifier = FingerprintVerifier(server_fingerprint_);
-    ssl::ctx->verify_server(&server_verifier.get());
+    ssl::ctx->verify_server(&server_verifier.value());
   }
 
   return retval;

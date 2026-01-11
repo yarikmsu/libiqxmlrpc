@@ -6,28 +6,25 @@
 
 #include "api_export.h"
 
+#include <mutex>
+
 namespace iqnet
 {
 
 //! Class which provides null synchronization.
-//! Methods are intentionally non-static for template compatibility with boost::mutex.
+//! Methods are intentionally non-static for template compatibility with std::mutex.
+//! Compatible with std::unique_lock<Null_lock>.
 class LIBIQXMLRPC_API Null_lock {
 public:
-  struct scoped_lock {
-    explicit scoped_lock(Null_lock&) {}
-    ~scoped_lock() {}
-
-    // cppcheck-suppress functionStatic
-    void lock() {}
-    // cppcheck-suppress functionStatic
-    void unlock() {}
-  };
-
   // cppcheck-suppress functionStatic
   void lock() {}
   // cppcheck-suppress functionStatic
   void unlock() {}
 };
+
+//! Type alias for scoped lock, works with both Null_lock and std::mutex
+template<typename Lock>
+using scoped_lock = std::unique_lock<Lock>;
 
 } // namespace iqnet
 

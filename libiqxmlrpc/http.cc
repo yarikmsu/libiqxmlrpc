@@ -7,11 +7,11 @@
 #include "method.h"
 #include "version.h"
 
-#include <boost/algorithm/string.hpp>
-
 #include "num_conv.h"
 
 #include <algorithm>
+#include <cctype>
+#include <cstring>
 #include <ctime>
 #include <deque>
 #include <functional>
@@ -20,6 +20,73 @@
 
 namespace iqxmlrpc {
 namespace http {
+
+namespace {
+
+// Helper: convert string to lowercase in-place
+inline void to_lower_inplace(std::string& s) {
+  std::transform(s.begin(), s.end(), s.begin(),
+    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+}
+
+// Helper: check if all characters are digits
+inline bool all_digits(const std::string& s) {
+  return !s.empty() && std::all_of(s.begin(), s.end(),
+    [](unsigned char c) { return std::isdigit(c); });
+}
+
+// Helper: check if string starts with prefix
+inline bool starts_with(const std::string& s, const char* prefix) {
+  size_t len = std::strlen(prefix);
+  return s.size() >= len && s.compare(0, len, prefix) == 0;
+}
+
+// Helper: check if string contains substring
+inline bool contains(const std::string& s, const char* sub) {
+  return s.find(sub) != std::string::npos;
+}
+
+// Helper: split string by whitespace, compressing consecutive delimiters
+template<typename Container>
+void split_by_whitespace(Container& result, const std::string& s) {
+  result.clear();
+  size_t start = 0;
+  size_t len = s.size();
+
+  while (start < len) {
+    // Skip leading whitespace
+    while (start < len && std::isspace(static_cast<unsigned char>(s[start]))) ++start;
+    if (start >= len) break;
+
+    // Find end of token
+    size_t end = start;
+    while (end < len && !std::isspace(static_cast<unsigned char>(s[end]))) ++end;
+
+    result.push_back(s.substr(start, end - start));
+    start = end;
+  }
+}
+
+// Helper: split string by any character in delimiters
+template<typename Container>
+void split_by_chars(Container& result, const std::string& s, const char* delims) {
+  result.clear();
+  size_t start = 0;
+  size_t len = s.size();
+
+  while (start < len) {
+    // Find next delimiter
+    size_t end = s.find_first_of(delims, start);
+    if (end == std::string::npos) end = len;
+
+    if (end > start) {
+      result.push_back(s.substr(start, end - start));
+    }
+    start = end + 1;
+  }
+}
+
+} // anonymous namespace
 
 namespace names {
   const char crlf[]           = "\r\n";
@@ -41,7 +108,7 @@ void unsigned_number(const std::string& val)
 {
   const char errmsg[] = "bad format of numeric option";
 
-  if (!boost::all(val, boost::is_digit()))
+  if (!all_digits(val))
     throw Malformed_packet(errmsg);
 
   try {
@@ -54,18 +121,18 @@ void unsigned_number(const std::string& val)
 void content_type(const std::string& val)
 {
   std::string cont_type(val);
-  boost::to_lower(cont_type);
+  to_lower_inplace(cont_type);
 
-  if (!boost::find_first(cont_type, "text/xml"))
+  if (!contains(cont_type, "text/xml"))
     throw Unsupported_content_type(cont_type);
 }
 
 void expect_continue(const std::string& val)
 {
   std::string exp(val);
-  boost::to_lower(exp);
+  to_lower_inplace(exp);
 
-  if (!boost::starts_with(exp, "100-continue"))
+  if (!starts_with(exp, "100-continue"))
     throw Expectation_failed();
 }
 
@@ -307,7 +374,7 @@ Request_header::Request_header(Verification_level lev, const std::string& to_par
   // parse method
   typedef std::deque<std::string> Token;
   Token method_line;
-  boost::split(method_line, get_head_line(), boost::is_space(), boost::token_compress_on);
+  split_by_whitespace(method_line, get_head_line());
 
   if (method_line.empty())
     throw Bad_request();
@@ -371,12 +438,12 @@ void Request_header::get_authinfo(std::string& user, std::string& pw) const
 
   std::vector<std::string> v;
   std::string authstring = get_string(names::authorization);
-  boost::split(v, authstring, boost::is_any_of(" \t"));
+  split_by_chars(v, authstring, " \t");
 
   if (v.size() != 2)
     throw Unauthorized();
 
-  boost::to_lower(v[0]);
+  to_lower_inplace(v[0]);
   if (v[0] != "basic")
     throw Unauthorized();
 
@@ -407,7 +474,7 @@ Response_header::Response_header(Verification_level lev, const std::string& to_p
 
   typedef std::deque<std::string> Token;
   Token resp_line;
-  boost::split(resp_line, get_head_line(), boost::is_space(), boost::token_compress_on);
+  split_by_whitespace(resp_line, get_head_line());
 
   if (resp_line.size() < 2) {
     throw Malformed_packet("Bad response");
@@ -502,21 +569,24 @@ void Packet_reader::check_sz( size_t sz )
 
 bool Packet_reader::read_header( const std::string& s )
 {
-  using boost::iterator_range;
-  using boost::find_first;
-
   header_cache += s;
-  iterator_range<std::string::iterator> i = find_first(header_cache, "\r\n\r\n");
 
-  if( i.begin() == i.end() )
-    i = boost::find_first(header_cache, "\n\n");
+  // Find header/body separator
+  size_t sep_pos = header_cache.find("\r\n\r\n");
+  size_t sep_len = 4;
 
-  if( i.begin() == i.end() )
+  if (sep_pos == std::string::npos) {
+    sep_pos = header_cache.find("\n\n");
+    sep_len = 2;
+  }
+
+  if (sep_pos == std::string::npos)
     return false;
 
-  // Use direct string construction instead of std::copy with back_inserter
-  content_cache.append(i.end(), header_cache.end());
-  header_cache.erase(i.begin(), header_cache.end());
+  // Content starts after the separator
+  size_t content_start = sep_pos + sep_len;
+  content_cache.append(header_cache, content_start, std::string::npos);
+  header_cache.erase(sep_pos);
   return true;
 }
 

@@ -7,20 +7,10 @@
 #include "lock.h"
 #include "method.h"
 
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable: 4275)
-#endif
-
-#include <boost/thread/thread.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/condition.hpp>
-
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
-
 #include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
 #include <deque>
 #include <vector>
 
@@ -47,7 +37,7 @@ struct Serial_executor_traits
 struct Pool_executor_traits
 {
   typedef Pool_executor_factory Executor_factory;
-  typedef boost::mutex Lock;
+  typedef std::mutex Lock;
 };
 
 //! Abstract executor class. Defines the policy for method execution.
@@ -137,13 +127,13 @@ class LIBIQXMLRPC_API Pool_executor_factory: public Executor_factory_base {
   class Pool_thread;
   friend class Pool_thread;
 
-  boost::thread_group       threads;
+  std::vector<std::thread>  threads;
   std::vector<Pool_thread*> pool;
 
   // Objects Pool_thread works with
   std::deque<Pool_executor*> req_queue;
-  boost::mutex               req_queue_lock;
-  boost::condition           req_queue_cond;
+  std::mutex                 req_queue_lock;
+  std::condition_variable    req_queue_cond;
 
   std::atomic<bool> in_destructor;
 

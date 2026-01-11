@@ -96,9 +96,9 @@ BOOST_AUTO_TEST_CASE(request_header_parse_get_method_throws)
 
 BOOST_AUTO_TEST_CASE(request_header_parse_empty_first_line_throws)
 {
-    // Empty first line (after split) results in Method_not_allowed since it's not "POST"
+    // Empty first line (after split) results in Bad_request since there's no method line
     std::string raw_header = "\r\ncontent-length: 0";
-    BOOST_CHECK_THROW(Request_header(HTTP_CHECK_WEAK, raw_header), Method_not_allowed);
+    BOOST_CHECK_THROW(Request_header(HTTP_CHECK_WEAK, raw_header), Bad_request);
 }
 
 BOOST_AUTO_TEST_CASE(request_header_user_agent)
@@ -802,9 +802,9 @@ BOOST_AUTO_TEST_CASE(request_bad_method_delete_throws)
 
 BOOST_AUTO_TEST_CASE(request_whitespace_only_method_line_throws)
 {
-    // Whitespace-only method line results in empty first token, treated as invalid method
+    // Whitespace-only method line results in empty container, treated as bad request
     std::string raw_header = "   \r\nhost: localhost\r\ncontent-length: 0";
-    BOOST_CHECK_THROW(Request_header(HTTP_CHECK_WEAK, raw_header), Method_not_allowed);
+    BOOST_CHECK_THROW(Request_header(HTTP_CHECK_WEAK, raw_header), Bad_request);
 }
 
 BOOST_AUTO_TEST_CASE(header_option_name_case_insensitive)

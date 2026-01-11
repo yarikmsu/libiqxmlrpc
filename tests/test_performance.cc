@@ -10,7 +10,6 @@
 #include "libiqxmlrpc/response_parser.h"
 #include "libiqxmlrpc/http.h"
 
-#include <boost/lexical_cast.hpp>
 #include <string>
 #include <vector>
 #include <memory>
@@ -30,60 +29,9 @@ using namespace iqxmlrpc;
 // ============================================================================
 
 void benchmark_number_conversions() {
-  perf::section("Number Conversion (boost::lexical_cast)");
+  perf::section("Number Conversion (std::to_chars/from_chars)");
 
   const size_t ITERS = 100000;
-
-  // int -> string
-  {
-    int val = 123456;
-    PERF_BENCHMARK("perf_int_to_string", ITERS, {
-      std::string s = boost::lexical_cast<std::string>(val);
-      perf::do_not_optimize(s);
-    });
-  }
-
-  // string -> int
-  PERF_BENCHMARK("perf_string_to_int", ITERS, {
-    std::string s = "123456";
-    int val = boost::lexical_cast<int>(s);
-    perf::do_not_optimize(val);
-  });
-
-  // int64_t -> string
-  {
-    int64_t val = 9223372036854775807LL;
-    PERF_BENCHMARK("perf_int64_to_string", ITERS, {
-      std::string s = boost::lexical_cast<std::string>(val);
-      perf::do_not_optimize(s);
-    });
-  }
-
-  // string -> int64_t
-  PERF_BENCHMARK("perf_string_to_int64", ITERS, {
-    std::string s = "9223372036854775807";
-    int64_t val = boost::lexical_cast<int64_t>(s);
-    perf::do_not_optimize(val);
-  });
-
-  // double -> string
-  {
-    double val = 3.141592653589793;
-    PERF_BENCHMARK("perf_double_to_string", ITERS, {
-      std::string s = boost::lexical_cast<std::string>(val);
-      perf::do_not_optimize(s);
-    });
-  }
-
-  // string -> double
-  PERF_BENCHMARK("perf_string_to_double", ITERS, {
-    std::string s = "3.141592653589793";
-    double val = boost::lexical_cast<double>(s);
-    perf::do_not_optimize(val);
-  });
-
-  // Now test the new num_conv functions
-  perf::section("Number Conversion (std::to_chars/from_chars)");
 
   // int -> string (num_conv)
   {
@@ -743,7 +691,7 @@ void benchmark_server_performance() {
 // ============================================================================
 
 #include <atomic>
-#include <boost/thread/mutex.hpp>
+#include <mutex>
 
 void benchmark_threading_primitives() {
   perf::section("Threading Primitives (mutex vs atomic)");
@@ -753,10 +701,10 @@ void benchmark_threading_primitives() {
   // Mutex-protected bool read (simulates old is_being_destructed())
   {
     bool flag = false;
-    boost::mutex mtx;
+    std::mutex mtx;
 
     PERF_BENCHMARK("perf_mutex_bool_read", ITERS, {
-      boost::mutex::scoped_lock lk(mtx);
+      std::lock_guard<std::mutex> lk(mtx);
       bool val = flag;
       perf::do_not_optimize(val);
     });
@@ -775,10 +723,10 @@ void benchmark_threading_primitives() {
   // Mutex-protected bool write (simulates old destruction_started())
   {
     bool flag = false;
-    boost::mutex mtx;
+    std::mutex mtx;
 
     PERF_BENCHMARK("perf_mutex_bool_write", ITERS, {
-      boost::mutex::scoped_lock lk(mtx);
+      std::lock_guard<std::mutex> lk(mtx);
       flag = true;
       perf::do_not_optimize(flag);
     });

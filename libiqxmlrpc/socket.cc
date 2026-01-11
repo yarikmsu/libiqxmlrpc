@@ -1,8 +1,7 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
-#include <errno.h>
-#include <boost/cerrno.hpp>
+#include <cerrno>
 #include "socket.h"
 #include "net_except.h"
 

@@ -1,4 +1,4 @@
-find_package(Boost 1.41.0 COMPONENTS unit_test_framework program_options thread chrono)
+find_package(Boost 1.41.0 COMPONENTS unit_test_framework program_options)
 
 include_directories(${OPENSSL_INCLUDE_DIR} ${LIBXML2_INCLUDE_DIR} ${Boost_INCLUDE_DIR} ${PROJECT_SOURCE_DIR})
 

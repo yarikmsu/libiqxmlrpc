@@ -6,9 +6,8 @@
 #include "lock.h"
 #include "socket.h"
 
-#include <boost/thread/mutex.hpp>
-
 #include <memory>
+#include <mutex>
 
 namespace iqnet {
 
@@ -54,7 +53,7 @@ public:
 private:
   std::unique_ptr<Interrupter_connection> server_;
   Socket client_;
-  boost::mutex lock_;
+  std::mutex lock_;
 };
 
 
@@ -76,7 +75,7 @@ Reactor_interrupter::Impl::Impl(Reactor_base* reactor):
 
 void Reactor_interrupter::Impl::make_interrupt()
 {
-  boost::mutex::scoped_lock lk(lock_);
+  std::lock_guard<std::mutex> lk(lock_);
   client_.send("\0", 1);
 }
 
