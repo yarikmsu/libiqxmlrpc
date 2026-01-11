@@ -15,6 +15,7 @@
 #include <vector>
 #include <memory>
 #include <cstring>
+#include <map>
 
 #include "libiqxmlrpc/num_conv.h"
 
@@ -613,7 +614,128 @@ void benchmark_http_header_parsing() {
 }
 
 // ============================================================================
-// I. Threading Primitives Benchmark
+// I. Server Performance Benchmarks
+// Target: Method dispatch, response handling, XML serialization
+// ============================================================================
+
+void benchmark_server_performance() {
+  perf::section("Server Performance");
+
+  const size_t ITERS = 100000;
+
+  // --- Map Lookup Pattern Benchmark ---
+  // Simulates dispatcher_manager.cc double lookup issue
+  {
+    std::map<std::string, int> method_map;
+    // Register 20 methods (typical server)
+    for (int i = 0; i < 20; i++) {
+      method_map["method_" + std::to_string(i)] = i;
+    }
+    std::string lookup_key = "method_10";  // Middle of map
+
+    // Pattern 1: Double lookup (current code)
+    PERF_BENCHMARK("perf_map_double_lookup", ITERS, {
+      if (method_map.find(lookup_key) != method_map.end()) {
+        int val = method_map[lookup_key];  // Second lookup!
+        perf::do_not_optimize(val);
+      }
+    });
+
+    // Pattern 2: Single lookup with iterator (optimized)
+    PERF_BENCHMARK("perf_map_single_lookup", ITERS, {
+      auto it = method_map.find(lookup_key);
+      if (it != method_map.end()) {
+        int val = it->second;  // No second lookup
+        perf::do_not_optimize(val);
+      }
+    });
+  }
+
+  // --- Response Partial Write Benchmark ---
+  // Simulates http_server.cc:126 string erase issue
+  {
+    const size_t RESPONSE_SIZE = 65536;  // 64KB response
+    const size_t CHUNK_SIZE = 16384;     // 16KB chunks (4 writes)
+
+    // Pattern 1: String erase (current code)
+    PERF_BENCHMARK("perf_response_erase", 1000, {
+      std::string response(RESPONSE_SIZE, 'X');
+      size_t remaining = RESPONSE_SIZE;
+      while (remaining > 0) {
+        size_t chunk = std::min(CHUNK_SIZE, remaining);
+        // Simulate send - just access the data
+        perf::do_not_optimize(response.c_str());
+        response.erase(0, chunk);  // O(n) erase!
+        remaining -= chunk;
+      }
+    });
+
+    // Pattern 2: Offset tracking (optimized)
+    PERF_BENCHMARK("perf_response_offset", 1000, {
+      std::string response(RESPONSE_SIZE, 'X');
+      size_t offset = 0;
+      size_t remaining = RESPONSE_SIZE;
+      while (remaining > 0) {
+        size_t chunk = std::min(CHUNK_SIZE, remaining);
+        // Simulate send - access data at offset
+        perf::do_not_optimize(response.c_str() + offset);
+        offset += chunk;  // O(1) offset update!
+        remaining -= chunk;
+      }
+    });
+  }
+
+  // --- XML Struct Serialization Benchmark ---
+  // Measures value_type_xml.cc struct visitor pattern
+  {
+    // Small struct (5 fields)
+    Struct s5;
+    s5.insert("id", 12345);
+    s5.insert("name", "test_item");
+    s5.insert("price", 99.99);
+    s5.insert("active", true);
+    s5.insert("count", 42);
+    Value* v5 = new Value(s5);
+    Response resp5(v5);
+
+    PERF_BENCHMARK("perf_serialize_struct_5", 10000, {
+      std::string xml = dump_response(resp5);
+      perf::do_not_optimize(xml);
+    });
+
+    // Medium struct (20 fields)
+    Struct s20;
+    for (int i = 0; i < 20; i++) {
+      s20.insert("field_" + std::to_string(i), i * 100);
+    }
+    Value* v20 = new Value(s20);
+    Response resp20(v20);
+
+    PERF_BENCHMARK("perf_serialize_struct_20", 10000, {
+      std::string xml = dump_response(resp20);
+      perf::do_not_optimize(xml);
+    });
+
+    // Nested struct (struct containing structs)
+    Struct outer;
+    for (int i = 0; i < 5; i++) {
+      Struct inner;
+      inner.insert("id", i);
+      inner.insert("value", "nested_" + std::to_string(i));
+      outer.insert("item_" + std::to_string(i), inner);
+    }
+    Value* vn = new Value(outer);
+    Response respn(vn);
+
+    PERF_BENCHMARK("perf_serialize_struct_nested", 10000, {
+      std::string xml = dump_response(respn);
+      perf::do_not_optimize(xml);
+    });
+  }
+}
+
+// ============================================================================
+// J. Threading Primitives Benchmark
 // Compare mutex-protected bool vs atomic<bool>
 // ============================================================================
 
@@ -696,6 +818,7 @@ int main(int /*argc*/, char* /*argv*/[]) {
   benchmark_value_operations();
   benchmark_base64();
   benchmark_parse_dump();
+  benchmark_server_performance();
   benchmark_threading_primitives();
 
   // Save baseline
