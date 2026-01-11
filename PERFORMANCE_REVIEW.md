@@ -6,6 +6,7 @@
 ### Changelog
 | Date | Change |
 |------|--------|
+| 2026-01-10 | Completed: Server quick wins - double lookup, offset tracking, visitor reuse (PR #56) |
 | 2026-01-10 | Completed: Single-pass HTTP header parsing (3x faster) (PR #54) |
 | 2026-01-10 | Completed: Add benchmark for atomic vs mutex comparison (PR #50) |
 | 2026-01-10 | Completed: Optimize Value::cast<T>() with type tags (29% faster array access) (PR #48) |
@@ -722,6 +723,25 @@ enum Verification_level { HTTP_CHECK_WEAK, HTTP_CHECK_STRICT };
     - Uses pointer arithmetic to find line boundaries, colons, and trim whitespace
     - Converts to lowercase during name extraction (no separate pass)
     - Eliminates intermediate deque allocation and string copies
+
+13. ~~**Fix double map lookup in method dispatcher**~~ ✅ **DONE (PR #56)**
+    - File: `dispatcher_manager.cc`
+    - **Optimization:** Changed from `find()` + `operator[]` pattern to single iterator lookup
+    - Saves one O(log n) map traversal per RPC method dispatch
+    - Pattern: `auto it = fs.find(name); if (it != fs.end()) return it->second->create();`
+
+14. ~~**Response offset tracking instead of string erase**~~ ✅ **DONE (PR #56)**
+    - Files: `http_server.cc`, `server_conn.h`, `server_conn.cc`
+    - **Optimization:** Replaced O(n) `string::erase()` with O(1) offset increment for partial sends
+    - Added `response_offset` member to `Server_connection`
+    - Critical for large responses that require multiple TCP packets
+    - Pattern: `send(response.c_str() + response_offset, remaining); response_offset += sz;`
+
+15. ~~**Struct visitor reuse in XML serialization**~~ ✅ **DONE (PR #56)**
+    - File: `value_type_xml.cc`
+    - **Optimization:** Reuses single `Value_type_to_xml` visitor instead of creating one per struct member
+    - Mirrors existing pattern in `do_visit_array()`
+    - Reduces allocations proportional to struct size
 
 ### All planned optimizations completed!
 
