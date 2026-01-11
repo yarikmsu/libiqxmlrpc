@@ -22,7 +22,7 @@ jobs:
           - name: ubi8
             runner: ubuntu-latest
             container: redhat/ubi8
-            install: dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm && dnf install -y gcc-c++ cmake make boost169-devel libxml2-devel openssl-devel && ln -s /usr/include/boost169/boost /usr/include/boost && ln -s /usr/lib64/boost169/* /usr/lib64/
+            install: dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm && dnf install -y gcc-c++ cmake make boost169-devel libxml2-devel openssl-devel python3 && ln -s /usr/include/boost169/boost /usr/include/boost && ln -s /usr/lib64/boost169/* /usr/lib64/
           - name: macos
             runner: macos-latest
             container: ""
