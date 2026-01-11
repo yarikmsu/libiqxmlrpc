@@ -15,6 +15,7 @@ Server_connection::Server_connection( const iqnet::Inet_addr& a ):
   server(nullptr),
   preader(),
   response(),
+  response_offset(0),
   keep_alive(false),
   read_buf_(65536, '\0')
 {
@@ -57,6 +58,7 @@ void Server_connection::schedule_response( http::Packet* pkt )
   std::unique_ptr<http::Packet> p(pkt);
   p->set_keep_alive( keep_alive );
   response = p->dump();
+  response_offset = 0;  // Reset offset for new response
   do_schedule_response();
 }
 
