@@ -2384,6 +2384,210 @@ BOOST_AUTO_TEST_CASE(http_client_connection_closed_during_read)
     BOOST_CHECK(network_error_occurred);
 }
 
+//-----------------------------------------------------------------------------
+// Firewall Rejection Tests (acceptor.cc lines 57-68)
+//-----------------------------------------------------------------------------
+
+// Test firewall rejecting connection with empty message (shutdown only)
+// Covers acceptor.cc lines 57-58, 64-68: Firewall rejection without message
+// Note: Firewall must be set BEFORE starting the server because the firewall
+// is propagated to the acceptor once at the start of work()
+BOOST_AUTO_TEST_CASE(firewall_blocks_with_empty_message)
+{
+    const int port = TEST_PORT + 230;
+
+    // Create server
+    Serial_executor_factory exec_factory;
+    Http_server server(Inet_addr("127.0.0.1", port), &exec_factory);
+    register_user_methods(server);
+
+    // Set firewall BEFORE starting server (critical!)
+    BlockAllFirewall fw;
+    server.set_firewall(&fw);
+
+    // Start server in thread
+    std::atomic<bool> server_running(true);
+    boost::thread server_thread([&]() {
+        server.work();
+        server_running = false;
+    });
+
+    // Give server time to start
+    boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+
+    // Try to connect - should be rejected by firewall
+    bool connection_failed = false;
+    try {
+        std::unique_ptr<Client_base> client(
+            new Client<Http_client_connection>(Inet_addr("127.0.0.1", port)));
+        client->set_timeout(2);
+        client->execute("echo", Value("should fail"));
+    } catch (const iqnet::network_error&) {
+        connection_failed = true;
+    } catch (const Client_timeout&) {
+        connection_failed = true;
+    } catch (...) {
+        connection_failed = true;
+    }
+
+    // Cleanup
+    server.set_exit_flag();
+    server.interrupt();
+    server_thread.timed_join(boost::posix_time::seconds(5));
+
+    BOOST_CHECK(connection_failed);
+}
+
+// Test firewall rejecting connection with custom message
+// Covers acceptor.cc lines 57-63, 68: Firewall rejection with message
+BOOST_AUTO_TEST_CASE(firewall_blocks_with_custom_message)
+{
+    const int port = TEST_PORT + 231;
+
+    // Create server
+    Serial_executor_factory exec_factory;
+    Http_server server(Inet_addr("127.0.0.1", port), &exec_factory);
+    register_user_methods(server);
+
+    // Set firewall BEFORE starting server (critical!)
+    CustomMessageFirewall fw;
+    server.set_firewall(&fw);
+
+    // Start server in thread
+    std::atomic<bool> server_running(true);
+    boost::thread server_thread([&]() {
+        server.work();
+        server_running = false;
+    });
+
+    // Give server time to start
+    boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+
+    // Try to connect - should receive error response
+    bool got_error = false;
+    try {
+        std::unique_ptr<Client_base> client(
+            new Client<Http_client_connection>(Inet_addr("127.0.0.1", port)));
+        client->set_timeout(2);
+        client->execute("echo", Value("should fail"));
+    } catch (const iqnet::network_error&) {
+        got_error = true;
+    } catch (const http::Error_response&) {
+        got_error = true;
+    } catch (...) {
+        got_error = true;
+    }
+
+    // Cleanup
+    server.set_exit_flag();
+    server.interrupt();
+    server_thread.timed_join(boost::posix_time::seconds(5));
+
+    BOOST_CHECK(got_error);
+}
+
+//-----------------------------------------------------------------------------
+// HTTP Server Error Handling Tests (http_server.cc lines 100-104, 136-147)
+//-----------------------------------------------------------------------------
+
+// Test HTTP server handling invalid HTTP method
+// Covers http_server.cc lines 100-104: Error_response catch block
+BOOST_FIXTURE_TEST_CASE(http_server_invalid_method_error, IntegrationFixture)
+{
+    start_server(1, 232);
+
+    // Connect with raw socket and send invalid HTTP method
+    Socket sock;
+    sock.connect(Inet_addr("127.0.0.1", port_));
+
+    // Send invalid HTTP method
+    const char* invalid_request =
+        "INVALID /RPC2 HTTP/1.1\r\n"
+        "Host: localhost\r\n"
+        "Content-Length: 0\r\n"
+        "\r\n";
+    sock.send(invalid_request, strlen(invalid_request));
+
+    // Read response
+    char buf[4096];
+    size_t n = sock.recv(buf, sizeof(buf));
+    std::string response(buf, n);
+
+    sock.close();
+
+    // Should get HTTP error response (405 Method Not Allowed or 400 Bad Request)
+    BOOST_CHECK(response.find("HTTP/1.") != std::string::npos);
+    BOOST_CHECK(response.find("405") != std::string::npos ||
+                response.find("400") != std::string::npos ||
+                response.find("500") != std::string::npos);
+}
+
+// Test HTTP server exception logging with std::exception
+// Covers http_server.cc lines 136-141: log_exception method
+BOOST_FIXTURE_TEST_CASE(http_server_logs_std_exception, IntegrationFixture)
+{
+    start_server(1, 233);
+
+    std::unique_ptr<Client_base> client(
+        new Client<Http_client_connection>(Inet_addr("127.0.0.1", port_)));
+
+    // Call method that throws std::exception - triggers log_exception
+    Response r = client->execute("std_exception_method", Param_list());
+    BOOST_CHECK(r.is_fault());
+
+    // Server should still be running
+    Response r2 = client->execute("echo", Value("still running"));
+    BOOST_CHECK(!r2.is_fault());
+}
+
+// Test HTTP server exception logging with unknown exception
+// Covers http_server.cc lines 144-147: log_unknown_exception method
+BOOST_FIXTURE_TEST_CASE(http_server_logs_unknown_exception, IntegrationFixture)
+{
+    start_server(1, 234);
+
+    std::unique_ptr<Client_base> client(
+        new Client<Http_client_connection>(Inet_addr("127.0.0.1", port_)));
+
+    // Call method that throws non-std::exception - triggers log_unknown_exception
+    Response r = client->execute("unknown_exception_method", Param_list());
+    BOOST_CHECK(r.is_fault());
+
+    // Server should still be running
+    Response r2 = client->execute("echo", Value("still running"));
+    BOOST_CHECK(!r2.is_fault());
+}
+
+//-----------------------------------------------------------------------------
+// Method.cc Normal Path Tests (lines 19, 27)
+//-----------------------------------------------------------------------------
+
+// Test Server_feedback normal paths through serverctl.stop method
+// Covers method.cc lines 19, 27: set_exit_flag() and log_message() with valid server
+BOOST_FIXTURE_TEST_CASE(server_feedback_normal_paths, IntegrationFixture)
+{
+    start_server(1, 235);
+
+    std::unique_ptr<Client_base> client(
+        new Client<Http_client_connection>(Inet_addr("127.0.0.1", port_)));
+
+    // First verify server is running
+    Response r1 = client->execute("echo", Value("before log"));
+    BOOST_CHECK(!r1.is_fault());
+    BOOST_CHECK_EQUAL(r1.value().get_string(), "before log");
+
+    // Call serverctl.log which calls server().log_message() -> method.cc line 27
+    // This tests the normal (non-null) path through Server_feedback::log_message
+    Response r2 = client->execute("serverctl.log", Value("Test message from coverage test"));
+    BOOST_CHECK(!r2.is_fault());
+    BOOST_CHECK_EQUAL(r2.value().get_bool(), true);
+
+    // We can still make requests after logging (server didn't stop)
+    Response r3 = client->execute("echo", Value("after log"));
+    BOOST_CHECK(!r3.is_fault());
+    BOOST_CHECK_EQUAL(r3.value().get_string(), "after log");
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 // vim:ts=2:sw=2:et
