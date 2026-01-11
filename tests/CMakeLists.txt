@@ -69,3 +69,11 @@ add_custom_target(perf-test
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Running performance benchmarks..."
 )
+
+# Wire protocol compatibility test (requires external Python XML-RPC server)
+# Run with: XMLRPC_TEST_PORT=8000 ./tests/wire-compatibility-test
+add_executable(wire-compatibility-test test_wire_compatibility.cc)
+target_link_libraries(wire-compatibility-test iqxmlrpc ${Boost_LIBRARIES} ${LIBXML2_LIBRARIES} ${OPENSSL_LIBRARIES})
+
+# Copy interop test scripts to build directory
+file(COPY interop DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
