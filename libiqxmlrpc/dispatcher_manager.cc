@@ -52,10 +52,12 @@ void Default_method_dispatcher::register_method
 
 Method* Default_method_dispatcher::do_create_method(const std::string& name)
 {
-  if( fs.find(name) == fs.end() )
+  // Use iterator to avoid double O(log n) lookup
+  auto it = fs.find(name);
+  if (it == fs.end())
     return nullptr;
 
-  return fs[name]->create();
+  return it->second->create();
 }
 
 void Default_method_dispatcher::do_get_methods_list(Array& retval) const
