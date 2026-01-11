@@ -11,6 +11,7 @@ using namespace iqxmlrpc;
 void register_user_methods(iqxmlrpc::Server& s)
 {
   register_method<serverctl_stop>(s, "serverctl.stop");
+  register_method<serverctl_log>(s, "serverctl.log");
   register_method(s, "echo", echo_method);
   register_method(s, "echo_user", echo_user);
   register_method(s, "error_method", error_method);
@@ -20,12 +21,24 @@ void register_user_methods(iqxmlrpc::Server& s)
   register_method<Get_file>(s, "get_file");
 }
 
-void serverctl_stop::execute( 
+void serverctl_stop::execute(
   const iqxmlrpc::Param_list&, iqxmlrpc::Value& )
 {
   BOOST_TEST_MESSAGE("Stop_server method invoked.");
   server().log_message( "Stopping the server." );
   server().set_exit_flag();
+}
+
+void serverctl_log::execute(
+  const iqxmlrpc::Param_list& args, iqxmlrpc::Value& result )
+{
+  BOOST_TEST_MESSAGE("Log_message method invoked.");
+  std::string msg = "Test log message";
+  if (!args.empty() && args[0].is_string()) {
+    msg = args[0].get_string();
+  }
+  server().log_message(msg);
+  result = true;
 }
 
 
