@@ -46,19 +46,15 @@ PRs must pass: ubuntu-24.04, ubi8, macos builds | ASan/UBSan | coverage | cppche
 
 ## Performance
 
-- **Benchmarks**: `make perf-test` (results in `tests/performance_baseline.txt`)
-- **Full review**: `PERFORMANCE_REVIEW.md`
-
-### Hot Path Guidelines
-Avoid: `boost::lexical_cast`, `dynamic_cast` for type checks, `std::locale` construction
-Prefer: `num_conv::to_string/from_string`, `value->type_tag()`, `strftime`
+- **Benchmarks**: `make perf-test`
+- **Guidelines**: `docs/PERFORMANCE_GUIDE.md`
 
 ## Reference Docs
 
 | Topic | File |
 |-------|------|
+| Performance rules & hot paths | `docs/PERFORMANCE_GUIDE.md` |
 | Coverage patterns & pitfalls | `docs/COVERAGE_GUIDE.md` |
 | SSL/HTTPS testing | `docs/SSL_TESTING.md` |
 | Debugging tips | `docs/DEBUGGING.md` |
-| Performance history | `PERFORMANCE_REVIEW.md` |
 | Wire compatibility | `COMPATIBILITY_TESTING_PLAN.md` |
