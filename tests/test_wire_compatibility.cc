@@ -67,10 +67,11 @@ std::unique_ptr<Client<Http_client_connection>> make_client() {
 struct WireCompatibilityFixture {
     std::unique_ptr<Client<Http_client_connection>> client;
 
-    WireCompatibilityFixture() {
+    WireCompatibilityFixture()
+        : client(make_client())
+    {
         // Parse command line for server/port if provided
         // For now, use defaults - can be extended with global fixture
-        client = make_client();
     }
 
     ~WireCompatibilityFixture() = default;
