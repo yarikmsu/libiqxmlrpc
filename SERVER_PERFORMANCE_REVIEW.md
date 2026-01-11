@@ -8,6 +8,7 @@
 
 | Date | PR | Change |
 |------|-----|--------|
+| 2026-01-11 | #62 | P3: Exception-free SSL flow (~850x speedup) |
 | 2026-01-11 | #60 | P1b: TLS cipher optimization with AES-NI |
 | 2026-01-11 | #59 | P1a: TLS session caching enabled |
 | 2026-01-10 | - | Initial plan created |
@@ -91,74 +92,7 @@ void set_server_cipher_options(SSL_CTX* ctx) {
 
 ---
 
-## 3. Connection Idle Timeout (Medium Impact)
-
-**Current State:** No idle timeout - zombie connections can accumulate indefinitely.
-
-**Location:** `libiqxmlrpc/server_conn.h`, `libiqxmlrpc/http_server.cc`
-
-**Proposed Change:**
-
-Add idle timeout tracking to `Server_connection`:
-```cpp
-// In server_conn.h
-class Server_connection {
-protected:
-    std::chrono::steady_clock::time_point last_activity_;
-    static constexpr std::chrono::seconds IDLE_TIMEOUT{60};
-
-public:
-    void touch() { last_activity_ = std::chrono::steady_clock::now(); }
-    bool is_idle() const {
-        return (std::chrono::steady_clock::now() - last_activity_) > IDLE_TIMEOUT;
-    }
-};
-```
-
-Add periodic idle check in reactor or use `SO_RCVTIMEO`/`SO_SNDTIMEO` socket options.
-
-**Impact:**
-- Prevents resource exhaustion from abandoned connections
-- Frees file descriptors for new connections
-
-**Effort:** Medium (requires reactor integration)
-
----
-
-## 4. Configurable Read Buffer Size (Low Impact)
-
-**Current State:** Fixed 64KB read buffer per connection (`server_conn.cc:20`).
-
-**Location:** `libiqxmlrpc/server_conn.cc`
-
-**Current Code:**
-```cpp
-read_buf_(65536, '\0')  // 64KB per connection
-```
-
-**Proposed Change:**
-```cpp
-// Make configurable, start smaller, grow on demand
-static constexpr size_t INITIAL_BUFFER_SIZE = 4096;   // 4KB initial
-static constexpr size_t MAX_BUFFER_SIZE = 65536;      // 64KB max
-
-// Grow buffer when needed
-void ensure_buffer_capacity(size_t needed) {
-    if (read_buf_.size() < needed && read_buf_.size() < MAX_BUFFER_SIZE) {
-        read_buf_.resize(std::min(needed, MAX_BUFFER_SIZE));
-    }
-}
-```
-
-**Impact:**
-- Memory reduction: 60KB saved per connection for small requests
-- With 100 connections: **6MB memory savings**
-
-**Effort:** Medium
-
----
-
-## 5. Request Size Limit (Already Implemented)
+## 3. Request Size Limit (Already Implemented)
 
 **Current State:** Available via `Server::set_max_request_sz()`
 
@@ -175,42 +109,47 @@ server.set_max_request_sz(1024 * 1024);  // 1MB limit
 
 ---
 
-## 6. Improve Exception Flow in SSL Path (Medium Impact)
+## 4. Improve Exception Flow in SSL Path (Medium Impact) ✅ Done (PR #62)
 
-**Current State:** Uses exceptions for normal TLS state transitions (`ssl_lib.cc:330-334`).
+**Status:** ✅ Implemented and merged in PR #62
 
-**Location:** `libiqxmlrpc/ssl_lib.cc`
+**Previous State:** Used exceptions for normal TLS state transitions (`ssl_lib.cc`).
 
-**Current Code:**
+**Location:** `libiqxmlrpc/ssl_lib.cc`, `libiqxmlrpc/ssl_connection.cc`
+
+**Problem:** Exception throwing for normal WANT_READ/WANT_WRITE flow had ~3000ns overhead per throw.
+
+**Implemented Change (PR #62):**
 ```cpp
-case SSL_ERROR_WANT_READ:
-    throw need_read();
-case SSL_ERROR_WANT_WRITE:
-    throw need_write();
+// New SslIoResult enum for return codes
+enum class SslIoResult { OK, WANT_READ, WANT_WRITE, CONNECTION_CLOSE, ERROR };
+
+// Non-throwing check function
+SslIoResult check_io_result(SSL* ssl, int ret, bool& clean_close);
+
+// Non-throwing SSL I/O methods in ssl::Connection
+SslIoResult try_ssl_read(char* buf, size_t len, size_t& bytes_read);
+SslIoResult try_ssl_write(const char* buf, size_t len, size_t& bytes_written);
+SslIoResult try_ssl_accept_nonblock();
+SslIoResult try_ssl_connect_nonblock();
+
+// Refactored switch_state() uses return codes instead of try/catch
 ```
 
-**Problem:** Exception throwing for normal flow has ~5-10% CPU overhead.
-
-**Proposed Change:** Return error codes instead of throwing for expected states:
-```cpp
-enum class SslResult { OK, WANT_READ, WANT_WRITE, ERROR };
-
-SslResult Ctx::handle_ssl_result(SSL* ssl, int ret) {
-    int err = SSL_get_error(ssl, ret);
-    switch (err) {
-        case SSL_ERROR_NONE: return SslResult::OK;
-        case SSL_ERROR_WANT_READ: return SslResult::WANT_READ;
-        case SSL_ERROR_WANT_WRITE: return SslResult::WANT_WRITE;
-        default: return SslResult::ERROR;
-    }
-}
-```
+**Benchmark Results:**
+| Path | Time (ns/op) | Notes |
+|------|-------------|-------|
+| Return code (WANT_READ) | **3.54** | New fast path |
+| Exception (WANT_READ) | **2,876** | Old slow path |
+| **Speedup** | **~850x** | Per WANT_READ/WANT_WRITE |
 
 **Impact:**
-- **5-10% CPU reduction** in SSL hot path
-- Cleaner code flow
+- Per SSL I/O operation (3-10 WANT_* events):
+  - Before: 9,000-30,000 ns exception overhead
+  - After: 12-40 ns return code overhead
+- **Savings: ~30 μs per SSL read/write** in high-throughput scenarios
 
-**Effort:** High (requires refactoring ssl_connection.cc state machine)
+**Effort:** High (refactored ssl_connection.cc state machine)
 
 ---
 
@@ -220,9 +159,9 @@ SslResult Ctx::handle_ssl_result(SSL* ssl, int ret) {
 |----------|------|--------|--------|--------|
 | ~~**P1**~~ | ~~TLS session caching~~ | ~~Low~~ | ~~High~~ | ✅ Done (PR #59) |
 | ~~**P1**~~ | ~~TLS cipher optimization~~ | ~~Low~~ | ~~Medium~~ | ✅ Done (PR #60) |
-| **P2** | Connection idle timeout | Medium | Medium | Pending |
-| **P2** | Configurable buffer size | Medium | Low | Pending |
-| **P3** | Exception-free SSL flow | High | Medium | Pending |
+| ~~**P2**~~ | ~~Exception-free SSL flow~~ | ~~High~~ | ~~Medium~~ | ✅ Done (PR #62) |
+
+*Note: Connection idle timeout and configurable buffer size were removed from scope (only 16-32 connections in production, sufficient memory).*
 
 ---
 
@@ -305,15 +244,13 @@ void set_server_cipher_options(SSL_CTX* ctx) {
 |--------|---------------------|--------|
 | TLS session caching | 20-30% faster reconnects | ✅ Done (PR #59) |
 | Cipher optimization | 10-30% faster encryption | ✅ Done (PR #60) |
-| Idle timeout | Prevents resource exhaustion | Pending |
-| Buffer optimization | 60KB/connection memory savings | Pending |
-| Exception-free SSL | 5-10% CPU reduction | Pending |
+| Exception-free SSL | ~850x faster WANT_* handling | ✅ Done (PR #62) |
 
-**Progress:** 2/5 optimizations completed
+**Progress:** ✅ All planned optimizations completed (3/3)
 
-**P1 Results (TLS Optimizations):**
-- PR #59 added TLS session caching for returning client speedup
-- PR #60 added cipher optimization with AES-NI hardware acceleration
-- Cipher throughput benchmark shows AES-128-GCM is 5-6x faster than AES-256-CBC
+**Completed Optimizations:**
+- **PR #59:** TLS session caching for returning client speedup
+- **PR #60:** Cipher optimization with AES-NI hardware acceleration (5-6x faster than CBC)
+- **PR #62:** Exception-free SSL flow (~850x speedup, saves ~30μs per SSL I/O)
 
-**Remaining potential improvement (P2-P3):** 10-20% additional latency reduction for HTTPS workloads.
+*Note: Connection idle timeout and buffer optimization were removed from scope - not needed for 16-32 connection production environment with sufficient memory.*
