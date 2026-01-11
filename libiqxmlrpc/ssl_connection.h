@@ -44,6 +44,33 @@ protected:
 
   bool shutdown_recved();
   bool shutdown_sent();
+
+  //! Non-throwing SSL read (P3 optimization).
+  /*! Returns result code instead of throwing for WANT_READ/WANT_WRITE.
+      \param buf Buffer to read into
+      \param len Max bytes to read
+      \param bytes_read Output: actual bytes read (only valid if OK returned)
+      \return SslIoResult indicating success or what to wait for
+  */
+  SslIoResult try_ssl_read( char* buf, size_t len, size_t& bytes_read );
+
+  //! Non-throwing SSL write (P3 optimization).
+  /*! Returns result code instead of throwing for WANT_READ/WANT_WRITE.
+      \param buf Buffer to write from
+      \param len Bytes to write
+      \param bytes_written Output: actual bytes written (only valid if OK returned)
+      \return SslIoResult indicating success or what to wait for
+  */
+  SslIoResult try_ssl_write( const char* buf, size_t len, size_t& bytes_written );
+
+  //! Non-throwing SSL accept (P3 optimization).
+  SslIoResult try_ssl_accept_nonblock();
+
+  //! Non-throwing SSL connect (P3 optimization).
+  SslIoResult try_ssl_connect_nonblock();
+
+  //! Non-throwing SSL shutdown (P3 optimization).
+  SslIoResult try_ssl_shutdown_nonblock();
 };
 
 //! Server-side established SSL-connection based on reactive model
