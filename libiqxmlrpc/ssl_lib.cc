@@ -12,8 +12,7 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/once.hpp>
+#include <mutex>
 
 #ifndef WIN32
 #include <pthread.h>
@@ -40,14 +39,14 @@ public:
 
   LockContainer():
     size(CRYPTO_num_locks()),
-    locks(new boost::mutex[size])
+    locks(new std::mutex[size])
   {
   }
 
   ~LockContainer();
 
   size_t size;
-  boost::mutex* locks;
+  std::mutex* locks;
 };
 
 void
@@ -56,7 +55,7 @@ openssl_lock_callback(int mode, int n, const char* /*file*/, int /*line*/)
   static LockContainer lks;
   // assert n < lks.size
 
-  boost::mutex& m = lks.locks[n];
+  std::mutex& m = lks.locks[n];
   if (mode & CRYPTO_LOCK) {
     m.lock();
   } else {
@@ -91,7 +90,7 @@ LockContainer::~LockContainer()
 #endif // OPENSSL_VERSION_NUMBER < 0x10100000L
 
 Ctx* ctx = nullptr;
-boost::once_flag ssl_init;
+std::once_flag ssl_init;
 int iqxmlrpc_ssl_data_idx = 0;
 
 void
@@ -258,7 +257,7 @@ struct Ctx::Impl {
 Ctx::Ctx( const std::string& cert_path, const std::string& key_path, bool client ):
   impl_(new Impl)
 {
-  boost::call_once(ssl_init, init_library);
+  std::call_once(ssl_init, init_library);
   impl_->ctx = SSL_CTX_new( client ? SSLv23_method() : SSLv23_server_method() );
   set_common_options(impl_->ctx);
 
@@ -284,7 +283,7 @@ Ctx::Ctx( const std::string& cert_path, const std::string& key_path, bool client
 Ctx::Ctx():
   impl_(new Impl)
 {
-  boost::call_once(ssl_init, init_library);
+  std::call_once(ssl_init, init_library);
   impl_->ctx = SSL_CTX_new( SSLv23_client_method() );
   set_common_options( impl_->ctx );
 }
