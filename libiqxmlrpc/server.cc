@@ -1,8 +1,11 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
+#include <algorithm>
 #include <memory>
 #include <optional>
+#include <set>
+#include <vector>
 
 #include "server.h"
 #include "auth_plugin.h"
@@ -37,6 +40,9 @@ public:
   std::unique_ptr<Interceptor> interceptors;
   const Auth_Plugin_base*    auth_plugin;
 
+  std::chrono::milliseconds idle_timeout{0};
+  std::set<Server_connection*> connections;
+
   Impl(
     const iqnet::Inet_addr& addr,
     iqnet::Accepted_conn_factory* cf,
@@ -54,7 +60,9 @@ public:
       ver_level(http::HTTP_CHECK_WEAK),
       disp_manager(),
       interceptors(nullptr),
-      auth_plugin(nullptr)
+      auth_plugin(nullptr),
+      idle_timeout(0),
+      connections()
   {
   }
 
@@ -141,6 +149,26 @@ http::Verification_level Server::get_verification_level() const
 void Server::set_auth_plugin( const Auth_Plugin_base& ap )
 {
   impl->auth_plugin = &ap;
+}
+
+void Server::set_idle_timeout(std::chrono::milliseconds timeout)
+{
+  impl->idle_timeout = timeout;
+}
+
+std::chrono::milliseconds Server::get_idle_timeout() const
+{
+  return impl->idle_timeout;
+}
+
+void Server::register_connection(Server_connection* conn)
+{
+  impl->connections.insert(conn);
+}
+
+void Server::unregister_connection(Server_connection* conn)
+{
+  impl->connections.erase(conn);
 }
 
 void Server::log_err_msg( const std::string& msg )
@@ -257,12 +285,38 @@ void Server::work()
     impl->acceptor->set_firewall( impl->firewall );
   }
 
+  // Use shorter poll timeout when idle timeout is enabled
+  // to ensure timely cleanup of idle connections
+  const int poll_timeout_ms = (impl->idle_timeout.count() > 0) ? 1000 : -1;
+
   for(bool have_handlers = true; have_handlers;)
   {
     if (impl->exit_flag)
       break;
 
-    have_handlers = get_reactor()->handle_events();
+    have_handlers = get_reactor()->handle_events(poll_timeout_ms);
+
+    // Check for idle connection timeouts
+    if (impl->idle_timeout.count() > 0 && !impl->connections.empty())
+    {
+      // Collect expired connections first to avoid modifying set during iteration
+      std::vector<Server_connection*> expired;
+      auto timeout = impl->idle_timeout;
+      std::copy_if(impl->connections.begin(), impl->connections.end(),
+                   std::back_inserter(expired),
+                   // cppcheck-suppress constParameterPointer
+                   [timeout](Server_connection* conn) {
+                     return conn->is_idle_timeout_expired(timeout);
+                   });
+
+      // Terminate expired connections
+      for (auto* conn : expired)
+      {
+        log_err_msg("Connection idle timeout expired for " +
+                    conn->get_peer_addr().get_host_name());
+        conn->terminate_idle();
+      }
+    }
   }
 
   impl->acceptor.reset(0);

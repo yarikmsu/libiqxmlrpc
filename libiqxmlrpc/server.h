@@ -4,6 +4,8 @@
 #ifndef _iqxmlrpc_server_h_
 #define _iqxmlrpc_server_h_
 
+#include <chrono>
+
 #include "acceptor.h"
 #include "builtins.h"
 #include "connection.h"
@@ -74,6 +76,18 @@ public:
   http::Verification_level get_verification_level() const;
 
   void set_auth_plugin(const Auth_Plugin_base&);
+
+  //! Set idle timeout for keep-alive connections.
+  //! Connections waiting for input longer than this will be closed.
+  //! A value of 0 disables idle timeout (default).
+  void set_idle_timeout(std::chrono::milliseconds timeout);
+  std::chrono::milliseconds get_idle_timeout() const;
+
+  //! Register a connection for idle timeout tracking.
+  void register_connection(Server_connection* conn);
+
+  //! Unregister a connection from idle timeout tracking.
+  void unregister_connection(Server_connection* conn);
   /*! \} */
 
   //! \name Run/stop server

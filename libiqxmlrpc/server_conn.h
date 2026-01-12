@@ -4,6 +4,8 @@
 #ifndef _iqxmlrpc_server_conn_h_
 #define _iqxmlrpc_server_conn_h_
 
+#include <chrono>
+#include <optional>
 #include <vector>
 #include "connection.h"
 #include "conn_factory.h"
@@ -49,6 +51,23 @@ public:
 
   void schedule_response( http::Packet* );
 
+  //! Called when connection starts waiting for input (idle state).
+  void start_idle();
+
+  //! Called when connection stops waiting for input (processing request).
+  void stop_idle();
+
+  //! Check if connection is in idle state (waiting for input).
+  bool is_idle() const { return is_waiting_input_; }
+
+  //! Check if idle timeout has expired.
+  //! Returns true only if connection is idle AND timeout has exceeded.
+  bool is_idle_timeout_expired(std::chrono::milliseconds timeout) const;
+
+  //! Terminate this connection due to idle timeout.
+  //! Called by the server when idle timeout expires.
+  virtual void terminate_idle() = 0;
+
 protected:
   http::Packet* read_request( const std::string& );
 
@@ -59,6 +78,8 @@ protected:
 
 private:
   std::vector<char> read_buf_;
+  bool is_waiting_input_ = false;
+  std::optional<std::chrono::steady_clock::time_point> idle_since_;
 };
 
 #ifdef _MSC_VER

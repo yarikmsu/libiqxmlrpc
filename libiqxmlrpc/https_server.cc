@@ -20,7 +20,9 @@ public:
   explicit Https_server_connection( const iqnet::Socket& );
 
   void post_accept() override { Reaction_connection::post_accept(); }
-  void finish() override { delete this; }
+  void finish() override;
+
+  void terminate_idle() override;
 
   bool catch_in_reactor() const override { return true; }
   void log_exception( const std::exception& ) override;
@@ -66,8 +68,26 @@ inline void Https_server_connection::my_reg_recv()
 }
 
 
+void Https_server_connection::finish()
+{
+  server->unregister_connection(this);
+  delete this;
+}
+
+
+void Https_server_connection::terminate_idle()
+{
+  stop_idle();
+  // Use reg_shutdown to properly close SSL connection
+  reg_shutdown();
+  finish();
+}
+
+
 void Https_server_connection::accept_succeed()
 {
+  server->register_connection(this);
+  start_idle();
   my_reg_recv();
 }
 
@@ -86,6 +106,7 @@ void Https_server_connection::recv_succeed( bool&, size_t, size_t real_len )
       return;
     }
 
+    stop_idle();
     server->schedule_execute( packet, this );
   }
   catch( const http::Error_response& e )
@@ -102,7 +123,10 @@ void Https_server_connection::send_succeed( bool& terminate )
   response = std::string();
 
   if( keep_alive )
+  {
+    start_idle();
     my_reg_recv();
+  }
   else
     terminate = reg_shutdown();
 }
