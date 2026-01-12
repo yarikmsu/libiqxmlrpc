@@ -1537,6 +1537,30 @@ BOOST_AUTO_TEST_CASE(ssl_client_only_context)
   iqnet::ssl::ctx = saved_ctx;
 }
 
+// Test that legacy TLS versions (1.0, 1.1) are disabled
+// Only TLS 1.2+ should be allowed for security compliance
+BOOST_AUTO_TEST_CASE(ssl_disables_legacy_tls_versions)
+{
+  iqnet::ssl::Ctx* ctx = iqnet::ssl::Ctx::client_only();
+  BOOST_REQUIRE(ctx != nullptr);
+
+  SSL_CTX* ssl_ctx = ctx->context();
+
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+  // OpenSSL 1.1.0+: Check minimum protocol version directly
+  int min_version = SSL_CTX_get_min_proto_version(ssl_ctx);
+  BOOST_CHECK_GE(min_version, TLS1_2_VERSION);
+#else
+  // OpenSSL 1.0.x: Check the legacy flags are set
+  long options = SSL_CTX_get_options(ssl_ctx);
+  BOOST_CHECK(options & SSL_OP_NO_SSLv3);
+  BOOST_CHECK(options & SSL_OP_NO_TLSv1);
+  BOOST_CHECK(options & SSL_OP_NO_TLSv1_1);
+#endif
+
+  delete ctx;
+}
+
 // Test SSL context creation with certificates
 BOOST_AUTO_TEST_CASE(ssl_context_creation)
 {
