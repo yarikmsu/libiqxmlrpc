@@ -45,7 +45,7 @@ void BuilderBase::visit_element(const std::string& tag) {
 
 **Purpose:** Disable deprecated/insecure TLS versions (PCI-DSS compliance, modern security).
 
-**Status:** Implemented in branch `security/disable-legacy-tls`
+**Status:** Implemented in branch `security/disable-legacy-tls` (PR #66, merged)
 
 **Changes Made:**
 - `libiqxmlrpc/ssl_lib.cc`: Added `SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1` to `set_common_options()`
@@ -75,40 +75,44 @@ int get_conn_timeout() const;
 
 ---
 
-## 4. Integer Overflow Protection for Buffer Sizes
+## 4. Integer Overflow Protection for Buffer Sizes ✅ COMPLETED
 
 **Purpose:** Prevent integer overflow when calculating buffer sizes.
 
-**Implementation Location:** `libiqxmlrpc/http.cc` and related buffer handling code
+**Status:** Implemented in branch `security/integer-overflow-protection` (PR #69)
 
-**Approach:**
-```cpp
-// Before buffer allocation, validate size won't overflow
-if (size > MAX_BUFFER_SIZE || size < 0) {
-    throw std::runtime_error("Invalid buffer size");
-}
-```
+**Changes Made:**
+- `libiqxmlrpc/safe_math.h`: New utility header with overflow-checked arithmetic functions
+  - `safe_math::add()` / `safe_math::mul()` - Throw `Integer_overflow` on overflow
+  - `safe_math::would_overflow_add()` / `would_overflow_mul()` - Non-throwing checks
+- `libiqxmlrpc/http.cc`:
+  - `Packet_reader::check_sz()` - Protected against Content-Length + header size overflow
+  - `Header::dump()` - Protected reserve calculation against huge option counts
+- `libiqxmlrpc/value_type.cc`:
+  - `Binary_data::encode()` - Protected base64 output size calculation
+  - `Binary_data::decode()` - Protected decoded data size calculation
+- `tests/test_safe_math.cc`: Comprehensive unit tests (274 lines)
 
-**Test:** Attempt to trigger overflow with malicious Content-Length headers.
+**Test:** `safe-math-test` covers normal operations, edge cases, overflow detection, and realistic scenarios simulating actual codebase usage patterns.
 
 ---
 
 ## Implementation Checklist
 
 - [x] ~~Create feature branch: `security/hardening-2026-01`~~ → Individual feature branches
-- [x] Implement XML depth limit with tests → PR #68 (`security/xml-depth-limit`)
-- [x] Implement TLS 1.0/1.1 disabling with tests → `security/disable-legacy-tls`
+- [x] Implement XML depth limit with tests → PR #68 (`security/xml-depth-limit`, merged)
+- [x] Implement TLS 1.0/1.1 disabling with tests → PR #66 (`security/disable-legacy-tls`, merged)
 - [ ] Implement connection timeout with tests
-- [ ] Implement integer overflow protection with tests
-- [x] Run full test suite including ASan/UBSan (for completed items)
+- [x] Implement integer overflow protection with tests → PR #69 (`security/integer-overflow-protection`)
+- [x] Run full test suite including ASan/UBSan (passed for all completed items)
 - [ ] Update documentation
-- [x] Create PRs for review (XML depth: #68)
+- [x] Create PRs for review (all completed items have PRs)
 
 ## Priority
 
 | Feature | Priority | Status | Rationale |
 |---------|----------|--------|-----------|
-| TLS 1.0/1.1 disable | High | ✅ Done | Compliance requirement, easy win |
-| Connection timeout | High | Pending | DoS protection |
+| TLS 1.0/1.1 disable | High | ✅ Done (PR #66) | Compliance requirement, easy win |
 | XML depth limit | Medium | ✅ Done (PR #68) | Defense in depth |
-| Integer overflow | Medium | Pending | Edge case hardening |
+| Integer overflow | Medium | ✅ Done (PR #69) | Edge case hardening |
+| Connection timeout | High | Pending | DoS protection |
