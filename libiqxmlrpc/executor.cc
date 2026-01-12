@@ -11,7 +11,7 @@
 #include <memory>
 
 using namespace iqxmlrpc;
-typedef boost::mutex::scoped_lock scoped_lock;
+typedef std::unique_lock<std::mutex> scoped_lock;
 
 Executor::Executor( Method* m, Server* s, Server_connection* cb ):
   method(m),
@@ -131,7 +131,11 @@ Pool_executor_factory::Pool_executor_factory(unsigned numthreads):
 Pool_executor_factory::~Pool_executor_factory()
 {
   destruction_started();
-  threads.join_all();
+  for (auto& t : threads) {
+    if (t.joinable()) {
+      t.join();
+    }
+  }
 
   util::delete_ptrs(pool.begin(), pool.end());
   scoped_lock lk(req_queue_lock);
@@ -148,7 +152,7 @@ Executor* Pool_executor_factory::create(
 
 iqnet::Reactor_base* Pool_executor_factory::create_reactor()
 {
-  return new iqnet::Reactor<boost::mutex>;
+  return new iqnet::Reactor<std::mutex>;
 }
 
 
@@ -158,7 +162,7 @@ void Pool_executor_factory::add_threads( unsigned num )
   {
     Pool_thread* t = new Pool_thread(i, this);
     pool.push_back(t);
-    threads.create_thread(*t);
+    threads.emplace_back([t]() { (*t)(); });
   }
 }
 

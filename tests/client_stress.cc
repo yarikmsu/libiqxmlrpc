@@ -6,8 +6,9 @@
 #include <sstream>
 #include <boost/test/test_tools.hpp>
 #include <boost/test/unit_test.hpp>
-#include <boost/thread/thread.hpp>
 #include <chrono>
+#include <thread>
+#include <vector>
 #include "client_common.h"
 #include "client_opts.h"
 
@@ -102,12 +103,14 @@ void do_test()
 BOOST_AUTO_TEST_CASE( stress_test )
 {
   auto start = std::chrono::steady_clock::now();
-  boost::thread_group thrds;
+  std::vector<std::thread> thrds;
 
   for(int i = 0; i < test_config.client_threads(); ++i)
-    thrds.create_thread(&do_test);
+    thrds.emplace_back(&do_test);
 
-  thrds.join_all();
+  for (auto& t : thrds) {
+    if (t.joinable()) t.join();
+  }
 
   auto end = std::chrono::steady_clock::now();
   std::chrono::duration<double> elapsed = end - start;

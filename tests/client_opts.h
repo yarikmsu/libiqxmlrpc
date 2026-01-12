@@ -3,7 +3,7 @@
 
 #include <string>
 #include <stdexcept>
-#include <boost/optional.hpp>
+#include <optional>
 #include <boost/program_options.hpp>
 #include "libiqxmlrpc/libiqxmlrpc.h"
 #include "libiqxmlrpc/client.h"

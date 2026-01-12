@@ -1,10 +1,9 @@
-include(FindBoost)
 include(FindLibXml2)
 include(FindOpenSSL)
 include(CheckFunctionExists)
+find_package(Threads REQUIRED)
 
-find_package(Boost 1.41.0 COMPONENTS date_time thread REQUIRED)
-include_directories(${Boost_INCLUDE_DIR} ${XML2_INCLUDE_DIRS} ${LIBXML2_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR} ${PROJECT_BINARY_DIR}/libiqxmlrpc)
+include_directories(${XML2_INCLUDE_DIRS} ${LIBXML2_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR} ${PROJECT_BINARY_DIR}/libiqxmlrpc)
 
 check_function_exists(poll HAVE_POLL)
 if(${HAVE_POLL})
@@ -122,13 +121,12 @@ else()
 endif()
 
 target_link_libraries(iqxmlrpc
-  ${Boost_LIBRARIES}
+  Threads::Threads
   ${XML2_LIBRARIES} # obsolete
   ${LIBXML2_LIBRARIES}
   ${OPENSSL_LIBRARIES}
 )
 
-string(REPLACE ";" " " PC_BOOST_LIBRARIES "${Boost_LIBRARIES}")
 string(REPLACE ";" " " PC_OPENSSL_LDFLAGS "${OPENSSL_LDFLAGS}")
 configure_file(../libiqxmlrpc.pc.in libiqxmlrpc.pc @ONLY)
 

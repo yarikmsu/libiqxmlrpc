@@ -29,7 +29,7 @@ namespace iqnet
 {
 
 //! The Reactor template class.
-//! Lock param can be either boost::mutex or iqnet::Null_lock.
+//! Lock param can be either std::mutex or iqnet::Null_lock.
 template <class Lock>
 class Reactor: public Reactor_base {
 public:
@@ -48,7 +48,7 @@ public:
   bool handle_events( Timeout ms = -1 ) override;
 
 private:
-  typedef typename Lock::scoped_lock        scoped_lock;
+  typedef iqnet::scoped_lock<Lock>          scoped_lock;
   typedef std::map<Socket::Handler, Event_handler*> EventHandlersMap;
   typedef EventHandlersMap::iterator        h_iterator;
   typedef HandlerStateList::const_iterator  hs_const_iterator;
