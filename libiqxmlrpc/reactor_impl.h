@@ -209,6 +209,12 @@ void Reactor<Lock>::invoke_servers_handler(
   }
 }
 
+// THREADING SAFETY NOTE:
+// This function is ONLY called from the reactor thread. Handler registration
+// and unregistration also only occur from the reactor thread. This single-threaded
+// access pattern guarantees that the handler pointer remains valid throughout
+// this function's execution, even though find_handler() releases the lock.
+// If this threading model changes, consider using shared_ptr for handlers.
 template <class Lock>
 void Reactor<Lock>::invoke_event_handler( const Reactor_base::HandlerState& hs )
 {
