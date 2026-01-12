@@ -70,14 +70,14 @@ struct Inet_addr::Impl {
 };
 
 Inet_addr::Impl::Impl( const std::string& h, int p ):
-  sa(), host(h), port(p)
+  sa(), sa_init_flag(), host(h), port(p)
 {
   if (h.find_first_of("\n\r") != std::string::npos)
     throw network_error("Hostname must not contain CR LF characters", false);
 }
 
 Inet_addr::Impl::Impl( int p ):
-  sa(SystemSockAddrIn()), host("0.0.0.0"), port(p)
+  sa(SystemSockAddrIn()), sa_init_flag(), host("0.0.0.0"), port(p)
 {
   sa->sin_family = PF_INET;
   sa->sin_port = htons(port);
@@ -86,6 +86,7 @@ Inet_addr::Impl::Impl( int p ):
 
 Inet_addr::Impl::Impl( const SystemSockAddrIn& s ):
   sa(s),
+  sa_init_flag(),
   host(inet_ntoa( sa->sin_addr )),
   port(ntohs( sa->sin_port ))
 {
