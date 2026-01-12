@@ -83,13 +83,13 @@ public:
 
   operator bool()
   {
-    typename Lock::scoped_lock lk(lock);
+    iqnet::scoped_lock<Lock> lk(lock);
     return val;
   }
 
   LockedBool& operator =(bool b)
   {
-    typename Lock::scoped_lock lk(lock);
+    iqnet::scoped_lock<Lock> lk(lock);
     val = b;
     return *this;
   }
