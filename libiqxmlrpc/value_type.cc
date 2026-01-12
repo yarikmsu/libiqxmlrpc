@@ -7,10 +7,10 @@
 #include "value.h"
 #include "value_type_visitor.h"
 
-#include <boost/date_time/posix_time/posix_time.hpp>
-
 #include <algorithm>
 #include <charconv>
+#include <chrono>
+#include <ctime>
 #include <string.h>
 
 namespace iqxmlrpc {
@@ -531,9 +531,21 @@ Date_time::Date_time( bool use_lt ):
   tm_(),
   cache()
 {
-  using namespace boost::posix_time;
-  ptime p = use_lt ? second_clock::local_time() : second_clock::universal_time();
-  tm_ = to_tm(p);
+  auto now = std::chrono::system_clock::now();
+  std::time_t time = std::chrono::system_clock::to_time_t(now);
+#ifdef _WIN32
+  if (use_lt) {
+    localtime_s(&tm_, &time);
+  } else {
+    gmtime_s(&tm_, &time);
+  }
+#else
+  if (use_lt) {
+    localtime_r(&time, &tm_);
+  } else {
+    gmtime_r(&time, &tm_);
+  }
+#endif
 }
 
 

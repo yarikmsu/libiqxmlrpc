@@ -6,5 +6,5 @@ Name: libiqxmlrpc
 Description: Object-oriented C++ XML-RPC library.
 Version: @Libiqxmlrpc_VERSION@
 Requires: libxml-2.0
-Libs: -L${libdir} -liqxmlrpc @PC_BOOST_LIBRARIES@ @PC_OPENSSL_LDFLAGS@
+Libs: -L${libdir} -liqxmlrpc -lpthread @PC_OPENSSL_LDFLAGS@
 Cflags: -I${includedir}
