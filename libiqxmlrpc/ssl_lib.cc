@@ -225,6 +225,9 @@ std::string
 ConnectionVerifier::cert_finger_sha256(X509_STORE_CTX* ctx)
 {
   X509* x = X509_STORE_CTX_get_current_cert(ctx);
+  if (!x) {
+    return "";  // No certificate available at this verification stage
+  }
   const EVP_MD* digest = EVP_get_digestbyname("sha256");
   unsigned int n = 0;
   unsigned char md[EVP_MAX_MD_SIZE];

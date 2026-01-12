@@ -138,7 +138,7 @@ void Reactor<Lock>::unregister_handler( Event_handler* eh, Event_mask mask )
 
   if( i != end() )
   {
-    int newmask = (i->mask &= !mask);
+    int newmask = (i->mask &= ~mask);
 
     if( !newmask )
     {
@@ -240,7 +240,7 @@ void Reactor<Lock>::handle_user_events()
     if( i->revents && (i->mask | i->revents) )
     {
       called_by_user.push_back( *i );
-      i->revents &= !i->mask;
+      i->revents &= ~i->mask;
     }
   }
 
