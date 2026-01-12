@@ -15,6 +15,10 @@ class Parser;
 
 class BuilderBase {
 public:
+  //! Maximum allowed XML nesting depth (DoS protection).
+  //! XML-RPC typically needs ~10 levels; 32 is generous for legitimate use.
+  static constexpr int MAX_PARSE_DEPTH = 32;
+
   BuilderBase(Parser&, bool expect_text = false);
   virtual ~BuilderBase() = default;
 
@@ -91,6 +95,10 @@ public:
 
   std::string
   context() const;
+
+  //! Returns the current XML nesting depth from libxml2.
+  int
+  xml_depth() const;
 
 private:
   class Impl;
