@@ -144,7 +144,18 @@ namespace {
 void
 set_common_options(SSL_CTX* ctx)
 {
-  SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+  // Enforce TLS 1.2 as minimum version (TLS 1.2 released 2008, widely supported)
+  // TLS 1.0 and 1.1 are deprecated and have known security weaknesses
+
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+  // OpenSSL 1.1.0+: Use the modern API (SSL_OP_NO_* flags are deprecated)
+  SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
+#else
+  // OpenSSL 1.0.x: Use the legacy flags
+  SSL_CTX_set_options(ctx,
+      SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 |
+      SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
+#endif
 }
 
 // Server-only cipher configuration for optimal performance
