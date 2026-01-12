@@ -1136,6 +1136,64 @@ BOOST_AUTO_TEST_CASE(binary_roundtrip_extended)
     BOOST_CHECK_EQUAL(bin2->get_data(), original);
 }
 
+// Tests for bytes >= 128 (covers signed char UB fix in encode())
+// On platforms where char is signed, bytes >= 128 are negative values.
+// Left-shifting negative values is undefined behavior in C++.
+BOOST_AUTO_TEST_CASE(binary_encode_high_bytes)
+{
+    // Test data with bytes >= 128 (would cause UB before fix on signed char platforms)
+    std::string data;
+    data.push_back(static_cast<char>(0x80));  // 128
+    data.push_back(static_cast<char>(0xFF));  // 255
+    data.push_back(static_cast<char>(0xAB));  // 171
+
+    std::unique_ptr<Binary_data> bin(Binary_data::from_data(data));
+    std::string base64 = bin->get_base64();
+
+    // Verify roundtrip
+    std::unique_ptr<Binary_data> decoded(Binary_data::from_base64(base64));
+    BOOST_CHECK_EQUAL(decoded->get_data(), data);
+
+    // Verify specific encoding: 0x80 0xFF 0xAB = gP+r in base64
+    BOOST_CHECK_EQUAL(base64, "gP+r");
+}
+
+BOOST_AUTO_TEST_CASE(binary_encode_boundary_values)
+{
+    // Test boundary: 127 (max positive signed char) and 128 (first "negative" as signed)
+    std::string data;
+    data.push_back(static_cast<char>(127));  // 0x7F - max positive signed char
+    data.push_back(static_cast<char>(128));  // 0x80 - would be -128 as signed char
+    data.push_back(static_cast<char>(129));  // 0x81 - would be -127 as signed char
+
+    std::unique_ptr<Binary_data> bin(Binary_data::from_data(data));
+    std::string base64 = bin->get_base64();
+
+    // Verify roundtrip
+    std::unique_ptr<Binary_data> decoded(Binary_data::from_base64(base64));
+    BOOST_CHECK_EQUAL(decoded->get_data(), data);
+
+    // Verify specific encoding: 0x7F 0x80 0x81 = f4CB in base64
+    BOOST_CHECK_EQUAL(base64, "f4CB");
+}
+
+BOOST_AUTO_TEST_CASE(binary_encode_all_high_bytes)
+{
+    // Test all possible high byte values (128-255)
+    std::string data;
+    for (int i = 128; i <= 255; ++i) {
+        data.push_back(static_cast<char>(i));
+    }
+
+    std::unique_ptr<Binary_data> bin(Binary_data::from_data(data));
+    std::string base64 = bin->get_base64();
+
+    // Verify roundtrip
+    std::unique_ptr<Binary_data> decoded(Binary_data::from_base64(base64));
+    BOOST_CHECK_EQUAL(decoded->get_data().size(), 128u);
+    BOOST_CHECK_EQUAL(decoded->get_data(), data);
+}
+
 // Tests for get_idx branches in value_type.cc lines 433-451
 BOOST_AUTO_TEST_CASE(binary_decode_all_uppercase)
 {
