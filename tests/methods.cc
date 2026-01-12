@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <iostream>
 #include <fstream>
+#include <mutex>
 #include <thread>
 #include <chrono>
 #include <openssl/md5.h>
@@ -9,6 +10,13 @@
 #include "methods.h"
 
 using namespace iqxmlrpc;
+
+// Thread-safe wrapper for BOOST_TEST_MESSAGE (which is not thread-safe)
+namespace {
+  std::mutex test_message_mutex;
+  #define THREAD_SAFE_TEST_MESSAGE(msg) \
+    do { std::lock_guard<std::mutex> lock(test_message_mutex); BOOST_TEST_MESSAGE(msg); } while(0)
+}
 
 void register_user_methods(iqxmlrpc::Server& s)
 {
@@ -27,7 +35,7 @@ void register_user_methods(iqxmlrpc::Server& s)
 void serverctl_stop::execute(
   const iqxmlrpc::Param_list&, iqxmlrpc::Value& )
 {
-  BOOST_TEST_MESSAGE("Stop_server method invoked.");
+  THREAD_SAFE_TEST_MESSAGE("Stop_server method invoked.");
   server().log_message( "Stopping the server." );
   server().set_exit_flag();
 }
@@ -35,7 +43,7 @@ void serverctl_stop::execute(
 void serverctl_log::execute(
   const iqxmlrpc::Param_list& args, iqxmlrpc::Value& result )
 {
-  BOOST_TEST_MESSAGE("Log_message method invoked.");
+  THREAD_SAFE_TEST_MESSAGE("Log_message method invoked.");
   std::string msg = "Test log message";
   if (!args.empty() && args[0].is_string()) {
     msg = args[0].get_string();
@@ -50,7 +58,7 @@ void echo_method(
   const iqxmlrpc::Param_list& args,
   iqxmlrpc::Value& retval )
 {
-  BOOST_TEST_MESSAGE("Echo method invoked.");
+  THREAD_SAFE_TEST_MESSAGE("Echo method invoked.");
 
   if (args.size())
     retval = args[0];
@@ -61,7 +69,7 @@ void trace_method(
   const iqxmlrpc::Param_list& args,
   iqxmlrpc::Value& retval )
 {
-  BOOST_TEST_MESSAGE("Trace method invoked.");
+  THREAD_SAFE_TEST_MESSAGE("Trace method invoked.");
   std::string s;
   for (std::vector<iqxmlrpc::Value>::const_iterator i = args.begin(); i != args.end(); ++i) {
     if( i->is_string() ) {
@@ -77,7 +85,7 @@ void echo_user(
   const iqxmlrpc::Param_list&,
   iqxmlrpc::Value& retval )
 {
-  BOOST_TEST_MESSAGE("echo_user method invoked.");
+  THREAD_SAFE_TEST_MESSAGE("echo_user method invoked.");
   retval = m->authname();
 }
 
@@ -86,7 +94,7 @@ void error_method(
   const iqxmlrpc::Param_list&,
   iqxmlrpc::Value& /*retval*/ )
 {
-  BOOST_TEST_MESSAGE("error_method method invoked.");
+  THREAD_SAFE_TEST_MESSAGE("error_method method invoked.");
   throw iqxmlrpc::Fault(123, "My fault");
 }
 
@@ -95,7 +103,7 @@ void std_exception_method(
   const iqxmlrpc::Param_list&,
   iqxmlrpc::Value& /*retval*/ )
 {
-  BOOST_TEST_MESSAGE("std_exception_method invoked.");
+  THREAD_SAFE_TEST_MESSAGE("std_exception_method invoked.");
   throw std::runtime_error("Test std::exception");
 }
 
@@ -104,7 +112,7 @@ void unknown_exception_method(
   const iqxmlrpc::Param_list&,
   iqxmlrpc::Value& /*retval*/ )
 {
-  BOOST_TEST_MESSAGE("unknown_exception_method invoked.");
+  THREAD_SAFE_TEST_MESSAGE("unknown_exception_method invoked.");
   throw 42;  // Throw a non-exception type
 }
 
@@ -119,13 +127,13 @@ namespace
 void Get_file::execute( 
   const iqxmlrpc::Param_list& args, iqxmlrpc::Value& retval )
 {
-  BOOST_TEST_MESSAGE("Get_file method invoked.");
+  THREAD_SAFE_TEST_MESSAGE("Get_file method invoked.");
 
   int retsize = args[0]["requested-size"]; 
   if (retsize <= 0)
 	  throw Fault( 0, "requested-size must be > 0" );
 
-  BOOST_TEST_MESSAGE("Generating data...");
+  THREAD_SAFE_TEST_MESSAGE("Generating data...");
   srand(time(0));
   std::string s(retsize, '\0');
   std::generate(s.begin(), s.end(), brand);
@@ -133,7 +141,7 @@ void Get_file::execute(
   retval = Struct();
   retval.insert("data", Binary_data::from_data(s));
 
-  BOOST_TEST_MESSAGE("Calculating MD5 checksum...");
+  THREAD_SAFE_TEST_MESSAGE("Calculating MD5 checksum...");
   typedef const unsigned char md5char;
   typedef const char strchar;
 
@@ -153,7 +161,7 @@ void sleep_method(
   const iqxmlrpc::Param_list& args,
   iqxmlrpc::Value& retval )
 {
-  BOOST_TEST_MESSAGE("Sleep method invoked.");
+  THREAD_SAFE_TEST_MESSAGE("Sleep method invoked.");
 
   double sleep_seconds = 0.1;  // Default 100ms
   if (!args.empty() && args[0].is_double()) {

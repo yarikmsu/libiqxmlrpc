@@ -2,7 +2,9 @@
 //  Copyright (C) 2011 Anton Dedov
 
 #include <algorithm>
+#include <atomic>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <vector>
@@ -29,9 +31,9 @@ public:
   std::unique_ptr<iqnet::Reactor_interrupter>   interrupter;
   std::unique_ptr<iqnet::Accepted_conn_factory> conn_factory;
   std::unique_ptr<iqnet::Acceptor>              acceptor;
-  iqnet::Firewall_base* firewall;
+  std::atomic<iqnet::Firewall_base*> firewall;
 
-  bool exit_flag;
+  std::atomic<bool> exit_flag;
   std::ostream* log;
   size_t max_req_sz;
   http::Verification_level ver_level;
@@ -40,8 +42,9 @@ public:
   std::unique_ptr<Interceptor> interceptors;
   const Auth_Plugin_base*    auth_plugin;
 
-  std::chrono::milliseconds idle_timeout{0};
+  std::atomic<int64_t> idle_timeout_ms{0};
   std::set<Server_connection*> connections;
+  mutable std::mutex connections_mutex;
 
   Impl(
     const iqnet::Inet_addr& addr,
@@ -61,8 +64,9 @@ public:
       disp_manager(),
       interceptors(nullptr),
       auth_plugin(nullptr),
-      idle_timeout(0),
-      connections()
+      idle_timeout_ms(0),
+      connections(),
+      connections_mutex()
   {
   }
 
@@ -153,21 +157,23 @@ void Server::set_auth_plugin( const Auth_Plugin_base& ap )
 
 void Server::set_idle_timeout(std::chrono::milliseconds timeout)
 {
-  impl->idle_timeout = timeout;
+  impl->idle_timeout_ms = timeout.count();
 }
 
 std::chrono::milliseconds Server::get_idle_timeout() const
 {
-  return impl->idle_timeout;
+  return std::chrono::milliseconds(impl->idle_timeout_ms.load());
 }
 
 void Server::register_connection(Server_connection* conn)
 {
+  std::lock_guard<std::mutex> lock(impl->connections_mutex);
   impl->connections.insert(conn);
 }
 
 void Server::unregister_connection(Server_connection* conn)
 {
+  std::lock_guard<std::mutex> lock(impl->connections_mutex);
   impl->connections.erase(conn);
 }
 
@@ -287,7 +293,7 @@ void Server::work()
 
   // Use shorter poll timeout when idle timeout is enabled
   // to ensure timely cleanup of idle connections
-  const int poll_timeout_ms = (impl->idle_timeout.count() > 0) ? 1000 : -1;
+  const int poll_timeout_ms = (impl->idle_timeout_ms.load() > 0) ? 1000 : -1;
 
   for(bool have_handlers = true; have_handlers;)
   {
@@ -297,19 +303,23 @@ void Server::work()
     have_handlers = get_reactor()->handle_events(poll_timeout_ms);
 
     // Check for idle connection timeouts
-    if (impl->idle_timeout.count() > 0 && !impl->connections.empty())
+    const auto timeout_ms = impl->idle_timeout_ms.load();
+    if (timeout_ms > 0)
     {
       // Collect expired connections first to avoid modifying set during iteration
       std::vector<Server_connection*> expired;
-      auto timeout = impl->idle_timeout;
-      std::copy_if(impl->connections.begin(), impl->connections.end(),
-                   std::back_inserter(expired),
-                   // cppcheck-suppress constParameterPointer
-                   [timeout](Server_connection* conn) {
-                     return conn->is_idle_timeout_expired(timeout);
-                   });
+      auto timeout = std::chrono::milliseconds(timeout_ms);
+      {
+        std::lock_guard<std::mutex> lock(impl->connections_mutex);
+        std::copy_if(impl->connections.begin(), impl->connections.end(),
+                     std::back_inserter(expired),
+                     // cppcheck-suppress constParameterPointer
+                     [timeout](Server_connection* conn) {
+                       return conn->is_idle_timeout_expired(timeout);
+                     });
+      }
 
-      // Terminate expired connections
+      // Terminate expired connections (outside lock)
       for (auto* conn : expired)
       {
         log_err_msg("Connection idle timeout expired for " +
