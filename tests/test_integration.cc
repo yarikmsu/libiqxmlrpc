@@ -2309,6 +2309,112 @@ BOOST_FIXTURE_TEST_CASE(reactor_mask_complex_responses, IntegrationFixture)
 BOOST_AUTO_TEST_SUITE_END()
 
 //=============================================================================
+// Defensive Synchronization Tests
+//
+// These tests exercise the defensive mutex protections added to:
+//   - Server connection set (server.cc)
+//   - Idle connection state (server_conn.cc)
+//   - SSL partial write handling (ssl_connection.cc)
+//=============================================================================
+
+BOOST_AUTO_TEST_SUITE(defensive_sync_tests)
+
+// Test that concurrent client requests work correctly with connection mutex
+// Exercises server.cc connection set synchronization
+BOOST_FIXTURE_TEST_CASE(concurrent_connection_registration, IntegrationFixture)
+{
+  start_server(4, 60);  // Pool executor with 4 threads
+
+  // Launch multiple concurrent clients
+  std::vector<std::thread> threads;
+  std::atomic<int> success_count(0);
+
+  for (int i = 0; i < 20; ++i) {
+    threads.emplace_back([this, i, &success_count]() {
+      try {
+        auto client = create_client();
+        Response r = client->execute("echo", Value(i));
+        if (!r.is_fault() && r.value().get_int() == i) {
+          ++success_count;
+        }
+      } catch (...) {}
+    });
+  }
+
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  BOOST_CHECK_EQUAL(success_count.load(), 20);
+}
+
+// Test large data transfer (exercises SSL partial write loop)
+// Covers ssl_connection.cc send() retry loop for partial writes
+BOOST_FIXTURE_TEST_CASE(large_data_transfer, IntegrationFixture)
+{
+  start_server(1, 61);
+  auto client = create_client();
+
+  // Create a large string to transfer (64KB)
+  std::string large_data(65536, 'X');
+  Response r = client->execute("echo", Value(large_data));
+
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string().length(), large_data.length());
+}
+
+// Test rapid connection create/destroy cycles
+// Exercises connection registration/unregistration under load
+BOOST_FIXTURE_TEST_CASE(rapid_connection_cycling, IntegrationFixture)
+{
+  start_server(2, 62);
+
+  for (int cycle = 0; cycle < 10; ++cycle) {
+    std::vector<std::thread> threads;
+    std::atomic<int> success_count(0);
+
+    // Create burst of connections
+    for (int i = 0; i < 5; ++i) {
+      threads.emplace_back([this, &success_count]() {
+        try {
+          auto client = create_client();
+          Response r = client->execute("echo", Value("rapid"));
+          if (!r.is_fault()) {
+            ++success_count;
+          }
+        } catch (...) {}
+      });
+    }
+
+    for (auto& t : threads) {
+      t.join();
+    }
+
+    BOOST_CHECK_GE(success_count.load(), 3);  // At least 60% success
+  }
+}
+
+// Test idle state transitions with keep-alive
+// Exercises idle_mutex_ in server_conn.cc
+BOOST_FIXTURE_TEST_CASE(idle_state_transitions, IntegrationFixture)
+{
+  start_server(1, 63);
+
+  auto client = create_client();
+  client->set_keep_alive(true);
+
+  // Make multiple requests on same connection
+  // Each request: stop_idle -> process -> start_idle
+  for (int i = 0; i < 5; ++i) {
+    Response r = client->execute("echo", Value(i));
+    BOOST_CHECK(!r.is_fault());
+    BOOST_CHECK_EQUAL(r.value().get_int(), i);
+  }
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+//=============================================================================
 // Coverage Improvement Tests - ssl_lib.cc, https_server.cc, http_client.cc
 //
 // These tests target specific uncovered code paths:
