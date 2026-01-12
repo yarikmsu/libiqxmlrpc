@@ -133,7 +133,7 @@ void Reactor<Lock>::register_handler( Event_handler* eh, Event_mask mask )
 template <class Lock>
 void Reactor<Lock>::unregister_handler( Event_handler* eh, Event_mask mask )
 {
-  scoped_lock lk(lock);
+  [[maybe_unused]] scoped_lock lk(lock);
   hs_iterator i = find_handler_state( eh );
 
   if( i != end() )
