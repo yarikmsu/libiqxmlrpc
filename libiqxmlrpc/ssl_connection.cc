@@ -86,12 +86,24 @@ void ssl::Connection::shutdown()
 
 size_t ssl::Connection::send( const char* data, size_t len )
 {
-  int ret = SSL_write( ssl, data, static_cast<int>(len) );
+  // Handle partial writes by retrying until all data is sent.
+  // In blocking mode, SSL_write typically writes all data or fails,
+  // but this loop provides robustness if SSL_MODE_ENABLE_PARTIAL_WRITE
+  // is enabled or in edge cases.
+  size_t total_written = 0;
 
-  if( static_cast<size_t>(ret) != len )
-    throw_io_exception( ssl, ret );
+  while( total_written < len )
+  {
+    int ret = SSL_write( ssl, data + total_written,
+                         static_cast<int>(len - total_written) );
 
-  return static_cast<size_t>(ret);
+    if( ret <= 0 )
+      throw_io_exception( ssl, ret );
+
+    total_written += static_cast<size_t>(ret);
+  }
+
+  return total_written;
 }
 
 
