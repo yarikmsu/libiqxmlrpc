@@ -3,6 +3,7 @@
 
 #include "value_type.h"
 
+#include "safe_math.h"
 #include "util.h"
 #include "value.h"
 #include "value_type_visitor.h"
@@ -408,7 +409,13 @@ void Binary_data::encode() const
   size_t dsz = data.length();
 
   // Pre-allocate: base64 is 4/3 of original size, plus padding
-  base64.reserve((dsz * 4) / 3 + 4);
+  // Use safe arithmetic to prevent integer overflow
+  if (!safe_math::would_overflow_mul(dsz, size_t(4))) {
+    size_t encoded_size = (dsz * 4) / 3;
+    if (!safe_math::would_overflow_add(encoded_size, size_t(4))) {
+      base64.reserve(encoded_size + 4);
+    }
+  }
 
   for( size_t i = 0; i < dsz; i += 3 )
   {
@@ -450,7 +457,13 @@ void Binary_data::decode()
   const size_t src_len = base64.length();
 
   // Reserve space (decoded is at most 3/4 of base64 size)
-  data.reserve((src_len * 3) / 4 + 1);
+  // Use safe arithmetic to prevent integer overflow
+  if (!safe_math::would_overflow_mul(src_len, size_t(3))) {
+    size_t decoded_size = (src_len * 3) / 4;
+    if (!safe_math::would_overflow_add(decoded_size, size_t(1))) {
+      data.reserve(decoded_size + 1);
+    }
+  }
 
   // Collect 4 valid base64 characters at a time
   unsigned char vals[4];
