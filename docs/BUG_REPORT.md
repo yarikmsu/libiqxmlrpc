@@ -3,8 +3,8 @@
 ## Executive Summary
 
 Code review identified issues across several categories:
-- **1 CONFIRMED BUG** - Definitely requires fixing
-- **3 LIKELY BUGS** - Require context verification, likely valid
+- **2 FIXED** ✅ - Resolved in PR #75
+- **2 LIKELY BUGS** - Require context verification, may warrant future attention
 - **2 DESIGN/ROBUSTNESS ISSUES** - Not bugs in normal use, but fragile
 - **1 CODE QUALITY** - Minor improvement recommended
 
@@ -12,53 +12,52 @@ Code review identified issues across several categories:
 
 ---
 
-## ✅ CONFIRMED BUG (Definitely Fix)
+## ✅ FIXED (Resolved in PR #75)
 
 ### 1. Bitwise Operation Bug in Reactor (2 instances)
 **Files:** `libiqxmlrpc/reactor_impl.h:141` and `:243`
-**Status:** ✅ CONFIRMED
+**Status:** ✅ **FIXED** in PR #75
 
 ```cpp
-// Line 141
-int newmask = (i->mask &= !mask);  // BUG: uses ! instead of ~
+// BEFORE (Bug)
+int newmask = (i->mask &= !mask);  // Logical NOT - wrong
+i->revents &= !i->mask;            // Logical NOT - wrong
 
-// Line 243
-i->revents &= !i->mask;  // Same bug
+// AFTER (Fixed)
+int newmask = (i->mask &= ~mask);  // Bitwise NOT - correct
+i->revents &= ~i->mask;            // Bitwise NOT - correct
 ```
 
-**Analysis:** `!mask` is logical NOT (returns 0 or 1), not bitwise NOT (`~mask`). For `mask=2`, `!2` returns `0`, so `&= 0` clears ALL bits instead of just the target bit.
+**Analysis:** `!mask` is logical NOT (returns 0 or 1), not bitwise NOT (`~mask`). The fix changes both instances to use proper bitwise NOT.
 
-**Why it works by accident:** Clearing all bits happens to achieve the goal when you want to clear specific bits. But this is fundamentally wrong:
-- If someone later changes `mask` to support multiple flags simultaneously, this breaks
-- Code maintainers will be confused by the semantics
-- Static analyzers may flag it
-
-**Fix:** Change `!mask` to `~mask` in both locations.
+**Tests added:** `reactor_mask_tests` suite with 3 test cases.
 
 ---
-
-## ⚠️ LIKELY BUGS (Context-Dependent)
 
 ### 2. Null Pointer in SSL Certificate Fingerprint
-**File:** `libiqxmlrpc/ssl_lib.cc:225-238`
-**Status:** ⚠️ LIKELY VALID
+**File:** `libiqxmlrpc/ssl_lib.cc:227`
+**Status:** ✅ **FIXED** in PR #75
 
 ```cpp
+// BEFORE (Bug)
 X509* x = X509_STORE_CTX_get_current_cert(ctx);  // Can return NULL
-// No null check!
 X509_digest(x, digest, md, &n);  // Crash if x is NULL
 
-for(int i = 0; i < 32; i++)  // Loop count
-   ss << std::hex << int(md[i]);
+// AFTER (Fixed)
+X509* x = X509_STORE_CTX_get_current_cert(ctx);
+if (!x) {
+  return "";  // No certificate available at this verification stage
+}
+X509_digest(x, digest, md, &n);
 ```
 
-**Analysis:**
-- **Null check issue:** ✅ Valid concern. `X509_STORE_CTX_get_current_cert()` can return NULL during certain verification stages.
-- **32-byte loop:** ❌ Not a bug. SHA-256 always produces exactly 32 bytes by definition. The hard-coded `32` is correct.
+**Analysis:** `X509_STORE_CTX_get_current_cert()` can return NULL during certain SSL verification stages.
 
-**Fix:** Add null check: `if (!x) return "";` or throw an appropriate exception.
+**Tests added:** `ssl_cert_fingerprint_valid` and `ssl_cert_fingerprint_stability` test cases.
 
 ---
+
+## ⚠️ LIKELY BUGS (Context-Dependent, Not Fixed)
 
 ### 3. SSL_write Partial Write Handling
 **File:** `libiqxmlrpc/ssl_connection.cc:87-95`
@@ -182,11 +181,11 @@ The following items from the initial review were determined to be NOT bugs:
 
 ---
 
-## Recommended Actions
+## Completed Actions
 
-### High Priority:
-1. **Fix bitwise bug** - Change `!mask` to `~mask` in `reactor_impl.h:141` and `:243`
-2. **Add null check** in `ssl_lib.cc:227` for `X509_STORE_CTX_get_current_cert()` return value
+### ✅ High Priority (Fixed in PR #75):
+1. ~~**Fix bitwise bug** - Change `!mask` to `~mask` in `reactor_impl.h:141` and `:243`~~ ✅
+2. ~~**Add null check** in `ssl_lib.cc:227` for `X509_STORE_CTX_get_current_cert()` return value~~ ✅
 
 ### Consider (Defensive Design):
 3. Add mutex to `impl->connections` as defensive measure
@@ -195,16 +194,9 @@ The following items from the initial review were determined to be NOT bugs:
 
 ---
 
-## Verification Plan
+## Verification
 
-```bash
-# Build and test
-make check
-
-# Verify bitwise fix works correctly
-grep -n "mask" libiqxmlrpc/reactor_impl.h  # Should show ~mask
-
-# Run with sanitizers (optional, for confidence)
-cmake .. -DCMAKE_CXX_FLAGS="-fsanitize=undefined"
-make check
-```
+The fixes were verified with:
+- All existing tests pass (`make check`)
+- New test suites added: `reactor_mask_tests`, `ssl_cert_fingerprint_*`
+- CI passed: ubuntu-24.04, ubi8, macos, ASan/UBSan, coverage, cppcheck, CodeQL
