@@ -1,6 +1,7 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
+#include <mutex>
 #include <optional>
 #include "inet_addr.h"
 #include "net_except.h"
@@ -57,6 +58,7 @@ typedef struct sockaddr_in SystemSockAddrIn;
 
 struct Inet_addr::Impl {
   mutable std::optional<SystemSockAddrIn> sa;
+  mutable std::once_flag sa_init_flag;
   std::string host;
   int port;
 
@@ -119,9 +121,11 @@ Inet_addr::Inet_addr( const SystemSockAddrIn& sa ):
 const SystemSockAddrIn*
 Inet_addr::get_sockaddr() const
 {
-  if (!impl_->sa) {
-    impl_->init_sockaddr();
-  }
+  std::call_once(impl_->sa_init_flag, [this]() {
+    if (!impl_->sa) {
+      impl_->init_sockaddr();
+    }
+  });
 
   return &(*impl_->sa);
 }

@@ -285,11 +285,14 @@ bool Reactor<Lock>::handle_system_events(Reactor_base::Timeout ms)
 template <class Lock>
 bool Reactor<Lock>::handle_events(Reactor_base::Timeout ms)
 {
-  if (handlers.empty())
-    return false;
+  {
+    scoped_lock lk(lock);
+    if (handlers.empty())
+      return false;
 
-  if (handlers.size() <= num_stoppers)
-    throw No_handlers();
+    if (handlers.size() <= num_stoppers)
+      throw No_handlers();
+  }
 
   handle_user_events();
   return handle_system_events(ms);
