@@ -9,28 +9,35 @@ Four security hardening features were identified that are not currently implemen
 
 ---
 
-## 1. XML Parsing Depth Limit
+## 1. XML Parsing Depth Limit ✅ COMPLETED
 
 **Purpose:** Prevent stack exhaustion attacks via deeply nested XML documents.
 
-**Implementation Location:** `libiqxmlrpc/parser2.cc`, `libiqxmlrpc/parser2.h`
+**Status:** Implemented in PR #68, branch `security/xml-depth-limit`
 
-**Approach:**
+**Changes Made:**
+- `libiqxmlrpc/except.h`: Added `Parse_depth_error` exception class (fault code -32700)
+- `libiqxmlrpc/parser2.h`: Added `MAX_PARSE_DEPTH` constant (32 levels) and `xml_depth()` method
+- `libiqxmlrpc/parser2.cc`: Added depth check in `BuilderBase::visit_element()` using libxml2's global depth tracking
+- `tests/parser2.cc`: Added 9 comprehensive unit tests
+
+**Implementation Details:**
 ```cpp
-// In parser2.h - add constant
-static constexpr int MAX_XML_DEPTH = 100;  // Configurable limit
+// In parser2.h - BuilderBase class
+static constexpr int MAX_PARSE_DEPTH = 32;  // XML-RPC typically needs ~10 levels
 
-// In BuilderBase::visit_element() - add check
+// In parser2.cc - uses libxml2's actual XML depth (not builder-local depth)
 void BuilderBase::visit_element(const std::string& tag) {
     depth_++;
-    if (depth_ > MAX_XML_DEPTH) {
-        throw Parse_error("XML nesting depth exceeds maximum allowed limit");
+    int xml_depth = parser_.xml_depth();
+    if (xml_depth > MAX_PARSE_DEPTH) {
+        throw Parse_depth_error(xml_depth, MAX_PARSE_DEPTH);
     }
     do_visit_element(tag);
 }
 ```
 
-**Test:** Create XML with 101+ nested elements, verify Parse_error is thrown.
+**Tests:** 9 test cases covering arrays, structs, mixed nesting, boundary conditions, error messages, and request/response parsing contexts.
 
 ---
 
@@ -88,20 +95,20 @@ if (size > MAX_BUFFER_SIZE || size < 0) {
 
 ## Implementation Checklist
 
-- [x] ~~Create feature branch: `security/hardening-2026-01`~~ → `security/disable-legacy-tls`
-- [ ] Implement XML depth limit with tests
-- [x] Implement TLS 1.0/1.1 disabling with tests
+- [x] ~~Create feature branch: `security/hardening-2026-01`~~ → Individual feature branches
+- [x] Implement XML depth limit with tests → PR #68 (`security/xml-depth-limit`)
+- [x] Implement TLS 1.0/1.1 disabling with tests → `security/disable-legacy-tls`
 - [ ] Implement connection timeout with tests
 - [ ] Implement integer overflow protection with tests
-- [ ] Run full test suite including ASan/UBSan
+- [x] Run full test suite including ASan/UBSan (for completed items)
 - [ ] Update documentation
-- [ ] Create PR for review
+- [x] Create PRs for review (XML depth: #68)
 
 ## Priority
 
-| Feature | Priority | Rationale |
-|---------|----------|-----------|
-| TLS 1.0/1.1 disable | High | Compliance requirement, easy win |
-| Connection timeout | High | DoS protection |
-| XML depth limit | Medium | Defense in depth |
-| Integer overflow | Medium | Edge case hardening |
+| Feature | Priority | Status | Rationale |
+|---------|----------|--------|-----------|
+| TLS 1.0/1.1 disable | High | ✅ Done | Compliance requirement, easy win |
+| Connection timeout | High | Pending | DoS protection |
+| XML depth limit | Medium | ✅ Done (PR #68) | Defense in depth |
+| Integer overflow | Medium | Pending | Edge case hardening |
