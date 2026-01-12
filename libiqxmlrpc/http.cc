@@ -5,6 +5,7 @@
 
 #include "http_errors.h"
 #include "method.h"
+#include "safe_math.h"
 #include "version.h"
 
 #include "num_conv.h"
@@ -317,8 +318,14 @@ void Header::set_option_default(const std::string& name, const std::string& valu
 std::string Header::dump() const
 {
   std::string retval = dump_head();
-  // Pre-reserve space: estimate ~64 bytes per option
-  retval.reserve(retval.size() + options_.size() * 64 + 4);
+  // Pre-reserve space: estimate ~64 bytes per option (with overflow protection)
+  if (!safe_math::would_overflow_mul(options_.size(), size_t(64))) {
+    size_t options_size = options_.size() * 64;
+    if (!safe_math::would_overflow_add(retval.size(), options_size) &&
+        !safe_math::would_overflow_add(retval.size() + options_size, size_t(4))) {
+      retval.reserve(retval.size() + options_size + 4);
+    }
+  }
 
   for (const auto& opt : options_) {
     retval += opt.first;
@@ -559,11 +566,22 @@ void Packet_reader::check_sz( size_t sz )
     return;
 
   if (header) {
-    if (header->content_length() + header_cache.length() >= pkt_max_sz)
+    // Use safe arithmetic to prevent integer overflow when summing sizes
+    size_t total_expected;
+    if (safe_math::would_overflow_add(header->content_length(), header_cache.length())) {
+      throw Request_too_large();
+    }
+    total_expected = header->content_length() + header_cache.length();
+    if (total_expected >= pkt_max_sz)
       throw Request_too_large();
   }
 
-  if( (total_sz += sz) >= pkt_max_sz )
+  // Use safe arithmetic for cumulative size tracking
+  if (safe_math::would_overflow_add(total_sz, sz)) {
+    throw Request_too_large();
+  }
+  total_sz += sz;
+  if( total_sz >= pkt_max_sz )
     throw Request_too_large();
 }
 
