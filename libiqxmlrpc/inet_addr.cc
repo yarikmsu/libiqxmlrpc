@@ -8,6 +8,19 @@
 
 namespace iqnet {
 
+namespace {
+  // Global mutex to serialize DNS lookups. While gethostbyname_r provides
+  // thread-local result storage, glibc's internal NSS implementation has
+  // shared state (dynarray) that causes TSan warnings. Serializing DNS
+  // lookups eliminates this race with minimal performance impact since
+  // DNS results are typically cached by the system resolver.
+  std::mutex& dns_mutex()
+  {
+    static std::mutex mtx;
+    return mtx;
+  }
+}
+
 std::string get_host_name()
 {
   char buf[1024];
@@ -98,10 +111,13 @@ Inet_addr::Impl::init_sockaddr() const
   sa = SystemSockAddrIn();
   // cppcheck-suppress constVariablePointer
   struct hostent* hent = nullptr;
-  IQXMLRPC_GETHOSTBYNAME(host.c_str());
-  sa->sin_family = PF_INET;
-  sa->sin_port = htons(port);
-  memcpy( static_cast<void*>(&(sa->sin_addr)), static_cast<const void*>(hent->h_addr), hent->h_length );
+  {
+    std::lock_guard<std::mutex> lock(dns_mutex());
+    IQXMLRPC_GETHOSTBYNAME(host.c_str());
+    sa->sin_family = PF_INET;
+    sa->sin_port = htons(port);
+    memcpy( static_cast<void*>(&(sa->sin_addr)), static_cast<const void*>(hent->h_addr), hent->h_length );
+  }
 }
 
 Inet_addr::Inet_addr( const std::string& host, int port ):
