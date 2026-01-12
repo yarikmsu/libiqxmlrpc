@@ -1,0 +1,12 @@
+# ThreadSanitizer suppressions for libiqxmlrpc
+# See https://github.com/google/sanitizers/wiki/ThreadSanitizerSuppressions
+
+# Suppress races in glibc's internal DNS resolver implementation.
+# gethostbyname_r uses __libc_dynarray_emplace_enlarge internally,
+# which has shared state that TSan cannot properly track.
+# The resolver's internal synchronization is correct, but TSan
+# sees the realloc operations on shared buffers as races.
+# This is a known limitation with glibc's NSS (Name Service Switch).
+race:__libc_dynarray_emplace_enlarge
+race:gethostbyname_r
+race:getaddrinfo

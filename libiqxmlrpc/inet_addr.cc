@@ -1,11 +1,25 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
+#include <mutex>
 #include <optional>
 #include "inet_addr.h"
 #include "net_except.h"
 
 namespace iqnet {
+
+namespace {
+  // Global mutex to serialize DNS lookups. While gethostbyname_r provides
+  // thread-local result storage, glibc's internal NSS implementation has
+  // shared state (dynarray) that causes TSan warnings. Serializing DNS
+  // lookups eliminates this race with minimal performance impact since
+  // DNS results are typically cached by the system resolver.
+  std::mutex& dns_mutex()
+  {
+    static std::mutex mtx;
+    return mtx;
+  }
+}
 
 std::string get_host_name()
 {
@@ -57,6 +71,7 @@ typedef struct sockaddr_in SystemSockAddrIn;
 
 struct Inet_addr::Impl {
   mutable std::optional<SystemSockAddrIn> sa;
+  mutable std::once_flag sa_init_flag;
   std::string host;
   int port;
 
@@ -68,14 +83,14 @@ struct Inet_addr::Impl {
 };
 
 Inet_addr::Impl::Impl( const std::string& h, int p ):
-  sa(), host(h), port(p)
+  sa(), sa_init_flag(), host(h), port(p)
 {
   if (h.find_first_of("\n\r") != std::string::npos)
     throw network_error("Hostname must not contain CR LF characters", false);
 }
 
 Inet_addr::Impl::Impl( int p ):
-  sa(SystemSockAddrIn()), host("0.0.0.0"), port(p)
+  sa(SystemSockAddrIn()), sa_init_flag(), host("0.0.0.0"), port(p)
 {
   sa->sin_family = PF_INET;
   sa->sin_port = htons(port);
@@ -84,6 +99,7 @@ Inet_addr::Impl::Impl( int p ):
 
 Inet_addr::Impl::Impl( const SystemSockAddrIn& s ):
   sa(s),
+  sa_init_flag(),
   host(inet_ntoa( sa->sin_addr )),
   port(ntohs( sa->sin_port ))
 {
@@ -95,10 +111,13 @@ Inet_addr::Impl::init_sockaddr() const
   sa = SystemSockAddrIn();
   // cppcheck-suppress constVariablePointer
   struct hostent* hent = nullptr;
-  IQXMLRPC_GETHOSTBYNAME(host.c_str());
-  sa->sin_family = PF_INET;
-  sa->sin_port = htons(port);
-  memcpy( static_cast<void*>(&(sa->sin_addr)), static_cast<const void*>(hent->h_addr), hent->h_length );
+  {
+    std::lock_guard<std::mutex> lock(dns_mutex());
+    IQXMLRPC_GETHOSTBYNAME(host.c_str());
+    sa->sin_family = PF_INET;
+    sa->sin_port = htons(port);
+    memcpy( static_cast<void*>(&(sa->sin_addr)), static_cast<const void*>(hent->h_addr), hent->h_length );
+  }
 }
 
 Inet_addr::Inet_addr( const std::string& host, int port ):
@@ -119,9 +138,11 @@ Inet_addr::Inet_addr( const SystemSockAddrIn& sa ):
 const SystemSockAddrIn*
 Inet_addr::get_sockaddr() const
 {
-  if (!impl_->sa) {
-    impl_->init_sockaddr();
-  }
+  std::call_once(impl_->sa_init_flag, [this]() {
+    if (!impl_->sa) {
+      impl_->init_sockaddr();
+    }
+  });
 
   return &(*impl_->sa);
 }

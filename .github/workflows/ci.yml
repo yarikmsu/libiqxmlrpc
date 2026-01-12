@@ -136,6 +136,35 @@ jobs:
         fail_ci_if_error: true
         verbose: true
 
+  tsan:
+    name: TSan
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y clang libboost-dev libboost-date-time-dev libboost-thread-dev libboost-test-dev libboost-program-options-dev libboost-chrono-dev libxml2-dev libssl-dev
+
+    - name: Configure
+      run: |
+        mkdir build && cd build
+        cmake -Dbuild_tests=ON \
+          -DCMAKE_C_COMPILER=clang \
+          -DCMAKE_CXX_COMPILER=clang++ \
+          -DCMAKE_CXX_FLAGS="-DBOOST_TIMER_ENABLE_DEPRECATED -fsanitize=thread -fno-omit-frame-pointer -g" \
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread" \
+          -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=thread" \
+          ..
+
+    - name: Build
+      run: cmake --build build
+
+    - name: Test
+      run: ctest --test-dir build --output-on-failure
+      env:
+        TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1:history_size=4:suppressions=${{ github.workspace }}/tests/tsan.suppressions
+
   cppcheck:
     name: cppcheck
     runs-on: ubuntu-latest
