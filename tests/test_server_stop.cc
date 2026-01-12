@@ -1,20 +1,15 @@
 #include <iostream>
 #include <memory>
-#include <boost/bind.hpp>
-#include <boost/thread.hpp>
-#include <boost/thread/condition.hpp>
-#include <boost/thread/mutex.hpp>
+#include <chrono>
+#include <condition_variable>
+#include <functional>
+#include <mutex>
+#include <thread>
 #include <boost/test/test_tools.hpp>
 #include <boost/test/unit_test.hpp>
 #include "libiqxmlrpc/libiqxmlrpc.h"
 #include "libiqxmlrpc/http_server.h"
 #include "libiqxmlrpc/executor.h"
-
-#if BOOST_VERSION >= 105000
-#define MY_BOOST_TIME_UTC boost::TIME_UTC_
-#else
-#define MY_BOOST_TIME_UTC boost::TIME_UTC
-#endif
 
 using namespace boost::unit_test_framework;
 using namespace iqxmlrpc;
@@ -29,7 +24,7 @@ public:
       static_cast<Executor_factory_base*>(new Pool_executor_factory(threads)) :
       static_cast<Executor_factory_base*>(new Serial_executor_factory)),
     serv_(new Http_server(port, exec_factory_.get())),
-    thread_(new boost::thread(boost::bind(&TestServer::run, this)))
+    thread_(new std::thread([this]() { this->serv_->work(); }))
   {
   }
 
@@ -40,55 +35,49 @@ public:
 
   void join()
   {
-    thread_->join();
+    if (thread_->joinable()) {
+      thread_->join();
+    }
   }
 
 private:
   std::unique_ptr<iqxmlrpc::Executor_factory_base> exec_factory_;
   std::unique_ptr<iqxmlrpc::Server> serv_;
-  std::unique_ptr<boost::thread> thread_;
-
-  static void run(TestServer* obj)
-  {
-    obj->serv_->work();
-  }
+  std::unique_ptr<std::thread> thread_;
 };
 
-void stop_and_join(unsigned threads, boost::condition* on_stop)
+void stop_and_join(unsigned threads, std::condition_variable* on_stop, std::mutex* mtx)
 {
   TestServer s(3344, threads);
 
-  boost::xtime time_wait;
-  boost::xtime_get(&time_wait, MY_BOOST_TIME_UTC);
-  time_wait.sec += 1;
-
-  boost::thread::sleep(time_wait);
+  std::this_thread::sleep_for(std::chrono::seconds(1));
 
   s.stop();
   s.join();
+
+  {
+    std::lock_guard<std::mutex> lk(*mtx);
+  }
   on_stop->notify_all();
 }
 
 void stop_test_server(unsigned server_threads)
 {
-  boost::condition stopped;
-  boost::mutex c_mutex;
+  std::condition_variable stopped;
+  std::mutex c_mutex;
 
-  boost::thread thr(boost::bind(stop_and_join, server_threads, &stopped));
+  std::thread thr([server_threads, &stopped, &c_mutex]() {
+    stop_and_join(server_threads, &stopped, &c_mutex);
+  });
 
-  {
-  boost::xtime time_wait;
-  boost::xtime_get(&time_wait, MY_BOOST_TIME_UTC);
-  time_wait.sec += 1;
-  boost::thread::sleep(time_wait);
+  std::this_thread::sleep_for(std::chrono::seconds(1));
+
+  std::unique_lock<std::mutex> lck(c_mutex);
+  BOOST_CHECK( stopped.wait_for(lck, std::chrono::seconds(3)) == std::cv_status::no_timeout );
+
+  if (thr.joinable()) {
+    thr.join();
   }
-
-  boost::xtime time_wait;
-  boost::xtime_get(&time_wait, MY_BOOST_TIME_UTC);
-  time_wait.sec += 3;
-
-  boost::mutex::scoped_lock lck(c_mutex);
-  BOOST_CHECK( stopped.timed_wait(lck, time_wait) );
 }
 
 void stop_test_server_st()
@@ -108,7 +97,7 @@ bool init_tests()
   test.add( BOOST_TEST_CASE(&stop_test_server_st) );
 
   for (unsigned i = 0; i < 50; ++i)
-    test.add( BOOST_TEST_CASE(boost::bind(stop_test_server_mt, i)));
+    test.add( BOOST_TEST_CASE(std::bind(stop_test_server_mt, i)));
 
   return true;
 }

@@ -1,9 +1,11 @@
 #define BOOST_TEST_MODULE integration_test
 
 #include <boost/test/unit_test.hpp>
-#include <boost/thread.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/condition_variable.hpp>
+
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
 
 #include "libiqxmlrpc/libiqxmlrpc.h"
 #include "libiqxmlrpc/http_server.h"
@@ -69,9 +71,9 @@ class IntegrationFixture {
 protected:
   std::unique_ptr<Http_server> server_;
   std::unique_ptr<Executor_factory_base> exec_factory_;
-  boost::thread server_thread_;
-  boost::mutex ready_mutex_;
-  boost::condition_variable ready_cond_;
+  std::thread server_thread_;
+  std::mutex ready_mutex_;
+  std::condition_variable ready_cond_;
   bool server_ready_;
   std::atomic<bool> server_running_;
   int port_;
@@ -108,9 +110,9 @@ public:
     register_user_methods(*server_);
 
     server_running_ = true;
-    server_thread_ = boost::thread([this]() {
+    server_thread_ = std::thread([this]() {
       {
-        boost::mutex::scoped_lock lk(ready_mutex_);
+        std::unique_lock<std::mutex> lk(ready_mutex_);
         server_ready_ = true;
         ready_cond_.notify_one();
       }
@@ -119,14 +121,14 @@ public:
     });
 
     // Wait for server to be ready
-    boost::mutex::scoped_lock lk(ready_mutex_);
-    bool result = ready_cond_.timed_wait(lk,
-      boost::posix_time::seconds(5),
+    std::unique_lock<std::mutex> lk(ready_mutex_);
+    bool result = ready_cond_.wait_for(lk,
+      std::chrono::seconds(5),
       [this]{ return server_ready_; });
     BOOST_REQUIRE_MESSAGE(result, "Server startup timeout");
 
     // Give the server a moment to enter the work loop
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
   }
 
   void stop_server() {
@@ -134,7 +136,7 @@ public:
       server_->set_exit_flag();
       server_->interrupt();
       if (server_thread_.joinable()) {
-        server_thread_.timed_join(boost::posix_time::seconds(5));
+        server_thread_.join();
       }
     }
     server_.reset();
@@ -182,7 +184,7 @@ BOOST_FIXTURE_TEST_CASE(accept_multiple_sequential_connections, IntegrationFixtu
 BOOST_FIXTURE_TEST_CASE(accept_with_thread_pool, IntegrationFixture)
 {
   start_server(4, 2);
-  std::vector<boost::thread> threads;
+  std::vector<std::thread> threads;
   std::atomic<int> success_count(0);
 
   for (int i = 0; i < 10; ++i) {
@@ -688,7 +690,7 @@ BOOST_FIXTURE_TEST_CASE(large_response, IntegrationFixture)
 BOOST_FIXTURE_TEST_CASE(concurrent_different_methods, IntegrationFixture)
 {
   start_server(4, 69);  // Thread pool
-  std::vector<boost::thread> threads;
+  std::vector<std::thread> threads;
   std::atomic<int> echo_count(0);
   std::atomic<int> trace_count(0);
 
@@ -1031,7 +1033,7 @@ std::string send_raw_http(const std::string& host, int port, const std::string& 
     sock.send(data.c_str(), data.length());
 
     // Small delay to let server process
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     char buffer[4096];
     std::string response;
@@ -1118,7 +1120,7 @@ BOOST_FIXTURE_TEST_CASE(incomplete_http_request_waits, IntegrationFixture)
     sock.send(partial, strlen(partial));
 
     // Server should wait for more data (not crash or return error)
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     // Send the rest of the request
     std::string rest =
@@ -1130,7 +1132,7 @@ BOOST_FIXTURE_TEST_CASE(incomplete_http_request_waits, IntegrationFixture)
 
     sock.send(rest.c_str(), rest.length());
 
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     char buffer[4096];
     sock.set_non_blocking(true);
@@ -1168,7 +1170,7 @@ BOOST_FIXTURE_TEST_CASE(expect_100_continue_handled, IntegrationFixture)
     sock.send(headers.c_str(), headers.length());
 
     // Wait for 100 Continue response
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     char buffer[4096];
     sock.set_non_blocking(true);
@@ -1188,7 +1190,7 @@ BOOST_FIXTURE_TEST_CASE(expect_100_continue_handled, IntegrationFixture)
 
     sock.send(body.c_str(), body.length());
 
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     try {
         size_t n = sock.recv(buffer, sizeof(buffer));
@@ -1392,9 +1394,9 @@ class HttpsIntegrationFixture {
 protected:
   std::unique_ptr<Https_server> server_;
   std::unique_ptr<Executor_factory_base> exec_factory_;
-  boost::thread server_thread_;
-  boost::mutex ready_mutex_;
-  boost::condition_variable ready_cond_;
+  std::thread server_thread_;
+  std::mutex ready_mutex_;
+  std::condition_variable ready_cond_;
   bool server_ready_ = false;
   std::atomic<bool> server_running_{false};
   int port_ = 19950;
@@ -1463,9 +1465,9 @@ public:
     register_user_methods(*server_);
 
     server_running_ = true;
-    server_thread_ = boost::thread([this]() {
+    server_thread_ = std::thread([this]() {
       {
-        boost::mutex::scoped_lock lk(ready_mutex_);
+        std::unique_lock<std::mutex> lk(ready_mutex_);
         server_ready_ = true;
         ready_cond_.notify_one();
       }
@@ -1473,12 +1475,12 @@ public:
       server_running_ = false;
     });
 
-    boost::mutex::scoped_lock lk(ready_mutex_);
-    ready_cond_.timed_wait(lk,
-      boost::posix_time::seconds(5),
+    std::unique_lock<std::mutex> lk(ready_mutex_);
+    ready_cond_.wait_for(lk,
+      std::chrono::seconds(5),
       [this]{ return server_ready_; });
 
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
 
   void stop_server() {
@@ -1486,7 +1488,7 @@ public:
       server_->set_exit_flag();
       server_->interrupt();
       if (server_thread_.joinable()) {
-        server_thread_.timed_join(boost::posix_time::seconds(5));
+        server_thread_.join();
       }
     }
     server_.reset();
@@ -1829,13 +1831,13 @@ BOOST_AUTO_TEST_CASE(connection_closed_by_peer)
     Inet_addr server_addr = server_sock.get_addr();
 
     // Start a thread that accepts and immediately closes
-    boost::thread acceptor([&server_sock]() {
+    std::thread acceptor([&server_sock]() {
         try {
             Socket accepted = server_sock.accept();
             // Send partial HTTP response then close
             const char* partial = "HTTP/1.1 200";
             accepted.send(partial, strlen(partial));
-            boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
             accepted.close();
         } catch (...) {}
     });
@@ -2315,7 +2317,7 @@ BOOST_AUTO_TEST_CASE(http_client_actual_request_timeout)
     std::atomic<bool> keep_running{true};
 
     // Thread that accepts connection but doesn't respond
-    boost::thread delayed_server([&server_sock, &keep_running]() {
+    std::thread delayed_server([&server_sock, &keep_running]() {
         try {
             Socket accepted = server_sock.accept();
             // Read the request to avoid connection errors
@@ -2324,7 +2326,7 @@ BOOST_AUTO_TEST_CASE(http_client_actual_request_timeout)
 
             // Hold connection open without responding until test completes
             while (keep_running.load()) {
-                boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
             accepted.close();
         } catch (...) {
@@ -2333,7 +2335,7 @@ BOOST_AUTO_TEST_CASE(http_client_actual_request_timeout)
     });
 
     // Give server thread time to start listening
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     bool timeout_occurred = false;
     try {
@@ -2363,7 +2365,7 @@ BOOST_AUTO_TEST_CASE(http_client_connection_closed_during_read)
     Inet_addr server_addr = server_sock.get_addr();
 
     // Thread that accepts, reads request, sends partial response, then closes
-    boost::thread partial_response_server([&server_sock]() {
+    std::thread partial_response_server([&server_sock]() {
         try {
             Socket accepted = server_sock.accept();
             // Read the full request
@@ -2375,7 +2377,7 @@ BOOST_AUTO_TEST_CASE(http_client_connection_closed_during_read)
             accepted.send(partial, strlen(partial));
 
             // Close immediately without sending body
-            boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
             accepted.close();
         } catch (...) {
             // Ignore errors during shutdown
@@ -2383,7 +2385,7 @@ BOOST_AUTO_TEST_CASE(http_client_connection_closed_during_read)
     });
 
     // Give server thread time to start listening
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     bool network_error_occurred = false;
     try {
@@ -2431,13 +2433,13 @@ BOOST_AUTO_TEST_CASE(firewall_blocks_with_empty_message)
 
     // Start server in thread
     std::atomic<bool> server_running(true);
-    boost::thread server_thread([&]() {
+    std::thread server_thread([&]() {
         server.work();
         server_running = false;
     });
 
     // Give server time to start
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     // Try to connect - should be rejected by firewall
     bool connection_failed = false;
@@ -2457,7 +2459,7 @@ BOOST_AUTO_TEST_CASE(firewall_blocks_with_empty_message)
     // Cleanup
     server.set_exit_flag();
     server.interrupt();
-    server_thread.timed_join(boost::posix_time::seconds(5));
+    server_thread.join();
 
     BOOST_CHECK(connection_failed);
 }
@@ -2479,13 +2481,13 @@ BOOST_AUTO_TEST_CASE(firewall_blocks_with_custom_message)
 
     // Start server in thread
     std::atomic<bool> server_running(true);
-    boost::thread server_thread([&]() {
+    std::thread server_thread([&]() {
         server.work();
         server_running = false;
     });
 
     // Give server time to start
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     // Try to connect - should receive error response
     bool got_error = false;
@@ -2505,7 +2507,7 @@ BOOST_AUTO_TEST_CASE(firewall_blocks_with_custom_message)
     // Cleanup
     server.set_exit_flag();
     server.interrupt();
-    server_thread.timed_join(boost::posix_time::seconds(5));
+    server_thread.join();
 
     BOOST_CHECK(got_error);
 }
