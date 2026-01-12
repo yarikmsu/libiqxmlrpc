@@ -3,12 +3,15 @@
 #include <memory>
 #include <vector>
 #include <algorithm>
+#include <sstream>
 #include <boost/test/test_tools.hpp>
 #include <boost/test/unit_test.hpp>
 #include "libiqxmlrpc/value.h"
 #include "libiqxmlrpc/value_parser.h"
 #include "libiqxmlrpc/request_parser.h"
 #include "libiqxmlrpc/response_parser.h"
+#include "libiqxmlrpc/except.h"
+#include "libiqxmlrpc/parser2.h"
 
 using namespace boost::unit_test;
 using namespace iqxmlrpc;
@@ -404,6 +407,159 @@ BOOST_AUTO_TEST_CASE(test_parse_fault_response)
   BOOST_CHECK(res.is_fault());
   BOOST_CHECK_EQUAL(res.fault_code(), 143);
   BOOST_CHECK_EQUAL(res.fault_string(), "Out of beer");
+}
+
+//
+// depth limit tests
+//
+
+namespace {
+
+// Helper: generate deeply nested arrays
+std::string generate_nested_arrays(int depth)
+{
+  std::ostringstream xml;
+  for (int i = 0; i < depth; ++i) {
+    xml << "<array><data><value>";
+  }
+  xml << "<int>42</int>";
+  for (int i = 0; i < depth; ++i) {
+    xml << "</value></data></array>";
+  }
+  return xml.str();
+}
+
+// Helper: generate deeply nested structs
+std::string generate_nested_structs(int depth)
+{
+  std::ostringstream xml;
+  for (int i = 0; i < depth; ++i) {
+    xml << "<struct><member><name>n" << i << "</name><value>";
+  }
+  xml << "<int>42</int>";
+  for (int i = 0; i < depth; ++i) {
+    xml << "</value></member></struct>";
+  }
+  return xml.str();
+}
+
+} // anonymous namespace
+
+BOOST_AUTO_TEST_CASE(test_depth_limit_valid_nesting)
+{
+  // Normal nesting (well within limit) should work
+  std::string xml = generate_nested_arrays(5);
+  Value v = parse_value(xml);
+  BOOST_CHECK(v.is_array());
+
+  // Struct nesting should also work
+  xml = generate_nested_structs(5);
+  v = parse_value(xml);
+  BOOST_CHECK(v.is_struct());
+}
+
+BOOST_AUTO_TEST_CASE(test_depth_limit_at_boundary)
+{
+  // Test parsing at exactly MAX_PARSE_DEPTH - should still work
+  // The limit is 32, but value parsing adds structure: value->array->data->value...
+  // Each array level adds about 3 XML elements (array, data, value)
+  // So 10 levels of arrays = ~30 XML elements
+  std::string xml = generate_nested_arrays(10);
+  Value v = parse_value(xml);
+  BOOST_CHECK(v.is_array());
+}
+
+BOOST_AUTO_TEST_CASE(test_depth_limit_exceeded_array)
+{
+  // Test exceeding depth limit with nested arrays
+  // 32/3 = ~10.6, so 15 levels should definitely exceed
+  std::string xml = generate_nested_arrays(15);
+  BOOST_CHECK_THROW(parse_value(xml), Parse_depth_error);
+}
+
+BOOST_AUTO_TEST_CASE(test_depth_limit_exceeded_struct)
+{
+  // Test exceeding depth limit with nested structs
+  // Each struct level adds: struct, member, name, value = ~4 elements
+  // So 10 levels should exceed limit
+  std::string xml = generate_nested_structs(12);
+  BOOST_CHECK_THROW(parse_value(xml), Parse_depth_error);
+}
+
+BOOST_AUTO_TEST_CASE(test_depth_limit_mixed_nesting)
+{
+  // Test mixed array and struct nesting that exceeds limit
+  std::ostringstream xml;
+  for (int i = 0; i < 8; ++i) {
+    xml << "<array><data><value><struct><member><name>x</name><value>";
+  }
+  xml << "<int>42</int>";
+  for (int i = 0; i < 8; ++i) {
+    xml << "</value></member></struct></value></data></array>";
+  }
+  BOOST_CHECK_THROW(parse_value(xml.str()), Parse_depth_error);
+}
+
+BOOST_AUTO_TEST_CASE(test_depth_limit_error_message)
+{
+  // Verify the error message contains useful information
+  std::string xml = generate_nested_arrays(15);
+  bool caught = false;
+  try {
+    parse_value(xml);
+  } catch (const Parse_depth_error& e) {
+    caught = true;
+    std::string msg = e.what();
+    // Check that error message mentions depth
+    BOOST_CHECK(msg.find("depth") != std::string::npos ||
+                msg.find("Depth") != std::string::npos ||
+                msg.find("exceeded") != std::string::npos);
+    // Check fault code is -32700 (parse error)
+    BOOST_CHECK_EQUAL(e.code(), -32700);
+  }
+  BOOST_CHECK(caught);
+}
+
+BOOST_AUTO_TEST_CASE(test_depth_limit_request_parsing)
+{
+  // Test depth limit in request parsing context
+  std::ostringstream xml;
+  xml << "<methodCall><methodName>test</methodName><params><param><value>";
+  for (int i = 0; i < 12; ++i) {
+    xml << "<array><data><value>";
+  }
+  xml << "<int>1</int>";
+  for (int i = 0; i < 12; ++i) {
+    xml << "</value></data></array>";
+  }
+  xml << "</value></param></params></methodCall>";
+
+  BOOST_CHECK_THROW(parse_request(xml.str()), Parse_depth_error);
+}
+
+BOOST_AUTO_TEST_CASE(test_depth_limit_response_parsing)
+{
+  // Test depth limit in response parsing context
+  std::ostringstream xml;
+  xml << "<methodResponse><params><param><value>";
+  for (int i = 0; i < 12; ++i) {
+    xml << "<struct><member><name>x</name><value>";
+  }
+  xml << "<int>1</int>";
+  for (int i = 0; i < 12; ++i) {
+    xml << "</value></member></struct>";
+  }
+  xml << "</value></param></params></methodResponse>";
+
+  BOOST_CHECK_THROW(parse_response(xml.str()), Parse_depth_error);
+}
+
+BOOST_AUTO_TEST_CASE(test_max_parse_depth_constant)
+{
+  // Verify the constant is accessible and has a reasonable value
+  BOOST_CHECK(BuilderBase::MAX_PARSE_DEPTH > 0);
+  BOOST_CHECK(BuilderBase::MAX_PARSE_DEPTH <= 256); // Sanity check - not too large
+  BOOST_CHECK_EQUAL(BuilderBase::MAX_PARSE_DEPTH, 32); // Current default
 }
 
 // vim:ts=2:sw=2:et
