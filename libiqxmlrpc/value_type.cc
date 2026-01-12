@@ -419,12 +419,14 @@ void Binary_data::encode() const
 
   for( size_t i = 0; i < dsz; i += 3 )
   {
-    unsigned c = 0xff0000 & d[i] << 16;
+    // Cast to unsigned char to avoid undefined behavior when char is signed
+    // Left-shifting negative values (chars >= 128 on signed char platforms) is UB
+    unsigned c = static_cast<unsigned>(static_cast<unsigned char>(d[i])) << 16;
     add_base64_char( (c >> 18) & 0x3f );
 
     if( i+1 < dsz )
     {
-      c |= 0x00ff00 & d[i+1] << 8;
+      c |= static_cast<unsigned>(static_cast<unsigned char>(d[i+1])) << 8;
       add_base64_char( (c >> 12) & 0x3f );
     }
     else
@@ -436,7 +438,7 @@ void Binary_data::encode() const
 
     if( i+2 < dsz )
     {
-      c |= 0x0000ff & d[i+2];
+      c |= static_cast<unsigned>(static_cast<unsigned char>(d[i+2]));
       add_base64_char( (c >> 6) & 0x3f );
       add_base64_char( c & 0x3f );
     }
