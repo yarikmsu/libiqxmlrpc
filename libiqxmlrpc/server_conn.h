@@ -5,6 +5,7 @@
 #define _iqxmlrpc_server_conn_h_
 
 #include <chrono>
+#include <mutex>
 #include <optional>
 #include <vector>
 #include "connection.h"
@@ -58,7 +59,10 @@ public:
   void stop_idle();
 
   //! Check if connection is in idle state (waiting for input).
-  bool is_idle() const { return is_waiting_input_; }
+  bool is_idle() const {
+    std::lock_guard<std::mutex> lock(idle_mutex_);
+    return is_waiting_input_;
+  }
 
   //! Check if idle timeout has expired.
   //! Returns true only if connection is idle AND timeout has exceeded.
@@ -78,6 +82,11 @@ protected:
 
 private:
   std::vector<char> read_buf_;
+
+  // Mutex for idle state - provides defensive synchronization.
+  // Currently all access is from the reactor thread, but mutex protects
+  // against future changes or API misuse.
+  mutable std::mutex idle_mutex_;
   bool is_waiting_input_ = false;
   std::optional<std::chrono::steady_clock::time_point> idle_since_;
 };

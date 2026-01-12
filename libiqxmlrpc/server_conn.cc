@@ -18,6 +18,7 @@ Server_connection::Server_connection( const iqnet::Inet_addr& a ):
   response_offset(0),
   keep_alive(false),
   read_buf_(65536, '\0'),
+  idle_mutex_(),
   is_waiting_input_(false),
   idle_since_(std::nullopt)
 {
@@ -67,6 +68,7 @@ void Server_connection::schedule_response( http::Packet* pkt )
 
 void Server_connection::start_idle()
 {
+  std::lock_guard<std::mutex> lock(idle_mutex_);
   is_waiting_input_ = true;
   idle_since_ = std::chrono::steady_clock::now();
 }
@@ -74,6 +76,7 @@ void Server_connection::start_idle()
 
 void Server_connection::stop_idle()
 {
+  std::lock_guard<std::mutex> lock(idle_mutex_);
   is_waiting_input_ = false;
   idle_since_ = std::nullopt;
 }
@@ -81,6 +84,7 @@ void Server_connection::stop_idle()
 
 bool Server_connection::is_idle_timeout_expired(std::chrono::milliseconds timeout) const
 {
+  std::lock_guard<std::mutex> lock(idle_mutex_);
   if (!is_waiting_input_ || !idle_since_) {
     return false;
   }

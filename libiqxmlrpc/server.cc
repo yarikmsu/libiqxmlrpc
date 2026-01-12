@@ -43,6 +43,10 @@ public:
   const Auth_Plugin_base*    auth_plugin;
 
   std::atomic<int64_t> idle_timeout_ms{0};
+
+  // Mutex for connections set - provides defensive synchronization.
+  // Currently all access is from the reactor thread, but mutex protects
+  // against future changes or API misuse.
   std::set<Server_connection*> connections;
   mutable std::mutex connections_mutex;
 

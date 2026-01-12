@@ -22,15 +22,21 @@ Socket::Socket():
 
 #ifndef WIN32
   {
+  // SO_REUSEADDR allows immediate reuse of the port after server restart.
+  // Return value intentionally ignored - this is a "best effort" optimization
+  // that should not prevent socket creation if it fails.
   int enable = 1;
-  setsockopt( sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable) );
+  (void)setsockopt( sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable) );
   }
 #endif //WIN32
 
 #if defined(__APPLE__)
   {
+  // SO_NOSIGPIPE prevents SIGPIPE on write to closed socket (macOS-specific).
+  // Return value intentionally ignored - fallback is to catch SIGPIPE or
+  // handle EPIPE error on send().
   int enable = 1;
-  setsockopt( sock, SOL_SOCKET, SO_NOSIGPIPE, &enable, sizeof(enable) );
+  (void)setsockopt( sock, SOL_SOCKET, SO_NOSIGPIPE, &enable, sizeof(enable) );
   }
 #endif
 
@@ -76,9 +82,12 @@ void Socket::set_non_blocking( bool flag )
 
 void Socket::set_nodelay( bool enable )
 {
+  // TCP_NODELAY disables Nagle's algorithm for lower latency.
+  // Return value intentionally ignored - this is a performance optimization
+  // that should not prevent communication if it fails.
   int flag = enable ? 1 : 0;
-  setsockopt( sock, IPPROTO_TCP, TCP_NODELAY,
-              reinterpret_cast<const char*>(&flag), sizeof(flag) );
+  (void)setsockopt( sock, IPPROTO_TCP, TCP_NODELAY,
+                    reinterpret_cast<const char*>(&flag), sizeof(flag) );
 }
 
 #if defined(MSG_NOSIGNAL)
