@@ -22,6 +22,7 @@ void trace_method(iqxmlrpc::Method*, const iqxmlrpc::Param_list&, iqxmlrpc::Valu
 void error_method(iqxmlrpc::Method*, const iqxmlrpc::Param_list&, iqxmlrpc::Value&);
 void std_exception_method(iqxmlrpc::Method*, const iqxmlrpc::Param_list&, iqxmlrpc::Value&);
 void unknown_exception_method(iqxmlrpc::Method*, const iqxmlrpc::Param_list&, iqxmlrpc::Value&);
+void sleep_method(iqxmlrpc::Method*, const iqxmlrpc::Param_list&, iqxmlrpc::Value&);
 
 class Get_file: public iqxmlrpc::Method {
 public:

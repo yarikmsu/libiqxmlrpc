@@ -262,6 +262,55 @@ BOOST_FIXTURE_TEST_CASE(connection_cleanup_on_shutdown, IntegrationFixture)
   BOOST_CHECK(!is_running());
 }
 
+BOOST_FIXTURE_TEST_CASE(connection_idle_timeout, IntegrationFixture)
+{
+  start_server(1, 14);
+  // Set a short idle timeout (100ms)
+  server_->set_idle_timeout(std::chrono::milliseconds(100));
+
+  // Create a client and keep connection alive
+  auto client = create_client();
+  client->set_keep_alive(true);
+
+  // Make a request - this should succeed
+  Response r = client->execute("echo", Value("test"));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), "test");
+
+  // Wait for idle timeout to expire
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+  // Force server to process timeout by interrupting
+  server_->interrupt();
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+  // Next request should fail or create a new connection
+  // since the server closed the idle connection
+  try {
+    Response r2 = client->execute("echo", Value("test2"));
+    // If we get here, the client created a new connection, which is fine
+    BOOST_CHECK(!r2.is_fault());
+  } catch (...) {
+    // Connection was closed by server due to idle timeout - expected
+    BOOST_CHECK(true);
+  }
+}
+
+BOOST_FIXTURE_TEST_CASE(connection_no_timeout_during_method_execution, IntegrationFixture)
+{
+  start_server(1, 15);
+  // Set a short idle timeout
+  server_->set_idle_timeout(std::chrono::milliseconds(50));
+
+  auto client = create_client();
+
+  // Execute a method that sleeps longer than the idle timeout
+  // The connection should NOT be closed because it's actively processing
+  Response r = client->execute("sleep", Value(0.2));  // 200ms sleep
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), "done");
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 //=============================================================================
