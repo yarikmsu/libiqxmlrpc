@@ -32,6 +32,7 @@ public:
   void handle_input( bool& ) override;
   void handle_output( bool& ) override;
 
+  void terminate_idle() override;
 
   bool catch_in_reactor() const override { return true; }
   void log_exception( const std::exception& ) override;
@@ -69,12 +70,15 @@ Http_server_connection::Http_server_connection( const iqnet::Socket& s ):
 void Http_server_connection::post_accept()
 {
   sock.set_non_blocking(true);
+  server->register_connection(this);
+  start_idle();
   reactor->register_handler( this, Reactor_base::INPUT );
 }
 
 
 void Http_server_connection::finish()
 {
+  server->unregister_connection(this);
   delete this;
 }
 
@@ -94,6 +98,7 @@ void Http_server_connection::handle_input( bool& terminate )
     if( !packet )
       return;
 
+    stop_idle();
     reactor->unregister_handler( this, Reactor_base::INPUT );
     server->schedule_execute( packet, this );
   }
@@ -121,6 +126,7 @@ void Http_server_connection::handle_output( bool& terminate )
     if( keep_alive )
     {
       reactor->unregister_handler( this, Reactor_base::OUTPUT );
+      start_idle();
       reactor->register_handler( this, Reactor_base::INPUT );
     }
     else
@@ -137,6 +143,14 @@ void Http_server_connection::handle_output( bool& terminate )
 void Http_server_connection::do_schedule_response()
 {
   reactor->register_handler( this, iqnet::Reactor_base::OUTPUT );
+}
+
+
+void Http_server_connection::terminate_idle()
+{
+  stop_idle();
+  reactor->unregister_handler( this );
+  finish();
 }
 
 

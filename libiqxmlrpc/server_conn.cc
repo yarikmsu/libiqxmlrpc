@@ -17,7 +17,9 @@ Server_connection::Server_connection( const iqnet::Inet_addr& a ):
   response(),
   response_offset(0),
   keep_alive(false),
-  read_buf_(65536, '\0')
+  read_buf_(65536, '\0'),
+  is_waiting_input_(false),
+  idle_since_(std::nullopt)
 {
 }
 
@@ -60,6 +62,31 @@ void Server_connection::schedule_response( http::Packet* pkt )
   response = p->dump();
   response_offset = 0;  // Reset offset for new response
   do_schedule_response();
+}
+
+
+void Server_connection::start_idle()
+{
+  is_waiting_input_ = true;
+  idle_since_ = std::chrono::steady_clock::now();
+}
+
+
+void Server_connection::stop_idle()
+{
+  is_waiting_input_ = false;
+  idle_since_ = std::nullopt;
+}
+
+
+bool Server_connection::is_idle_timeout_expired(std::chrono::milliseconds timeout) const
+{
+  if (!is_waiting_input_ || !idle_since_) {
+    return false;
+  }
+
+  auto elapsed = std::chrono::steady_clock::now() - *idle_since_;
+  return elapsed > timeout;
 }
 
 // vim:ts=2:sw=2:et
