@@ -1,24 +1,21 @@
 # Debugging Guide
 
-## Running Tests
-
-### Single Test with Verbose Output
-```bash
-./tests/integration-test --run_test=network_error_tests/client_connection_timeout --log_level=all
-```
-
-### Run Specific Test Suite
-```bash
-./tests/integration-test --run_test=network_error_tests
-```
+Quick reference for debugging. For detailed guides, see related docs.
 
 ## Memory Debugging
 
-### AddressSanitizer (Local)
+### AddressSanitizer (ASan/UBSan)
 ```bash
-cmake .. -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer"
-make integration-test
-./tests/integration-test
+cmake .. -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+make check
+```
+
+### ThreadSanitizer (TSan)
+```bash
+cmake .. -DCMAKE_CXX_COMPILER=clang++ \
+  -DCMAKE_CXX_FLAGS="-fsanitize=thread -fno-omit-frame-pointer -g" \
+  -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
+make check
 ```
 
 ### Valgrind
@@ -26,45 +23,24 @@ make integration-test
 valgrind --leak-check=full ./tests/integration-test
 ```
 
-## Coverage Debugging
+## Performance Profiling
 
-### Find Uncovered Lines
-```bash
-gcov -b libiqxmlrpc/CMakeFiles/iqxmlrpc.dir/connector.cc.gcno
-grep -n "#####" connector.cc.gcov
-```
+See `@docs/PERFORMANCE_GUIDE.md` for benchmark workflows.
 
-## Performance Debugging
-
-### Compare Before/After Changes
-```bash
-make perf-test
-cp tests/performance_baseline.txt tests/baseline_before.txt
-# ... make changes ...
-make perf-test
-diff tests/baseline_before.txt tests/performance_baseline.txt
-```
-
-### Profile with perf (Linux)
+### Linux perf
 ```bash
 perf record ./tests/test_performance
 perf report
 ```
 
+## Coverage & Testing
+
+See `@docs/COVERAGE_GUIDE.md` for coverage commands and test patterns.
+
 ## Common Issues
 
-### Test Port Conflicts
-Use unique port offsets for each test to avoid conflicts:
-```cpp
-start_server(1, 120);  // Uses port TEST_PORT + 120
-```
-
-### SSL Handshake Timeouts
-- Ensure certificates are valid
-- Check that SSL context is properly initialized
-- Verify server is listening before client connects
-
-### Memory Leaks in Tests
-- Always call `stop_server()` in test cleanup
-- Don't use 0-second timeouts that disconnect before server cleanup
-- Let connections complete gracefully
+See `@.claude/rules/common-pitfalls.md` for:
+- Test port conflicts
+- SSL handshake issues
+- Memory leaks in tests
+- Thread safety pitfalls
