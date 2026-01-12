@@ -24,7 +24,7 @@ make perf-test                                     # Run benchmarks
 
 ## CI Checks
 
-PRs must pass: ubuntu-24.04, ubi8, macos builds | ASan/UBSan | coverage | cppcheck | CodeQL
+PRs must pass: ubuntu-24.04, ubi8, macos builds | ASan/UBSan | TSan | coverage | cppcheck | CodeQL
 
 ## Architecture
 
@@ -45,6 +45,7 @@ PRs must pass: ubuntu-24.04, ubi8, macos builds | ASan/UBSan | coverage | cppche
 
 | Topic | File |
 |-------|------|
+| C++ style & patterns | `docs/CPP_STYLE.md` |
 | Coding standards | `docs/CODING_STANDARDS.md` |
 | Testing & coverage | `docs/COVERAGE_GUIDE.md` |
 | Performance rules | `docs/PERFORMANCE_GUIDE.md` |
