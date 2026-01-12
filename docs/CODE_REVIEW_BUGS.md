@@ -2,16 +2,19 @@
 
 **Date:** 2026-01-12
 **Reviewer:** Automated Code Analysis
+**Last Updated:** 2026-01-12 (deep review corrections)
 
 ## Executive Summary
 
-Comprehensive code review identified **14 potential bugs** across memory safety, concurrency, and logic error categories.
+Comprehensive code review identified potential bugs across memory safety, concurrency, and logic error categories.
 
 | Severity | Count | Categories |
 |----------|-------|------------|
-| **HIGH** | 2 | Undefined behavior, Race condition |
-| **MEDIUM** | 8 | Memory safety, Integer overflow, TOCTOU |
-| **LOW** | 4 | Defensive coding, Edge cases |
+| **HIGH** | 1 | Undefined behavior (confirmed) |
+| **MEDIUM** | 5 | Memory safety, TOCTOU, Design issues |
+| **LOW/CODE QUALITY** | 8 | Defensive coding, Clarity improvements |
+
+**Note:** After deep review, several initial findings were reclassified. Items marked with ⚠️ were downgraded after analysis showed they are design issues or false positives rather than functional bugs.
 
 ---
 
@@ -46,44 +49,40 @@ c |= static_cast<unsigned char>(d[i+2]) & 0x0000ff;
 
 ---
 
-### 2. Race Condition: Non-Atomic Firewall Pointer Access
+### ⚠️ 2. Design Issue: Firewall Pointer Not Propagated After Server Start (Downgraded)
 
-**File:** `libiqxmlrpc/acceptor.cc:34-37, 53-59`
-**Status:** OPEN
+**File:** `libiqxmlrpc/acceptor.cc:34-37`, `libiqxmlrpc/server.cc:285-295`
+**Status:** OPEN (Design Issue, not Race Condition)
+**Original Severity:** HIGH → **Revised: MEDIUM (Design Flaw)**
 
 ```cpp
-// In set_firewall():
-void Acceptor::set_firewall( iqnet::Firewall_base* fw )
-{
-  delete firewall;  // Delete old pointer
-  firewall = fw;    // Assign new - NOT ATOMIC
-}
+// Server stores firewall atomically
+std::atomic<iqnet::Firewall_base*> firewall;  // server.cc:34
 
-// In accept():
-void Acceptor::accept()
-{
-  Socket new_sock( sock.accept() );
+// But only copies to Acceptor ONCE when work() creates acceptor
+impl->acceptor->set_firewall( impl->firewall );  // server.cc:295
 
-  if( firewall && !firewall->grant( new_sock.get_peer_addr() ) )  // Read 1
-  {
-    std::string msg = firewall->message();  // Read 2 - TOCTOU!
+// Acceptor has NON-atomic copy
+Firewall_base* firewall;  // acceptor.h:28
 ```
 
-**Issue:** The `firewall` member is a raw pointer (`Firewall_base*`) with no synchronization:
+**Deep Analysis:** After reviewing the threading model:
 
-1. `set_firewall()` performs delete-then-assign without any locking
-2. `accept()` reads `firewall` twice without protection
-3. Concurrent calls can cause:
-   - Use-after-free (reading deleted firewall)
-   - Null pointer dereference (firewall set to nullptr between checks)
-   - Double-free (if set_firewall called twice concurrently)
+1. **NOT a race condition in practice** - Both `Acceptor::set_firewall()` and `Acceptor::accept()` are called from the reactor thread only
+2. **The real issue is design:** `Server::set_firewall()` updates `impl->firewall` (atomic), but this change is NEVER propagated to the already-created `Acceptor`
+3. If user calls `server.set_firewall(new_fw)` after `work()` has started, the Acceptor continues using the old firewall
 
-**Mitigating Factor:** The single-threaded reactor model *may* prevent concurrent access in practice, but the code is inherently unsafe and fragile to future changes.
+**Impact:** Firewall changes after server start are silently ignored. This is a confusing API design, not a memory safety bug.
 
-**Recommended Fix:** Either:
-1. Use `std::atomic<Firewall_base*>` with proper memory ordering, OR
-2. Use `std::shared_ptr<Firewall_base>` for safe concurrent access, OR
-3. Document and enforce single-threaded access requirement
+**Recommended Fix:**
+```cpp
+void Server::set_firewall( iqnet::Firewall_base* fw )
+{
+  impl->firewall = fw;
+  if (impl->acceptor)
+    impl->acceptor->set_firewall(fw);  // Propagate to existing acceptor
+}
+```
 
 ---
 
@@ -227,10 +226,11 @@ for(;;)
 
 ---
 
-### 7. Ambiguous Logic: HTTP Auth Substring Handling
+### ⚠️ 7. Code Clarity: HTTP Auth Substring Handling (Downgraded to LOW)
 
 **File:** `libiqxmlrpc/http.cc:461-463`
-**Status:** OPEN
+**Status:** OPEN (Code Quality, not Bug)
+**Original Severity:** MEDIUM → **Revised: LOW (Code Clarity)**
 
 ```cpp
 size_t colon_it = data.find_first_of(":");
@@ -239,12 +239,14 @@ pw = colon_it < std::string::npos ?
   data.substr(colon_it + 1, std::string::npos) : std::string();
 ```
 
-**Issue:**
-- When no colon found (`colon_it == npos`), `user` gets entire string via `substr(0, npos)`
-- The ternary condition `colon_it < npos` is always false when colon not found
-- Logic is confusing and may not match intended behavior
+**Deep Analysis:** The logic is actually **CORRECT** but confusing:
+- When colon found: `colon_it < npos` is TRUE → password extracted correctly
+- When no colon: `colon_it == npos`, so `colon_it < npos` is FALSE → `pw = ""` (empty)
+- `user = data.substr(0, npos)` returns entire string when colon not found (correct behavior)
 
-**Recommended Fix:**
+**Issue:** Not a bug, but the logic relies on subtle `npos` behavior that's hard to read.
+
+**Recommended Refactor:** (for clarity, not correctness)
 ```cpp
 size_t colon_pos = data.find(':');
 if (colon_pos == std::string::npos) {
@@ -258,26 +260,36 @@ if (colon_pos == std::string::npos) {
 
 ---
 
-### 8. Uninitialized Array: Base64 Decode Buffer
+### ⚠️ 8. Defensive Coding: Base64 Decode Buffer (Downgraded to LOW)
 
-**File:** `libiqxmlrpc/value_type.cc:473-506`
-**Status:** OPEN
+**File:** `libiqxmlrpc/value_type.cc:469-506`
+**Status:** OPEN (Code Quality, not Bug)
+**Original Severity:** MEDIUM → **Revised: LOW (Defensive Coding)**
 
 ```cpp
-unsigned char vals[4];  // Uninitialized!
-int val_idx = 0;
+unsigned char vals[4];  // Not zero-initialized
+size_t val_idx = 0;
 
 for (size_t i = 0; i < src_len && !done; ++i) {
   const signed char v = base64_decode[src[i]];
 
   if (v >= 0) {
-    vals[val_idx++] = static_cast<unsigned char>(v);
+    vals[val_idx++] = static_cast<unsigned char>(v);  // Always written before read
 
     if (val_idx == 4) {
-      // Use vals[0], vals[1], vals[2], vals[3]
+      // Read vals[0-3] - all were just written
 ```
 
-**Issue:** The `vals` array is declared but not initialized. While the code logic should ensure values are written before read, malformed Base64 input could potentially cause reads of uninitialized memory.
+**Deep Analysis:** The code is actually **SAFE**:
+- Values are always written (`vals[val_idx++] = ...`) before being read
+- When `val_idx == 4`, exactly 4 values have been written
+- On padding (`=`), `val_idx` must be 2 or 3, meaning those values were written
+- Invalid states throw `Malformed_base64()` before any uninitialized read
+
+**Issue:** Not a bug, but zero-initializing would be defensive and clearer:
+```cpp
+unsigned char vals[4] = {0, 0, 0, 0};  // Defensive initialization
+```
 
 ---
 
@@ -405,22 +417,36 @@ Executor::~Executor()
 
 ### Immediate Actions (HIGH Priority)
 
-1. **Fix Base64 signed char UB** - Add explicit `unsigned char` casts
-2. **Document/fix firewall threading** - Either add synchronization or document single-threaded requirement
+1. **Fix Base64 signed char UB** - Add explicit `unsigned char` casts to prevent undefined behavior on binary data with bytes >= 128
 
 ### Short-Term Actions (MEDIUM Priority)
 
+2. **Fix firewall propagation** - Update `Server::set_firewall()` to propagate changes to existing Acceptor
 3. Add exception safety to `push_interceptor()`
-4. Add bounds validation for `response_offset`
-5. Review all TOCTOU patterns in connection/timeout handling
-6. Initialize `vals[]` array in Base64 decode
-7. Clarify HTTP auth parsing logic
+4. Add bounds validation for `response_offset` (defensive)
+5. Review TOCTOU patterns in idle timeout handling
 
-### Long-Term Actions (LOW Priority)
+### Long-Term Actions (LOW/Code Quality)
 
+6. Refactor HTTP auth parsing for clarity (not a bug, just confusing)
+7. Zero-initialize Base64 decode buffer (defensive)
 8. Add defensive null checks throughout
 9. Replace raw pointer ownership with smart pointers
 10. Add assertions for invariant checking in debug builds
+
+---
+
+## Revision History
+
+| Date | Change |
+|------|--------|
+| 2026-01-12 | Initial report with 14 findings |
+| 2026-01-12 | Deep review: Downgraded 4 findings after verifying code correctness |
+
+**Key Corrections:**
+- Bug #2 (Firewall): Not a race condition - single-threaded reactor prevents concurrent access. Real issue is design flaw (changes not propagated)
+- Bug #7 (HTTP Auth): Logic is correct, just confusing. Downgraded to code quality.
+- Bug #8 (Base64 Decode): Array is safely initialized before use. Downgraded to defensive coding.
 
 ---
 
