@@ -41,6 +41,14 @@ public:
     Exception(std::string("Parser error. ") += d, -32700) {}
 };
 
+//! XML Parser depth exceeded error (DoS protection).
+class LIBIQXMLRPC_API Parse_depth_error: public Exception {
+public:
+  explicit Parse_depth_error( int depth, int max_depth ):
+    Exception("Parser error. Maximum XML depth exceeded (" +
+              std::to_string(depth) + " > " + std::to_string(max_depth) + ")", -32700) {}
+};
+
 //! XML Parser error.
 class LIBIQXMLRPC_API XmlBuild_error: public Exception {
 public:
