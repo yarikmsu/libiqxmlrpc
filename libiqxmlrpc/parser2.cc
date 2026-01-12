@@ -60,6 +60,10 @@ void
 BuilderBase::visit_element(const std::string& tag)
 {
   depth_++;
+  int xml_depth = parser_.xml_depth();
+  if (xml_depth > MAX_PARSE_DEPTH) {
+    throw Parse_depth_error(xml_depth, MAX_PARSE_DEPTH);
+  }
   do_visit_element(tag);
 }
 
@@ -271,6 +275,12 @@ std::string
 Parser::context() const
 {
   return impl_->get_context();
+}
+
+int
+Parser::xml_depth() const
+{
+  return impl_->depth();
 }
 
 //
