@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <iostream>
 #include <fstream>
+#include <thread>
+#include <chrono>
 #include <openssl/md5.h>
 #include <boost/test/test_tools.hpp>
 #include "libiqxmlrpc/server.h"
@@ -18,6 +20,7 @@ void register_user_methods(iqxmlrpc::Server& s)
   register_method(s, "std_exception_method", std_exception_method);
   register_method(s, "unknown_exception_method", unknown_exception_method);
   register_method(s, "trace", trace_method);
+  register_method(s, "sleep", sleep_method);
   register_method<Get_file>(s, "get_file");
 }
 
@@ -143,4 +146,25 @@ void Get_file::execute(
   
   retval.insert("md5", Binary_data::from_data(
     reinterpret_cast<strchar*>(md5), sizeof(md5)));
+}
+
+void sleep_method(
+  iqxmlrpc::Method*,
+  const iqxmlrpc::Param_list& args,
+  iqxmlrpc::Value& retval )
+{
+  BOOST_TEST_MESSAGE("Sleep method invoked.");
+
+  double sleep_seconds = 0.1;  // Default 100ms
+  if (!args.empty() && args[0].is_double()) {
+    sleep_seconds = args[0].get_double();
+  } else if (!args.empty() && args[0].is_int()) {
+    sleep_seconds = static_cast<double>(args[0].get_int());
+  }
+
+  auto duration = std::chrono::duration<double>(sleep_seconds);
+  std::this_thread::sleep_for(
+    std::chrono::duration_cast<std::chrono::milliseconds>(duration));
+
+  retval = "done";
 }
