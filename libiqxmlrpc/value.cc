@@ -145,6 +145,9 @@ Value::~Value()
 template <class T>
 T* Value::cast() const
 {
+  // Null check guards against use-after-move
+  if (!value)
+    throw Bad_cast();
   // Use type tag for O(1) type checking instead of slow dynamic_cast
   if (value->type_tag() != TypeTag<T>::value)
     throw Bad_cast();
