@@ -66,6 +66,11 @@ const Value& Response::value() const
   if( is_fault() )
     throw iqxmlrpc::Exception( fault_string_, fault_code_ );
 
+  // Defensive check: currently is_fault() implies !value_, but this
+  // guards against future refactoring or Response(nullptr) edge case
+  if( !value_ )
+    throw iqxmlrpc::Exception( "Response has no value" );
+
   return *value_;
 }
 
