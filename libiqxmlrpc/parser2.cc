@@ -199,8 +199,10 @@ public:
   {
     std::string rv = to_string(xmlTextReaderName(reader));
 
-    size_t pos = rv.find_first_of(":");
-    if (pos != std::string::npos)
+    // Strip namespace prefix (e.g., "ns:element" -> "element")
+    // Only strip if there's content after the colon (guards against "element:")
+    size_t pos = rv.find(':');
+    if (pos != std::string::npos && pos + 1 < rv.size())
     {
       rv.erase(0, pos+1);
     }

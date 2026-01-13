@@ -308,6 +308,63 @@ BOOST_AUTO_TEST_CASE(response_struct_value)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+BOOST_AUTO_TEST_SUITE(namespace_prefix_tests)
+
+BOOST_AUTO_TEST_CASE(parse_response_with_namespace_prefix)
+{
+    // Test that namespace prefixes are correctly stripped from tag names
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<ns:methodResponse xmlns:ns=\"http://example.com/ns/\">"
+        "<ns:params>"
+        "<ns:param><ns:value><ns:int>42</ns:int></ns:value></ns:param>"
+        "</ns:params>"
+        "</ns:methodResponse>";
+
+    Response resp = parse_response(xml);
+    BOOST_CHECK(!resp.is_fault());
+    BOOST_CHECK(resp.value().is_int());
+    BOOST_CHECK_EQUAL(resp.value().get_int(), 42);
+}
+
+BOOST_AUTO_TEST_CASE(parse_response_with_mixed_namespace)
+{
+    // Mix of prefixed and non-prefixed elements
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse xmlns:ns=\"http://example.com/ns/\">"
+        "<params>"
+        "<param><value><ns:string>hello</ns:string></value></param>"
+        "</params>"
+        "</methodResponse>";
+
+    Response resp = parse_response(xml);
+    BOOST_CHECK(!resp.is_fault());
+    BOOST_CHECK(resp.value().is_string());
+    BOOST_CHECK_EQUAL(resp.value().get_string(), "hello");
+}
+
+BOOST_AUTO_TEST_CASE(parse_request_with_namespace_prefix)
+{
+    // Test request parsing with namespace prefix
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<ns:methodCall xmlns:ns=\"http://example.com/ns/\">"
+        "<ns:methodName>test.method</ns:methodName>"
+        "<ns:params>"
+        "<ns:param><ns:value><ns:i4>99</ns:i4></ns:value></ns:param>"
+        "</ns:params>"
+        "</ns:methodCall>";
+
+    std::unique_ptr<Request> req(parse_request(xml));
+    BOOST_REQUIRE(req != nullptr);
+    BOOST_CHECK_EQUAL(req->get_name(), "test.method");
+    BOOST_CHECK_EQUAL(req->get_params().size(), 1u);
+    BOOST_CHECK_EQUAL(req->get_params()[0].get_int(), 99);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
 BOOST_AUTO_TEST_SUITE(value_type_tests)
 
 BOOST_AUTO_TEST_CASE(parse_double_value)
