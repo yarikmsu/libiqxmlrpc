@@ -32,6 +32,15 @@ public:
 
   Handler get_handler() const { return sock; }
 
+  //! Check if socket handler is valid (not closed/uninitialized).
+  bool is_valid() const {
+#ifdef _WINDOWS
+    return sock != INVALID_SOCKET;
+#else
+    return sock != -1;
+#endif
+  }
+
   void shutdown();
   void close();
 
