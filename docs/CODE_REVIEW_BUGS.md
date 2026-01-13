@@ -2,17 +2,28 @@
 
 **Date:** 2026-01-12
 **Reviewer:** Automated Code Analysis
-**Last Updated:** 2026-01-12 (deep review corrections)
+**Last Updated:** 2026-01-13 (all high/medium priority bugs fixed)
 
 ## Executive Summary
 
-Comprehensive code review identified potential bugs across memory safety, concurrency, and logic error categories.
+✅ **All HIGH and MEDIUM severity bugs have been fixed.**
 
-| Severity | Count | Categories |
-|----------|-------|------------|
-| **HIGH** | 1 | Undefined behavior (confirmed) |
-| **MEDIUM** | 5 | Memory safety, TOCTOU, Design issues |
-| **LOW/CODE QUALITY** | 8 | Defensive coding, Clarity improvements |
+| Severity | Found | Fixed | Status |
+|----------|-------|-------|--------|
+| **HIGH** | 1 | 1 | ✅ Complete |
+| **MEDIUM** | 5 | 5 | ✅ Complete |
+| **LOW/CODE QUALITY** | 8 | - | Deferred (code quality, not bugs) |
+
+### Fix Summary
+
+| Bug | Description | Fixed In |
+|-----|-------------|----------|
+| #1 | Base64 signed char UB | PR #81 |
+| #2 | Firewall propagation | PR #86 |
+| #3 | Interceptor exception safety | PR #83 |
+| #4 | Response offset underflow | PR #85 |
+| #5 | TOCTOU idle timeout | PR #89 |
+| #6 | Pool executor race | PR #89 |
 
 **Note:** After deep review, several initial findings were reclassified. Items marked with ⚠️ were downgraded after analysis showed they are design issues or false positives rather than functional bugs.
 
@@ -23,7 +34,7 @@ Comprehensive code review identified potential bugs across memory safety, concur
 ### 1. Undefined Behavior: Signed Char Left Shift in Base64 Encoding
 
 **File:** `libiqxmlrpc/value_type.cc:422-427`
-**Status:** OPEN
+**Status:** ✅ FIXED in PR #81
 
 ```cpp
 unsigned c = 0xff0000 & d[i] << 16;
@@ -52,7 +63,7 @@ c |= static_cast<unsigned char>(d[i+2]) & 0x0000ff;
 ### ⚠️ 2. Design Issue: Firewall Pointer Not Propagated After Server Start (Downgraded)
 
 **File:** `libiqxmlrpc/acceptor.cc:34-37`, `libiqxmlrpc/server.cc:285-295`
-**Status:** OPEN (Design Issue, not Race Condition)
+**Status:** ✅ FIXED in PR #86
 **Original Severity:** HIGH → **Revised: MEDIUM (Design Flaw)**
 
 ```cpp
@@ -91,7 +102,7 @@ void Server::set_firewall( iqnet::Firewall_base* fw )
 ### 3. Memory Leak: Interceptor Exception Safety
 
 **File:** `libiqxmlrpc/server.cc:116-118`
-**Status:** OPEN
+**Status:** ✅ FIXED in PR #83
 
 ```cpp
 void Server::push_interceptor(Interceptor* ic)
@@ -126,7 +137,7 @@ void Server::push_interceptor(Interceptor* ic)
 ### 4. Integer Underflow: Response Offset Calculation
 
 **File:** `libiqxmlrpc/http_server.cc:117`
-**Status:** OPEN
+**Status:** ✅ FIXED in PR #85
 
 ```cpp
 void Http_server_connection::handle_output( bool& terminate )
@@ -155,7 +166,7 @@ size_t remaining = response.length() - response_offset;
 ### 5. TOCTOU: Idle Timeout Check-Then-Act Pattern
 
 **File:** `libiqxmlrpc/server.cc:315-328`
-**Status:** OPEN
+**Status:** ✅ FIXED in PR #89
 
 ```cpp
 // Collect expired connections (under lock)
@@ -190,7 +201,7 @@ for (auto* conn : expired)
 ### 6. TOCTOU: Pool Executor Destructor Race Window
 
 **File:** `libiqxmlrpc/executor.cc:131-142, 94-115`
-**Status:** OPEN
+**Status:** ✅ FIXED in PR #89
 
 ```cpp
 // Destructor
@@ -417,16 +428,16 @@ Executor::~Executor()
 
 ### Immediate Actions (HIGH Priority)
 
-1. **Fix Base64 signed char UB** - Add explicit `unsigned char` casts to prevent undefined behavior on binary data with bytes >= 128
+1. ✅ **Fix Base64 signed char UB** - Fixed in PR #81
 
 ### Short-Term Actions (MEDIUM Priority)
 
-2. **Fix firewall propagation** - Update `Server::set_firewall()` to propagate changes to existing Acceptor
-3. Add exception safety to `push_interceptor()`
-4. Add bounds validation for `response_offset` (defensive)
-5. Review TOCTOU patterns in idle timeout handling
+2. ✅ **Fix firewall propagation** - Fixed in PR #86 (thread-safe with mutex protection)
+3. ✅ Add exception safety to `push_interceptor()` - Fixed in PR #83
+4. ✅ Add bounds validation for `response_offset` - Fixed in PR #85
+5. ✅ Fix TOCTOU patterns in idle timeout and pool executor - Fixed in PR #89
 
-### Long-Term Actions (LOW/Code Quality)
+### Long-Term Actions (LOW/Code Quality) - Deferred
 
 6. Refactor HTTP auth parsing for clarity (not a bug, just confusing)
 7. Zero-initialize Base64 decode buffer (defensive)
@@ -442,11 +453,19 @@ Executor::~Executor()
 |------|--------|
 | 2026-01-12 | Initial report with 14 findings |
 | 2026-01-12 | Deep review: Downgraded 4 findings after verifying code correctness |
+| 2026-01-13 | **All HIGH/MEDIUM bugs fixed** - PRs #81, #83, #85, #86, #89 merged |
 
 **Key Corrections:**
 - Bug #2 (Firewall): Not a race condition - single-threaded reactor prevents concurrent access. Real issue is design flaw (changes not propagated)
 - Bug #7 (HTTP Auth): Logic is correct, just confusing. Downgraded to code quality.
 - Bug #8 (Base64 Decode): Array is safely initialized before use. Downgraded to defensive coding.
+
+**Fixes Applied:**
+- PR #81: Cast to `unsigned char` before left-shift in Base64 encode
+- PR #83: Exception-safe interceptor chaining with try/catch restore
+- PR #85: Defensive bounds check for response_offset before subtraction
+- PR #86: Thread-safe firewall propagation with atomic pointer and acceptor mutex
+- PR #89: Atomic `try_claim_for_termination()` and pre-wait destruction check
 
 ---
 
