@@ -468,7 +468,7 @@ void Binary_data::decode()
   }
 
   // Collect 4 valid base64 characters at a time
-  unsigned char vals[4];
+  unsigned char vals[4] = {0, 0, 0, 0};  // Zero-init for defensive coding
   size_t val_idx = 0;
   bool done = false;
 
