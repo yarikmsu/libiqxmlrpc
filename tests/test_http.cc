@@ -478,6 +478,49 @@ BOOST_AUTO_TEST_CASE(packet_reader_lf_line_ending)
     BOOST_CHECK_EQUAL(pkt->content(), "test");
 }
 
+BOOST_AUTO_TEST_CASE(packet_reader_mixed_crlf_lf_separator)
+{
+    // Test mixed line ending: headers use CRLF, but separator is CRLF+LF (\r\n\n)
+    Packet_reader reader;
+    std::string raw = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 4\r\n\ntest";
+    std::unique_ptr<Packet> pkt(reader.read_request(raw));
+    BOOST_REQUIRE(pkt != nullptr);
+    BOOST_CHECK_EQUAL(pkt->content(), "test");
+}
+
+BOOST_AUTO_TEST_CASE(packet_reader_response_mixed_crlf_lf_separator)
+{
+    // Test response parsing with mixed line ending (\r\n\n)
+    Packet_reader reader;
+    std::string raw = "HTTP/1.1 200 OK\r\ncontent-length: 4\r\n\ntest";
+    std::unique_ptr<Packet> pkt(reader.read_response(raw, false));
+    BOOST_REQUIRE(pkt != nullptr);
+    BOOST_CHECK_EQUAL(pkt->content(), "test");
+}
+
+BOOST_AUTO_TEST_CASE(packet_reader_no_separator_incomplete)
+{
+    // Test that single \r or \n is not treated as separator
+    Packet_reader reader;
+
+    // Only single \r - should not find separator (returns null, incomplete)
+    std::string raw1 = "POST /RPC2 HTTP/1.1\rhost: localhost\rcontent-length: 4\rtest";
+    std::unique_ptr<Packet> pkt1(reader.read_request(raw1));
+    BOOST_CHECK(pkt1 == nullptr);  // No valid separator found
+}
+
+BOOST_AUTO_TEST_CASE(packet_reader_first_separator_wins)
+{
+    // Test that the first valid separator is used when multiple patterns exist
+    // Content contains what looks like another separator, but first one should win
+    Packet_reader reader;
+    std::string raw = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 8\r\n\r\naa\r\n\r\nbb";
+    std::unique_ptr<Packet> pkt(reader.read_request(raw));
+    BOOST_REQUIRE(pkt != nullptr);
+    // Content should be "aa\r\n\r\nbb" (8 bytes) - the embedded separator is part of content
+    BOOST_CHECK_EQUAL(pkt->content(), "aa\r\n\r\nbb");
+}
+
 BOOST_AUTO_TEST_CASE(packet_reader_multiple_reads_resets)
 {
     Packet_reader reader;
