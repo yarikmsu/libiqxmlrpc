@@ -8,6 +8,8 @@
 #include "reactor.h"
 #include "socket.h"
 
+#include <atomic>
+
 namespace iqnet {
 
 class Accepted_conn_factory;
@@ -25,7 +27,7 @@ class LIBIQXMLRPC_API Acceptor: public Event_handler {
   Socket sock;
   Accepted_conn_factory *factory;
   Reactor_base *reactor;
-  Firewall_base* firewall;
+  std::atomic<Firewall_base*> firewall;
 
 public:
   Acceptor( const iqnet::Inet_addr& bind_addr, Accepted_conn_factory*, Reactor_base* );

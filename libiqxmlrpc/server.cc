@@ -50,6 +50,10 @@ public:
   std::set<Server_connection*> connections;
   mutable std::mutex connections_mutex;
 
+  // Mutex for acceptor - protects against race between set_firewall()
+  // from main thread and work() from worker thread
+  mutable std::mutex acceptor_mutex;
+
   Impl(
     const iqnet::Inet_addr& addr,
     iqnet::Accepted_conn_factory* cf,
@@ -70,7 +74,8 @@ public:
       auth_plugin(nullptr),
       idle_timeout_ms(0),
       connections(),
-      connections_mutex()
+      connections_mutex(),
+      acceptor_mutex()
   {
   }
 
@@ -293,15 +298,24 @@ void Server::schedule_response(
 
 void Server::set_firewall( iqnet::Firewall_base* _firewall )
 {
-   impl->firewall = _firewall;
+  impl->firewall = _firewall;
+  // Propagate to existing acceptor if server is already running
+  // Lock to prevent race with work() creating/destroying acceptor
+  std::lock_guard<std::mutex> lock(impl->acceptor_mutex);
+  if (impl->acceptor)
+    impl->acceptor->set_firewall(_firewall);
 }
 
 void Server::work()
 {
-  if( !impl->acceptor.get() )
+  // Lock to prevent race with set_firewall() accessing acceptor
   {
-    impl->acceptor.reset(new iqnet::Acceptor( impl->bind_addr, get_conn_factory(), get_reactor()));
-    impl->acceptor->set_firewall( impl->firewall );
+    std::lock_guard<std::mutex> lock(impl->acceptor_mutex);
+    if( !impl->acceptor.get() )
+    {
+      impl->acceptor.reset(new iqnet::Acceptor( impl->bind_addr, get_conn_factory(), get_reactor()));
+      impl->acceptor->set_firewall( impl->firewall );
+    }
   }
 
   // Use shorter poll timeout when idle timeout is enabled
@@ -342,7 +356,11 @@ void Server::work()
     }
   }
 
-  impl->acceptor.reset(0);
+  // Lock to prevent race with set_firewall() accessing acceptor
+  {
+    std::lock_guard<std::mutex> lock(impl->acceptor_mutex);
+    impl->acceptor.reset(0);
+  }
   impl->exit_flag = false;
 }
 
