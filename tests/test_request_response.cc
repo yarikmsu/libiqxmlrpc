@@ -168,6 +168,17 @@ BOOST_AUTO_TEST_CASE(response_fault_value_throws)
     BOOST_CHECK_THROW(resp.value(), Exception);
 }
 
+BOOST_AUTO_TEST_CASE(response_nullptr_construction_is_fault)
+{
+    // Response with nullptr is treated as fault (is_fault() returns true)
+    Response resp(nullptr);
+
+    BOOST_CHECK(resp.is_fault());
+    BOOST_CHECK_EQUAL(resp.fault_code(), 0);
+    // Attempting to get value should throw
+    BOOST_CHECK_THROW(resp.value(), Exception);
+}
+
 BOOST_AUTO_TEST_CASE(response_dump_value)
 {
     Response resp(new Value("result string"));
