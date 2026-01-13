@@ -43,11 +43,13 @@ Default_method_dispatcher::~Default_method_dispatcher()
 void Default_method_dispatcher::register_method
   ( const std::string& name, Method_factory_base* fb )
 {
-  Factory_map::iterator it = fs.find(name);
-  if (it != fs.end()) {
-    delete it->second;
+  // Use insert() to avoid double O(log n) lookup
+  auto result = fs.insert({name, fb});
+  if (!result.second) {
+    // Key already existed: delete old factory, update via iterator
+    delete result.first->second;
+    result.first->second = fb;
   }
-  fs[name] = fb;
 }
 
 Method* Default_method_dispatcher::do_create_method(const std::string& name)
