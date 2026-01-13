@@ -1529,6 +1529,48 @@ BOOST_AUTO_TEST_CASE(value_move_self_assignment)
     BOOST_CHECK(true);
 }
 
+BOOST_AUTO_TEST_CASE(value_use_after_move_throws_bad_cast)
+{
+    Value a(42);
+    Value b(std::move(a));
+
+    // Accessing moved-from value should throw Bad_cast
+    BOOST_CHECK_THROW(a.get_int(), Value::Bad_cast);
+    BOOST_CHECK_THROW(a.get_string(), Value::Bad_cast);
+    BOOST_CHECK_THROW(a.get_double(), Value::Bad_cast);
+    BOOST_CHECK_THROW(a.get_bool(), Value::Bad_cast);
+    BOOST_CHECK_THROW(a.get_int64(), Value::Bad_cast);
+}
+
+BOOST_AUTO_TEST_CASE(value_use_after_move_assignment_throws)
+{
+    Value a(std::string("test"));
+    Value b(0);
+
+    b = std::move(a);
+
+    // Accessing moved-from value should throw Bad_cast
+    BOOST_CHECK_THROW(a.get_string(), Value::Bad_cast);
+}
+
+BOOST_AUTO_TEST_CASE(value_is_type_methods_return_false_after_move)
+{
+    Value a(42);
+    Value b(std::move(a));
+
+    // is_* methods should return false for moved-from value (not throw)
+    BOOST_CHECK(!a.is_int());
+    BOOST_CHECK(!a.is_string());
+    BOOST_CHECK(!a.is_double());
+    BOOST_CHECK(!a.is_bool());
+    BOOST_CHECK(!a.is_int64());
+    BOOST_CHECK(!a.is_binary());
+    BOOST_CHECK(!a.is_datetime());
+    BOOST_CHECK(!a.is_array());
+    BOOST_CHECK(!a.is_struct());
+    BOOST_CHECK(!a.is_nil());
+}
+
 BOOST_AUTO_TEST_CASE(array_push_back_rvalue)
 {
     Array arr;
