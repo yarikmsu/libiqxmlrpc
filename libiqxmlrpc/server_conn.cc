@@ -93,4 +93,18 @@ bool Server_connection::is_idle_timeout_expired(std::chrono::milliseconds timeou
   return elapsed > timeout;
 }
 
+
+bool Server_connection::try_claim_for_termination()
+{
+  std::lock_guard<std::mutex> lock(idle_mutex_);
+  if (!is_waiting_input_) {
+    // Connection is no longer idle (received data since check)
+    return false;
+  }
+  // Atomically mark as non-idle and claim for termination
+  is_waiting_input_ = false;
+  idle_since_ = std::nullopt;
+  return true;
+}
+
 // vim:ts=2:sw=2:et

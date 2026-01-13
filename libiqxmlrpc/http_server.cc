@@ -159,7 +159,11 @@ void Http_server_connection::do_schedule_response()
 
 void Http_server_connection::terminate_idle()
 {
-  stop_idle();
+  // Atomically check if still idle to prevent TOCTOU race:
+  // Connection may have received data between timeout check and termination
+  if (!try_claim_for_termination()) {
+    return;  // Connection is no longer idle, don't terminate
+  }
   reactor->unregister_handler( this );
   finish();
 }

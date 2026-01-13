@@ -95,6 +95,11 @@ void Pool_executor_factory::Pool_thread::operator ()()
   {
     scoped_lock lk(pool_ptr->req_queue_lock);
 
+    // Check BEFORE waiting to prevent race where notification arrives
+    // while thread is processing a request (after unlock, before wait)
+    if (pool_ptr->is_being_destructed())
+      return;
+
     if (pool_ptr->req_queue.empty())
     {
       pool_ptr->req_queue_cond.wait(lk);

@@ -68,6 +68,11 @@ public:
   //! Returns true only if connection is idle AND timeout has exceeded.
   bool is_idle_timeout_expired(std::chrono::milliseconds timeout) const;
 
+  //! Atomically check if still idle and mark as non-idle.
+  //! Returns true if was idle (and should be terminated), false if no longer idle.
+  //! This prevents TOCTOU race between checking idle state and terminating.
+  bool try_claim_for_termination();
+
   //! Terminate this connection due to idle timeout.
   //! Called by the server when idle timeout expires.
   virtual void terminate_idle() = 0;
