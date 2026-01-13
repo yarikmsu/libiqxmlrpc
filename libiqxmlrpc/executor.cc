@@ -22,10 +22,7 @@ Executor::Executor( Method* m, Server* s, Server_connection* cb ):
 }
 
 
-Executor::~Executor()
-{
-  delete method;
-}
+Executor::~Executor() = default;
 
 
 void Executor::schedule_response( const Response& resp )
@@ -142,7 +139,7 @@ Pool_executor_factory::~Pool_executor_factory()
     }
   }
 
-  util::delete_ptrs(pool.begin(), pool.end());
+  // pool is now unique_ptr - automatic cleanup
   scoped_lock lk(req_queue_lock);
   util::delete_ptrs(req_queue.begin(), req_queue.end());
 }
@@ -165,9 +162,10 @@ void Pool_executor_factory::add_threads( unsigned num )
 {
   for( unsigned i = 0; i < num; ++i )
   {
-    Pool_thread* t = new Pool_thread(i, this);
-    pool.push_back(t);
-    threads.emplace_back([t]() { (*t)(); });
+    auto t = std::make_unique<Pool_thread>(i, this);
+    Pool_thread* raw_ptr = t.get();
+    pool.push_back(std::move(t));
+    threads.emplace_back([raw_ptr]() { (*raw_ptr)(); });
   }
 }
 
