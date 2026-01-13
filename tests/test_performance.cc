@@ -20,6 +20,7 @@
 #include <openssl/rand.h>
 
 #include "libiqxmlrpc/num_conv.h"
+#include "libiqxmlrpc/reactor.h"
 
 using namespace iqxmlrpc;
 
@@ -1053,6 +1054,68 @@ void benchmark_exception_vs_return_code() {
 }
 
 // ============================================================================
+// L. Reactor Handler List Copy-on-Write Benchmark
+// ============================================================================
+
+void benchmark_reactor_handler_list() {
+  perf::section("Reactor Handler List Copy-on-Write");
+
+  const size_t ITERS = 100000;
+
+  // --- Benchmark with 100 handlers (moderate connection count) ---
+  {
+    // Old approach: Full std::list copy
+    iqnet::Reactor_base::HandlerStateList handlers_copy;
+    for (size_t i = 0; i < 100; ++i) {
+      handlers_copy.push_back(iqnet::Reactor_base::HandlerState(static_cast<iqnet::Socket::Handler>(i)));
+    }
+
+    PERF_BENCHMARK("perf_handler_list_copy_100", ITERS, {
+      iqnet::Reactor_base::HandlerStateList tmp(handlers_copy);
+      perf::do_not_optimize(tmp);
+    });
+  }
+
+  {
+    // New approach: shared_ptr snapshot (COW)
+    auto handlers_cow = std::make_shared<iqnet::Reactor_base::HandlerStateList>();
+    for (size_t i = 0; i < 100; ++i) {
+      handlers_cow->push_back(iqnet::Reactor_base::HandlerState(static_cast<iqnet::Socket::Handler>(i)));
+    }
+
+    PERF_BENCHMARK("perf_handler_list_cow_100", ITERS, {
+      auto snapshot = handlers_cow;  // Just refcount increment
+      perf::do_not_optimize(snapshot);
+    });
+  }
+
+  // --- Benchmark with 1000 handlers (high connection count) ---
+  {
+    iqnet::Reactor_base::HandlerStateList handlers_copy;
+    for (size_t i = 0; i < 1000; ++i) {
+      handlers_copy.push_back(iqnet::Reactor_base::HandlerState(static_cast<iqnet::Socket::Handler>(i)));
+    }
+
+    PERF_BENCHMARK("perf_handler_list_copy_1000", ITERS / 10, {
+      iqnet::Reactor_base::HandlerStateList tmp(handlers_copy);
+      perf::do_not_optimize(tmp);
+    });
+  }
+
+  {
+    auto handlers_cow = std::make_shared<iqnet::Reactor_base::HandlerStateList>();
+    for (size_t i = 0; i < 1000; ++i) {
+      handlers_cow->push_back(iqnet::Reactor_base::HandlerState(static_cast<iqnet::Socket::Handler>(i)));
+    }
+
+    PERF_BENCHMARK("perf_handler_list_cow_1000", ITERS / 10, {
+      auto snapshot = handlers_cow;
+      perf::do_not_optimize(snapshot);
+    });
+  }
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 
@@ -1083,6 +1146,7 @@ int main(int /*argc*/, char* /*argv*/[]) {
   benchmark_ssl_context();
   benchmark_cipher_throughput();
   benchmark_exception_vs_return_code();
+  benchmark_reactor_handler_list();
 
   // Save baseline
   std::strftime(time_buf, sizeof(time_buf), "%Y%m%d_%H%M%S", std::localtime(&now));
