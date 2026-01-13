@@ -309,10 +309,8 @@ bool Header::option_exists(const std::string& name) const
 
 void Header::set_option_default(const std::string& name, const std::string& value)
 {
-  if (option_exists(name))
-    return;
-
-  set_option(name, value);
+  // insert() is a no-op if key exists, avoiding double lookup
+  options_.insert({name, value});
 }
 
 std::string Header::dump() const
