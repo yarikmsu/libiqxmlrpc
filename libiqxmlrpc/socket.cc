@@ -53,7 +53,9 @@ Socket::Socket( Socket::Handler h, const Inet_addr& addr ):
 
 void Socket::shutdown()
 {
-  ::shutdown( sock, 2 );
+  if (is_valid()) {
+    ::shutdown(sock, 2);
+  }
 }
 
 void Socket::close()
