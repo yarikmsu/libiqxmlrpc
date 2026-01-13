@@ -15,7 +15,7 @@ Connection::Connection( const Socket& s ):
 
 Connection::~Connection()
 {
-  ::shutdown( sock.get_handler(), 2 );
+  sock.shutdown();  // Socket::shutdown() validates internally
   sock.close();
 }
 
