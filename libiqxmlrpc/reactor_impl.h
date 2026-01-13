@@ -75,7 +75,7 @@ private:
   ReactorImpl impl;
 
   EventHandlersMap handlers;
-  HandlerStateList handlers_states;
+  CowList<HandlerState> handlers_states;  // COW for zero-copy reads on hot path
 
   unsigned num_stoppers;
 };
@@ -120,11 +120,13 @@ void Reactor<Lock>::register_handler( Event_handler* eh, Event_mask mask )
 
   if( handlers.find(fd) == handlers.end() )
   {
+    handlers_states.copy_for_write();  // COW: copy if readers hold references
     handlers_states.push_back( HandlerState(fd, mask) );
     handlers[fd] = eh;
   }
   else
   {
+    handlers_states.copy_for_write();  // COW: copy if readers hold references
     typename Reactor<Lock>::hs_iterator i = find_handler_state(eh);
     i->mask |= mask;
   }
@@ -134,6 +136,7 @@ template <class Lock>
 void Reactor<Lock>::unregister_handler( Event_handler* eh, Event_mask mask )
 {
   scoped_lock lk(lock);
+  handlers_states.copy_for_write();  // COW: copy if readers hold references
   hs_iterator i = find_handler_state( eh );
 
   if( i != end() )
@@ -159,6 +162,7 @@ void Reactor<Lock>::unregister_handler( Event_handler* eh )
 
   if( i != handlers.end() )
   {
+    handlers_states.copy_for_write();  // COW: copy if readers hold references
     handlers.erase(i);
     handlers_states.erase(find_handler_state(eh));
 
@@ -171,6 +175,7 @@ template <class Lock>
 void Reactor<Lock>::fake_event( Event_handler* eh, Event_mask mask )
 {
   scoped_lock lk(lock);
+  handlers_states.copy_for_write();  // COW: copy if readers hold references
   hs_iterator i = find_handler_state( eh );
 
   if( i != end() )
@@ -241,6 +246,7 @@ void Reactor<Lock>::handle_user_events()
   HandlerStateList called_by_user;
   scoped_lock lk(lock);
 
+  handlers_states.copy_for_write();  // COW: copy if readers hold references
   for( hs_iterator i = begin(); i != end(); ++i )
   {
     if( i->revents && (i->mask | i->revents) )
@@ -263,15 +269,18 @@ void Reactor<Lock>::handle_user_events()
 template <class Lock>
 bool Reactor<Lock>::handle_system_events(Reactor_base::Timeout ms)
 {
-  scoped_lock lk(lock);
-  HandlerStateList tmp(handlers_states);
-  lk.unlock();
+  // COW optimization: get immutable snapshot instead of O(N) copy
+  CowList<HandlerState>::Snapshot snapshot;
+  {
+    scoped_lock lk(lock);
+    snapshot = handlers_states.snapshot();  // Just refcount++, no copy!
+  }
 
   // if all events were of "user" type
-  if (tmp.empty())
+  if (snapshot->empty())
     return true;
 
-  impl.reset(tmp);
+  impl.reset(*snapshot);
   HandlerStateList ret;
   bool succ = impl.poll(ret, ms);
 
