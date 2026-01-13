@@ -9,6 +9,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <memory>
 #include <mutex>
 #include <thread>
 #include <deque>
@@ -47,7 +48,7 @@ public:
   Executor& operator=(const Executor&) = delete;
 
 protected:
-  Method* method;
+  std::unique_ptr<Method> method;
   Interceptor* interceptors;
 
 private:
@@ -128,7 +129,7 @@ class LIBIQXMLRPC_API Pool_executor_factory: public Executor_factory_base {
   friend class Pool_thread;
 
   std::vector<std::thread>  threads;
-  std::vector<Pool_thread*> pool;
+  std::vector<std::unique_ptr<Pool_thread>> pool;
 
   // Objects Pool_thread works with
   std::deque<Pool_executor*> req_queue;
