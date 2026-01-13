@@ -125,9 +125,6 @@ private:
 template <class Method_class>
 inline void register_method(Server& server, const std::string& name)
 {
-//  typedef typename Method_class::Help Help;
-//  Introspector::register_help_obj( meth_name, new Help );
-
   server.register_method(name, new Method_factory<Method_class>);
 }
 
