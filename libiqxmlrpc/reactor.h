@@ -9,6 +9,7 @@
 #include "socket.h"
 
 #include <list>
+#include <memory>
 
 namespace iqnet
 {
@@ -70,6 +71,46 @@ public:
 
   typedef std::list<HandlerState> HandlerStateList;
   typedef int Timeout;
+
+  //! Copy-on-write wrapper for handler list to avoid O(N) copies on hot path.
+  //! Readers get immutable snapshots (shared_ptr<const>), writers copy if needed.
+  //! Thread safety: All methods except snapshot() must be called with the external
+  //! lock held. snapshot() may be called under lock to safely share data with
+  //! readers who will access it without the lock.
+  template<typename T>
+  class CowList {
+  public:
+    using List = std::list<T>;
+    using Snapshot = std::shared_ptr<const List>;
+
+    CowList() : data_(std::make_shared<List>()) {}
+
+    //! Get immutable snapshot - just refcount increment, no copy
+    Snapshot snapshot() const { return data_; }
+
+    //! Copy before write if readers hold references (caller must hold lock)
+    void copy_for_write() {
+      if (data_.use_count() != 1) {
+        data_ = std::make_shared<List>(*data_);
+      }
+    }
+
+    // Iterator access (for compatibility with existing code)
+    auto begin() { return data_->begin(); }
+    auto end() { return data_->end(); }
+    auto begin() const { return data_->begin(); }
+    auto end() const { return data_->end(); }
+
+    // Container methods
+    size_t size() const { return data_->size(); }
+
+    // Modification methods (caller must call copy_for_write() first)
+    void push_back(const T& val) { data_->push_back(val); }
+    void erase(typename List::iterator it) { data_->erase(it); }
+
+  private:
+    std::shared_ptr<List> data_;
+  };
 
   virtual ~Reactor_base() {};
 
