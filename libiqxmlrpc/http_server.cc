@@ -113,6 +113,17 @@ void Http_server_connection::handle_input( bool& terminate )
 
 void Http_server_connection::handle_output( bool& terminate )
 {
+  // Defensive check: prevent unsigned underflow if offset exceeds length
+  // This should never happen in normal operation, but protects against
+  // corruption or logic errors that could cause buffer over-read in send()
+  if (response_offset > response.length()) {
+    server->log_err_msg("Response offset corruption detected, resetting connection");
+    response.clear();
+    response_offset = 0;
+    terminate = true;
+    return;
+  }
+
   // Use offset tracking instead of O(n) string erase for partial sends
   size_t remaining = response.length() - response_offset;
   size_t sz = send( response.c_str() + response_offset, remaining );
