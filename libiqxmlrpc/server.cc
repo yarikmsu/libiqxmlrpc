@@ -115,8 +115,17 @@ iqnet::Reactor_base* Server::get_reactor()
 
 void Server::push_interceptor(Interceptor* ic)
 {
-  ic->nest(impl->interceptors.release());
-  impl->interceptors.reset(ic);
+  // Exception-safe interceptor chaining:
+  // Release old interceptor first, then try to nest it in the new one.
+  // If nest() throws, restore the old interceptor to prevent memory leak.
+  Interceptor* old = impl->interceptors.release();
+  try {
+    ic->nest(old);
+    impl->interceptors.reset(ic);
+  } catch (...) {
+    impl->interceptors.reset(old);  // Restore on failure
+    throw;
+  }
 }
 
 void Server::push_dispatcher(Method_dispatcher_base* disp)
