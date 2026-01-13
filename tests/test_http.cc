@@ -478,6 +478,16 @@ BOOST_AUTO_TEST_CASE(packet_reader_lf_line_ending)
     BOOST_CHECK_EQUAL(pkt->content(), "test");
 }
 
+BOOST_AUTO_TEST_CASE(packet_reader_mixed_crlf_lf_separator)
+{
+    // Test mixed line ending: headers use CRLF, but separator is CRLF+LF (\r\n\n)
+    Packet_reader reader;
+    std::string raw = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 4\r\n\ntest";
+    std::unique_ptr<Packet> pkt(reader.read_request(raw));
+    BOOST_REQUIRE(pkt != nullptr);
+    BOOST_CHECK_EQUAL(pkt->content(), "test");
+}
+
 BOOST_AUTO_TEST_CASE(packet_reader_multiple_reads_resets)
 {
     Packet_reader reader;

@@ -591,10 +591,18 @@ bool Packet_reader::read_header( const std::string& s )
 {
   header_cache += s;
 
-  // Find header/body separator
+  // Find header/body separator (RFC 7230: CRLF CRLF)
+  // Also handle common non-compliant variations for robustness
   size_t sep_pos = header_cache.find("\r\n\r\n");
   size_t sep_len = 4;
 
+  // Check for mixed line endings: CRLF followed by LF (3 chars)
+  if (sep_pos == std::string::npos) {
+    sep_pos = header_cache.find("\r\n\n");
+    sep_len = 3;
+  }
+
+  // Check for Unix-style: LF LF (2 chars)
   if (sep_pos == std::string::npos) {
     sep_pos = header_cache.find("\n\n");
     sep_len = 2;
