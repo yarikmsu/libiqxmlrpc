@@ -22,10 +22,7 @@ Executor::Executor( Method* m, Server* s, Server_connection* cb ):
 }
 
 
-Executor::~Executor()
-{
-  delete method;
-}
+Executor::~Executor() = default;
 
 
 void Executor::schedule_response( const Response& resp )
@@ -44,7 +41,7 @@ void Serial_executor::execute( const Param_list& params )
 {
   try {
     std::unique_ptr<Value> result(new Value(0));
-    method->process_execution( interceptors, params, *result.get() );
+    method->process_execution( interceptors, params, *result );
     schedule_response( Response(result.release()) );
   }
   catch( const Fault& f )
@@ -73,7 +70,7 @@ class Pool_executor_factory::Pool_thread {
   Pool_executor_factory* pool;
 
 public:
-  Pool_thread( unsigned, Pool_executor_factory* pool_ ):
+  explicit Pool_thread( Pool_executor_factory* pool_ ):
     pool(pool_)
   {
   }
@@ -86,33 +83,28 @@ public:
 
 void Pool_executor_factory::Pool_thread::operator ()()
 {
-  Pool_executor_factory::Pool_thread* obj =
-    static_cast<Pool_executor_factory::Pool_thread*>(this);
-
-  Pool_executor_factory* pool_ptr = obj->pool;
-
   for(;;)
   {
-    scoped_lock lk(pool_ptr->req_queue_lock);
+    scoped_lock lk(pool->req_queue_lock);
 
     // Check BEFORE waiting to prevent race where notification arrives
     // while thread is processing a request (after unlock, before wait)
-    if (pool_ptr->is_being_destructed())
+    if (pool->is_being_destructed())
       return;
 
-    if (pool_ptr->req_queue.empty())
+    if (pool->req_queue.empty())
     {
-      pool_ptr->req_queue_cond.wait(lk);
+      pool->req_queue_cond.wait(lk);
 
-      if (pool_ptr->is_being_destructed())
+      if (pool->is_being_destructed())
         return;
 
-      if (pool_ptr->req_queue.empty())
+      if (pool->req_queue.empty())
         continue;
     }
 
-    Pool_executor* executor = pool_ptr->req_queue.front();
-    pool_ptr->req_queue.pop_front();
+    Pool_executor* executor = pool->req_queue.front();
+    pool->req_queue.pop_front();
     lk.unlock();
 
     executor->process_actual_execution();
@@ -142,7 +134,6 @@ Pool_executor_factory::~Pool_executor_factory()
     }
   }
 
-  util::delete_ptrs(pool.begin(), pool.end());
   scoped_lock lk(req_queue_lock);
   util::delete_ptrs(req_queue.begin(), req_queue.end());
 }
@@ -165,9 +156,10 @@ void Pool_executor_factory::add_threads( unsigned num )
 {
   for( unsigned i = 0; i < num; ++i )
   {
-    Pool_thread* t = new Pool_thread(i, this);
-    pool.push_back(t);
-    threads.emplace_back([t]() { (*t)(); });
+    auto t = std::make_unique<Pool_thread>(this);
+    Pool_thread* raw_ptr = t.get();
+    pool.push_back(std::move(t));
+    threads.emplace_back([raw_ptr]() { (*raw_ptr)(); });
   }
 }
 
@@ -223,7 +215,7 @@ void Pool_executor::process_actual_execution()
 {
   try {
     std::unique_ptr<Value> result(new Value(0));
-    method->process_execution( interceptors, params, *result.get() );
+    method->process_execution( interceptors, params, *result );
     schedule_response( Response(result.release()) );
   }
   catch( const Fault& f )
