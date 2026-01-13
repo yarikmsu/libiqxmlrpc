@@ -16,7 +16,7 @@ Acceptor::Acceptor( const iqnet::Inet_addr& bind_addr, Accepted_conn_factory* fa
   sock(),
   factory(factory_),
   reactor(reactor_),
-  firewall(0)
+  firewall(nullptr)
 {
   sock.bind( bind_addr );
   listen();
@@ -33,8 +33,9 @@ Acceptor::~Acceptor()
 
 void Acceptor::set_firewall( iqnet::Firewall_base* fw )
 {
-  delete firewall;
-  firewall = fw;
+  // Atomically swap to new firewall and delete the old one
+  Firewall_base* old = firewall.exchange(fw);
+  delete old;
 }
 
 
@@ -54,9 +55,11 @@ void Acceptor::accept()
 {
   Socket new_sock( sock.accept() );
 
-  if( firewall && !firewall->grant( new_sock.get_peer_addr() ) )
+  // Load firewall pointer atomically for thread-safe access
+  Firewall_base* fw = firewall.load();
+  if( fw && !fw->grant( new_sock.get_peer_addr() ) )
   {
-    std::string msg = firewall->message();
+    std::string msg = fw->message();
 
     if (!msg.empty())
     {
