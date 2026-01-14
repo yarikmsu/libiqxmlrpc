@@ -18,10 +18,14 @@ cmake_minimum_required(VERSION 3.10)
 #   ./fuzz_serialize -dict=../fuzz/xml.dict corpus/serialize/
 #   ./fuzz_num_conv corpus/num_conv/
 #   ./fuzz_xheaders corpus/xheaders/
+#   ./fuzz_inet_addr -dict=../fuzz/inet_addr.dict corpus/inet_addr/
+#   ./fuzz_dispatcher -dict=../fuzz/dispatcher.dict corpus/dispatcher/
 #
 # Dictionaries:
-#   xml.dict  - XML-RPC tokens for fuzz_request, fuzz_response, fuzz_value, fuzz_serialize
-#   http.dict - HTTP tokens for fuzz_http, fuzz_packet
+#   xml.dict        - XML-RPC tokens for fuzz_request, fuzz_response, fuzz_value, fuzz_serialize
+#   http.dict       - HTTP tokens for fuzz_http, fuzz_packet
+#   inet_addr.dict  - IP/hostname tokens for fuzz_inet_addr
+#   dispatcher.dict - Method dispatch tokens for fuzz_dispatcher
 #
 # Seed corpus:
 #   fuzz/corpus/ contains initial seed inputs for each fuzzer
@@ -68,6 +72,10 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/http.dict
                ${CMAKE_CURRENT_BINARY_DIR}/fuzz_http.dict COPYONLY)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/http.dict
                ${CMAKE_CURRENT_BINARY_DIR}/fuzz_packet.dict COPYONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/inet_addr.dict
+               ${CMAKE_CURRENT_BINARY_DIR}/fuzz_inet_addr.dict COPYONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/dispatcher.dict
+               ${CMAKE_CURRENT_BINARY_DIR}/fuzz_dispatcher.dict COPYONLY)
 
 # Copy seed corpus directories for local testing
 # OSS-Fuzz uses _seed_corpus.zip files created by build.sh
