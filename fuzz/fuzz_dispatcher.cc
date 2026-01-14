@@ -62,7 +62,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       iqxmlrpc::Method::Data method_data;
       method_data.method_name = req->get_name();
 
-      iqxmlrpc::Method* method = disp_manager.create_method(method_data);
+      std::unique_ptr<iqxmlrpc::Method> method(disp_manager.create_method(method_data));
       if (method) {
         // Execute the method with parsed parameters
         try {
@@ -73,7 +73,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         } catch (...) {
           // Method execution may throw
         }
-        delete method;
       }
 
       // Exercise get_methods_list (introspection)
@@ -101,10 +100,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       // Try to create the registered method
       iqxmlrpc::Method::Data method_data;
       method_data.method_name = method_name;
-      iqxmlrpc::Method* method = disp_manager.create_method(method_data);
+      std::unique_ptr<iqxmlrpc::Method> method(disp_manager.create_method(method_data));
       if (method) {
         (void)method->name();
-        delete method;
       }
 
       // Get methods list
@@ -136,7 +134,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         iqxmlrpc::Method::Data method_data;
         method_data.method_name = introspection_methods[idx];
 
-        iqxmlrpc::Method* method = disp_manager.create_method(method_data);
+        std::unique_ptr<iqxmlrpc::Method> method(disp_manager.create_method(method_data));
         if (method) {
           // Execute introspection method
           iqxmlrpc::Value response{iqxmlrpc::Nil{}};
@@ -147,7 +145,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
           } catch (...) {
             // Some introspection methods may require parameters
           }
-          delete method;
         }
       } catch (...) {
         // Expected
@@ -165,10 +162,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       iqxmlrpc::Method::Data method_data;
       method_data.method_name = input;  // Use raw fuzz input as method name
 
-      iqxmlrpc::Method* method = disp_manager.create_method(method_data);
-      if (method) {
-        delete method;
-      }
+      std::unique_ptr<iqxmlrpc::Method> method(disp_manager.create_method(method_data));
+      // unique_ptr automatically handles cleanup
       // Null result expected for unknown methods
     } catch (...) {
       // Expected
