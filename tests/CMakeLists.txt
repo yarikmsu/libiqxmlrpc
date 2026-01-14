@@ -1,4 +1,4 @@
-find_package(Boost 1.41.0 COMPONENTS unit_test_framework program_options)
+find_package(Boost 1.53.0 COMPONENTS unit_test_framework program_options)
 
 include_directories(${OPENSSL_INCLUDE_DIR} ${LIBXML2_INCLUDE_DIR} ${Boost_INCLUDE_DIR} ${PROJECT_SOURCE_DIR})
 
@@ -45,13 +45,24 @@ iqxmlrpc_test(method-dispatch-test test_method_dispatch.cc)
 iqxmlrpc_test(exceptions-test test_exceptions.cc)
 iqxmlrpc_test(socket-test test_socket.cc)
 iqxmlrpc_test(safe-math-test test_safe_math.cc)
+iqxmlrpc_test(perf-utils-test test_perf_utils.cc)
+
+# Thread safety tests
+# NOTE: These tests stress-test Boost.Lockfree which produces TSan false positives.
+# The tests validate correctness via data integrity checks, not TSan cleanliness.
+# Use label "lockfree_stress" to exclude from TSan CI runs via: ctest -LE lockfree_stress
+iqxmlrpc_test(thread-safety-test test_thread_safety.cc methods.cc)
+set_tests_properties(thread-safety-test PROPERTIES
+    TIMEOUT 180
+    LABELS "lockfree_stress")
 
 # Integration test (in-process server/client testing)
 iqxmlrpc_test(integration-test test_integration.cc methods.cc)
 set_tests_properties(integration-test PROPERTIES TIMEOUT 120)
 
-# Run tests automatically after build
-add_custom_target(check ALL
+# Run tests with: make check (or cmake --build . --target check)
+# Note: Not ALL - tests run explicitly via CI Test step or make check
+add_custom_target(check
 	COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
 	DEPENDS ${UNIT_TEST_TARGETS}
 	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}

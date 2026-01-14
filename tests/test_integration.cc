@@ -18,6 +18,7 @@
 #include "libiqxmlrpc/ssl_lib.h"
 
 #include "methods.h"
+#include "test_common.h"
 
 #include <atomic>
 #include <memory>
@@ -25,11 +26,9 @@
 
 using namespace iqxmlrpc;
 using namespace iqnet;
+using namespace iqxmlrpc_test;
 
 namespace {
-
-// Test port - use a high port unlikely to be in use
-const int TEST_PORT = 19876;
 
 // Simple auth plugin for testing
 class TestAuthPlugin : public Auth_Plugin_base {
@@ -66,95 +65,9 @@ public:
   bool grant(const Inet_addr&) override { return true; }
 };
 
-// Integration test fixture
-class IntegrationFixture {
-protected:
-  std::unique_ptr<Http_server> server_;
-  std::unique_ptr<Executor_factory_base> exec_factory_;
-  std::thread server_thread_;
-  std::mutex ready_mutex_;
-  std::condition_variable ready_cond_;
-  bool server_ready_;
-  std::atomic<bool> server_running_;
-  int port_;
-
-public:
-  IntegrationFixture()
-    : server_()
-    , exec_factory_()
-    , server_thread_()
-    , ready_mutex_()
-    , ready_cond_()
-    , server_ready_(false)
-    , server_running_(false)
-    , port_(TEST_PORT) {}
-
-  ~IntegrationFixture() {
-    stop_server();
-  }
-
-  void start_server(int numthreads = 1, int port_offset = 0) {
-    port_ = TEST_PORT + port_offset;
-
-    if (numthreads > 1) {
-      exec_factory_.reset(new Pool_executor_factory(numthreads));
-    } else {
-      exec_factory_.reset(new Serial_executor_factory);
-    }
-
-    server_.reset(new Http_server(
-      Inet_addr("127.0.0.1", port_),
-      exec_factory_.get()));
-
-    // Register test methods
-    register_user_methods(*server_);
-
-    server_running_ = true;
-    server_thread_ = std::thread([this]() {
-      {
-        std::unique_lock<std::mutex> lk(ready_mutex_);
-        server_ready_ = true;
-        ready_cond_.notify_one();
-      }
-      server_->work();
-      server_running_ = false;
-    });
-
-    // Wait for server to be ready
-    std::unique_lock<std::mutex> lk(ready_mutex_);
-    bool result = ready_cond_.wait_for(lk,
-      std::chrono::seconds(5),
-      [this]{ return server_ready_; });
-    BOOST_REQUIRE_MESSAGE(result, "Server startup timeout");
-
-    // Give the server a moment to enter the work loop
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-  }
-
-  void stop_server() {
-    if (server_ && server_running_) {
-      server_->set_exit_flag();
-      server_->interrupt();
-      if (server_thread_.joinable()) {
-        server_thread_.join();
-      }
-    }
-    server_.reset();
-    exec_factory_.reset();
-    server_ready_ = false;
-    server_running_ = false;
-  }
-
-  std::unique_ptr<Client_base> create_client() {
-    return std::unique_ptr<Client_base>(
-      new Client<Http_client_connection>(Inet_addr("127.0.0.1", port_)));
-  }
-
-  Server& server() { return *server_; }
-  bool is_running() const { return server_running_; }
-};
-
 } // anonymous namespace
+
+// IntegrationFixture is now provided by test_common.h
 
 //=============================================================================
 // Acceptor Tests
@@ -2743,7 +2656,7 @@ BOOST_AUTO_TEST_CASE(http_client_connection_closed_during_read)
 // is propagated to the acceptor once at the start of work()
 BOOST_AUTO_TEST_CASE(firewall_blocks_with_empty_message)
 {
-    const int port = TEST_PORT + 230;
+    const int port = INTEGRATION_TEST_PORT + 230;
 
     // Create server
     Serial_executor_factory exec_factory;
@@ -2791,7 +2704,7 @@ BOOST_AUTO_TEST_CASE(firewall_blocks_with_empty_message)
 // Covers acceptor.cc lines 57-63, 68: Firewall rejection with message
 BOOST_AUTO_TEST_CASE(firewall_blocks_with_custom_message)
 {
-    const int port = TEST_PORT + 231;
+    const int port = INTEGRATION_TEST_PORT + 231;
 
     // Create server
     Serial_executor_factory exec_factory;

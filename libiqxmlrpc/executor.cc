@@ -83,30 +83,37 @@ public:
 
 void Pool_executor_factory::Pool_thread::operator ()()
 {
-  for(;;)
+  Pool_executor_factory* pool_ptr = this->pool;
+
+  for (;;)
   {
-    scoped_lock lk(pool->req_queue_lock);
+    Pool_executor* executor = nullptr;
 
-    // Check BEFORE waiting to prevent race where notification arrives
-    // while thread is processing a request (after unlock, before wait)
-    if (pool->is_being_destructed())
-      return;
-
-    if (pool->req_queue.empty())
+    // Lock-free dequeue loop
+    while (!pool_ptr->req_queue.pop(executor))
     {
-      pool->req_queue_cond.wait(lk);
-
-      if (pool->is_being_destructed())
+      // Check shutdown flag (lock-free)
+      if (pool_ptr->is_being_destructed())
         return;
 
-      if (pool->req_queue.empty())
-        continue;
+      // Wait for work using condition variable
+      std::unique_lock<std::mutex> lk(pool_ptr->wait_mutex);
+
+      // Double-check shutdown under lock to avoid lost wakeups
+      if (pool_ptr->is_being_destructed())
+        return;
+
+      // Only sleep if no pending work (avoids spurious wakeups)
+      if (pool_ptr->pending_count.load(std::memory_order_acquire) == 0)
+        pool_ptr->wait_cond.wait(lk);
+
+      // After wakeup, loop back to try pop again
     }
 
-    Pool_executor* executor = pool->req_queue.front();
-    pool->req_queue.pop_front();
-    lk.unlock();
+    // Successfully dequeued - decrement pending count
+    pool_ptr->pending_count.fetch_sub(1, std::memory_order_relaxed);
 
+    // Execute the work (no lock held)
     executor->process_actual_execution();
   }
 }
@@ -117,8 +124,9 @@ Pool_executor_factory::Pool_executor_factory(unsigned numthreads):
   threads(),
   pool(),
   req_queue(),
-  req_queue_lock(),
-  req_queue_cond(),
+  wait_mutex(),
+  wait_cond(),
+  pending_count(0),
   in_destructor(false)
 {
   add_threads(numthreads);
@@ -134,8 +142,13 @@ Pool_executor_factory::~Pool_executor_factory()
     }
   }
 
-  scoped_lock lk(req_queue_lock);
-  util::delete_ptrs(req_queue.begin(), req_queue.end());
+  // pool contains unique_ptr<Pool_thread>, auto-cleaned when vector destructs
+
+  // Drain remaining items from lock-free queue (single-threaded after join)
+  Pool_executor* remaining = nullptr;
+  while (req_queue.pop(remaining)) {
+    delete remaining;
+  }
 }
 
 
@@ -166,9 +179,18 @@ void Pool_executor_factory::add_threads( unsigned num )
 
 void Pool_executor_factory::register_executor( Pool_executor* executor )
 {
-  scoped_lock lk(req_queue_lock);
-  req_queue.push_back(executor);
-  req_queue_cond.notify_one();
+  // Lock-free enqueue
+  while (!req_queue.push(executor)) {
+    std::this_thread::yield();  // Queue full - rare with proper sizing
+  }
+
+  pending_count.fetch_add(1, std::memory_order_release);
+
+  // Wake one sleeping worker
+  {
+    std::lock_guard<std::mutex> lk(wait_mutex);
+    wait_cond.notify_one();
+  }
 }
 
 
@@ -176,8 +198,11 @@ void Pool_executor_factory::destruction_started()
 {
   in_destructor.store(true, std::memory_order_release);
 
-  scoped_lock lk(req_queue_lock);
-  req_queue_cond.notify_all();
+  // Wake all workers to exit
+  {
+    std::lock_guard<std::mutex> lk(wait_mutex);
+    wait_cond.notify_all();
+  }
 }
 
 

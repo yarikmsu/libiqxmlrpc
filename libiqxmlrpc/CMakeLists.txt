@@ -2,8 +2,9 @@ include(FindLibXml2)
 include(FindOpenSSL)
 include(CheckFunctionExists)
 find_package(Threads REQUIRED)
+find_package(Boost 1.53.0 REQUIRED)
 
-include_directories(${XML2_INCLUDE_DIRS} ${LIBXML2_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR} ${PROJECT_BINARY_DIR}/libiqxmlrpc)
+include_directories(${XML2_INCLUDE_DIRS} ${LIBXML2_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${PROJECT_BINARY_DIR}/libiqxmlrpc)
 
 check_function_exists(poll HAVE_POLL)
 if(${HAVE_POLL})
