@@ -54,13 +54,15 @@ inline void exercise_value(const iqxmlrpc::Value& v, int depth = 0) {
     } catch (...) {}
   }
 
-  // Exercise struct member access
+  // Exercise struct member access - iterate all members
   if (v.is_struct()) {
     try {
       (void)v.size();
-      // Access common struct member names that might exist
-      try { exercise_value(v["faultCode"], depth + 1); } catch (...) {}
-      try { exercise_value(v["faultString"], depth + 1); } catch (...) {}
+      const iqxmlrpc::Struct& s = v.the_struct();
+      size_t count = 0;
+      for (auto it = s.begin(); it != s.end() && count < MAX_ARRAY_ELEMENTS; ++it, ++count) {
+        exercise_value(*(it->second), depth + 1);
+      }
     } catch (...) {}
   }
 }

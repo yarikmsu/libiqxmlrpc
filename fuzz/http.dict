@@ -40,16 +40,35 @@
 "Close"
 "100-continue"
 
-# Status codes
+# Status codes - 1xx Informational
+"100 Continue"
+"101 Switching Protocols"
+
+# Status codes - 2xx Success
 "200 OK"
 "201 Created"
+"204 No Content"
+
+# Status codes - 3xx Redirection
+"301 Moved Permanently"
+"302 Found"
+"304 Not Modified"
+"307 Temporary Redirect"
+
+# Status codes - 4xx Client Error
 "400 Bad Request"
 "401 Unauthorized"
 "403 Forbidden"
 "404 Not Found"
+"405 Method Not Allowed"
+"408 Request Timeout"
+"413 Payload Too Large"
+
+# Status codes - 5xx Server Error
 "500 Internal Server Error"
 "502 Bad Gateway"
 "503 Service Unavailable"
+"504 Gateway Timeout"
 
 # Line endings
 "\r\n"
@@ -85,3 +104,20 @@
 # Cookie headers
 "Cookie:"
 "Set-Cookie:"
+
+# Cache headers
+"Cache-Control:"
+"Pragma:"
+"ETag:"
+"If-None-Match:"
+"If-Modified-Since:"
+"Last-Modified:"
+"Expires:"
+"no-cache"
+"no-store"
+"max-age="
+
+# Security headers
+"X-Frame-Options:"
+"X-Content-Type-Options:"
+"nosniff"

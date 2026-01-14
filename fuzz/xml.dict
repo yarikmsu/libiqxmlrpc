@@ -98,3 +98,37 @@
 # Namespace declarations
 "xmlns="
 "xmlns:ex="
+
+# XML comments
+"<!--"
+"-->"
+
+# Self-closing element variants
+"<value/>"
+"<string/>"
+"<int/>"
+"<i4/>"
+"<i8/>"
+"<boolean/>"
+"<double/>"
+"<array/>"
+"<struct/>"
+"<data/>"
+"<params/>"
+"<param/>"
+
+# XXE/DTD tokens (for security testing)
+"<!DOCTYPE"
+"<!ENTITY"
+"SYSTEM"
+"PUBLIC"
+"file://"
+"http://"
+"<!ATTLIST"
+"<!ELEMENT"
+"]>"
+
+# Whitespace variations
+"\t"
+"\n"
+"  "
