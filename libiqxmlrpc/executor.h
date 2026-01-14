@@ -12,8 +12,9 @@
 #include <memory>
 #include <mutex>
 #include <thread>
-#include <deque>
 #include <vector>
+
+#include <boost/lockfree/queue.hpp>
 
 namespace iqnet
 {
@@ -131,10 +132,14 @@ class LIBIQXMLRPC_API Pool_executor_factory: public Executor_factory_base {
   std::vector<std::thread>  threads;
   std::vector<std::unique_ptr<Pool_thread>> pool;
 
-  // Objects Pool_thread works with
-  std::deque<Pool_executor*> req_queue;
-  std::mutex                 req_queue_lock;
-  std::condition_variable    req_queue_cond;
+  // Lock-free work queue for reduced contention under high load
+  static constexpr size_t QUEUE_CAPACITY = 1024;
+  boost::lockfree::queue<Pool_executor*, boost::lockfree::capacity<QUEUE_CAPACITY>> req_queue;
+
+  // Wait coordination (only for sleeping workers, not on hot path)
+  std::mutex              wait_mutex;
+  std::condition_variable wait_cond;
+  std::atomic<size_t>     pending_count{0};
 
   std::atomic<bool> in_destructor;
 

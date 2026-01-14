@@ -8,15 +8,10 @@
 #include <boost/test/test_tools.hpp>
 #include "libiqxmlrpc/server.h"
 #include "methods.h"
+#include "test_common.h"
 
 using namespace iqxmlrpc;
-
-// Thread-safe wrapper for BOOST_TEST_MESSAGE (which is not thread-safe)
-namespace {
-  std::mutex test_message_mutex;
-  #define THREAD_SAFE_TEST_MESSAGE(msg) \
-    do { std::lock_guard<std::mutex> lock(test_message_mutex); BOOST_TEST_MESSAGE(msg); } while(0)
-}
+// THREAD_SAFE_TEST_MESSAGE macro is defined in test_common.h
 
 void register_user_methods(iqxmlrpc::Server& s)
 {
