@@ -1,0 +1,134 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default",
+      "description": "Default build with tests enabled",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_CXX_FLAGS": "-DBOOST_TIMER_ENABLE_DEPRECATED",
+        "build_tests": true
+      }
+    },
+    {
+      "name": "fuzzing",
+      "displayName": "Fuzzing (Linux)",
+      "description": "Build fuzz targets with ASan + libFuzzer (Linux)",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build-fuzz",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_CXX_FLAGS": "-DBOOST_TIMER_ENABLE_DEPRECATED -fsanitize=fuzzer-no-link,address -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address",
+        "LIB_FUZZING_ENGINE": "-fsanitize=fuzzer",
+        "build_fuzzers": true,
+        "build_tests": false
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "fuzzing-macos",
+      "displayName": "Fuzzing (macOS)",
+      "description": "Build fuzz targets with ASan + libFuzzer (macOS with Homebrew LLVM)",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build-fuzz",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "/opt/homebrew/opt/llvm/bin/clang",
+        "CMAKE_CXX_COMPILER": "/opt/homebrew/opt/llvm/bin/clang++",
+        "CMAKE_CXX_FLAGS": "-DBOOST_TIMER_ENABLE_DEPRECATED -fsanitize=fuzzer-no-link,address -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address -L/opt/homebrew/opt/llvm/lib/c++ -Wl,-rpath,/opt/homebrew/opt/llvm/lib/c++",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address -L/opt/homebrew/opt/llvm/lib/c++ -Wl,-rpath,/opt/homebrew/opt/llvm/lib/c++",
+        "LIB_FUZZING_ENGINE": "-fsanitize=fuzzer",
+        "build_fuzzers": true,
+        "build_tests": false
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
+    },
+    {
+      "name": "fuzzing-macos-intel",
+      "displayName": "Fuzzing (macOS Intel)",
+      "description": "Build fuzz targets with ASan + libFuzzer (Intel Mac with Homebrew LLVM)",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build-fuzz",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "/usr/local/opt/llvm/bin/clang",
+        "CMAKE_CXX_COMPILER": "/usr/local/opt/llvm/bin/clang++",
+        "CMAKE_CXX_FLAGS": "-DBOOST_TIMER_ENABLE_DEPRECATED -fsanitize=fuzzer-no-link,address -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address -L/usr/local/opt/llvm/lib/c++ -Wl,-rpath,/usr/local/opt/llvm/lib/c++",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address -L/usr/local/opt/llvm/lib/c++ -Wl,-rpath,/usr/local/opt/llvm/lib/c++",
+        "LIB_FUZZING_ENGINE": "-fsanitize=fuzzer",
+        "build_fuzzers": true,
+        "build_tests": false
+      }
+    },
+    {
+      "name": "asan",
+      "displayName": "AddressSanitizer",
+      "description": "Build with AddressSanitizer for memory error detection",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build-asan",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_CXX_FLAGS": "-DBOOST_TIMER_ENABLE_DEPRECATED -fsanitize=address -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address",
+        "build_tests": true
+      }
+    },
+    {
+      "name": "tsan",
+      "displayName": "ThreadSanitizer",
+      "description": "Build with ThreadSanitizer for data race detection",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build-tsan",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_CXX_FLAGS": "-DBOOST_TIMER_ENABLE_DEPRECATED -fsanitize=thread -fno-omit-frame-pointer -g",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=thread",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=thread",
+        "build_tests": true
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default"
+    },
+    {
+      "name": "fuzzing",
+      "configurePreset": "fuzzing"
+    },
+    {
+      "name": "fuzzing-macos",
+      "configurePreset": "fuzzing-macos"
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan"
+    },
+    {
+      "name": "tsan",
+      "configurePreset": "tsan"
+    }
+  ]
+}
