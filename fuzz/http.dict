@@ -12,6 +12,8 @@
 "DELETE "
 "HEAD "
 "OPTIONS "
+"PATCH "
+"CONNECT "
 
 # Common headers
 "Content-Type:"
@@ -21,6 +23,10 @@
 "User-Agent:"
 "Accept:"
 "Transfer-Encoding:"
+"Authorization:"
+"Expect:"
+"Server:"
+"Date:"
 
 # Content types
 "text/xml"
@@ -32,6 +38,7 @@
 "close"
 "Keep-Alive"
 "Close"
+"100-continue"
 
 # Status codes
 "200 OK"

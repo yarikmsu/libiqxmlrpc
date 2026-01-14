@@ -1,12 +1,18 @@
 // Fuzz target for HTTP header parsing
-// Copyright (C) 2024 libiqxmlrpc contributors
+// Copyright (C) 2026 libiqxmlrpc contributors
 
 #include "libiqxmlrpc/http.h"
 #include <cstdint>
 #include <cstddef>
 #include <string>
 
+// Maximum input size to prevent slow units
+constexpr size_t MAX_INPUT_SIZE = 64 * 1024;
+
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+  // Limit input size to prevent slow units
+  if (size > MAX_INPUT_SIZE) return 0;
+
   std::string input(reinterpret_cast<const char*>(data), size);
 
   // Fuzz HTTP request header parsing
