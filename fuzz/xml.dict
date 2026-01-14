@@ -217,6 +217,10 @@
 "\xFF\xFE"
 "\xFE\xFF"
 
+# UTF-32 BOM patterns
+"\x00\x00\xFE\xFF"
+"\xFF\xFE\x00\x00"
+
 # XML 1.1 declaration (different parsing rules)
 "version=\"1.1\""
 
