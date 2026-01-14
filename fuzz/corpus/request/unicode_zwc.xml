@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<methodCall>
+<methodName>test.zwc</methodName>
+<params>
+<param><value><string>zero​width​space</string></value></param>
+<param><value><string>zero‌width‌non‌joiner</string></value></param>
+<param><value><string>zero‍width‍joiner</string></value></param>
+</params>
+</methodCall>

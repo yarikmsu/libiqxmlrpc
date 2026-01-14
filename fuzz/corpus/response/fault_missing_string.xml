@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<methodResponse>
+<fault>
+<value><struct>
+<member><name>faultCode</name><value><i4>500</i4></value></member>
+</struct></value>
+</fault>
+</methodResponse>

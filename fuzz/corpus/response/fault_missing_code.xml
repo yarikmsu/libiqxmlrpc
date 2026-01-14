@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<methodResponse>
+<fault>
+<value><struct>
+<member><name>faultString</name><value><string>Error without code</string></value></member>
+</struct></value>
+</fault>
+</methodResponse>

