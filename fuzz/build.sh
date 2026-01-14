@@ -196,6 +196,31 @@ mkdir -p "$OUT/fuzz_xheaders_seed_corpus"
 echo -n "X-Custom-Header-Value" > "$OUT/fuzz_xheaders_seed_corpus/valid.txt"
 echo -n "value with spaces" > "$OUT/fuzz_xheaders_seed_corpus/spaces.txt"
 
+# Create seed corpus for fuzz_inet_addr
+mkdir -p "$OUT/fuzz_inet_addr_seed_corpus"
+echo -n "127.0.0.1" > "$OUT/fuzz_inet_addr_seed_corpus/localhost.txt"
+echo -n "192.168.1.1" > "$OUT/fuzz_inet_addr_seed_corpus/private.txt"
+echo -n "10.0.0.1" > "$OUT/fuzz_inet_addr_seed_corpus/class_a.txt"
+printf "host\nname" > "$OUT/fuzz_inet_addr_seed_corpus/crlf.txt"
+
+# Create seed corpus for fuzz_dispatcher
+mkdir -p "$OUT/fuzz_dispatcher_seed_corpus"
+cat > "$OUT/fuzz_dispatcher_seed_corpus/listmethods.xml" << 'EOF'
+<?xml version="1.0"?>
+<methodCall>
+<methodName>system.listMethods</methodName>
+<params></params>
+</methodCall>
+EOF
+
+cat > "$OUT/fuzz_dispatcher_seed_corpus/echo.xml" << 'EOF'
+<?xml version="1.0"?>
+<methodCall>
+<methodName>test.echo</methodName>
+<params><param><value><string>hello</string></value></param></params>
+</methodCall>
+EOF
+
 # Zip all seed corpora
 cd "$OUT"
 for corpus_dir in fuzz_*_seed_corpus; do

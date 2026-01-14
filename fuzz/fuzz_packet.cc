@@ -198,5 +198,91 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     }
   }
 
+  // Test chunked transfer-encoding body parsing
+  // This constructs HTTP requests with chunked bodies using fuzz input
+  if (size > 10) {
+    try {
+      // Construct a chunked HTTP request
+      std::string chunked_request =
+          "POST /RPC2 HTTP/1.1\r\n"
+          "Host: localhost\r\n"
+          "Transfer-Encoding: chunked\r\n"
+          "\r\n";
+
+      // Add chunk(s) from fuzz input
+      size_t chunk_offset = 0;
+      size_t chunk_count = 0;
+      while (chunk_offset < size && chunk_count < 10) {
+        // Use first byte at offset to determine chunk size
+        size_t chunk_size = data[chunk_offset] % 256;
+        chunk_offset++;
+
+        if (chunk_offset + chunk_size > size) {
+          chunk_size = size - chunk_offset;
+        }
+
+        // Write chunk header (hex size)
+        char chunk_header[32];
+        std::snprintf(chunk_header, sizeof(chunk_header), "%zx\r\n", chunk_size);
+        chunked_request += chunk_header;
+
+        // Write chunk data
+        if (chunk_size > 0) {
+          chunked_request.append(reinterpret_cast<const char*>(data + chunk_offset), chunk_size);
+          chunk_offset += chunk_size;
+        }
+
+        // Write chunk terminator
+        chunked_request += "\r\n";
+        chunk_count++;
+
+        // If chunk_size was 0, that's the final chunk
+        if (chunk_size == 0) break;
+      }
+
+      // Add final chunk if not already added
+      if (chunk_count > 0 && chunked_request.find("0\r\n\r\n") == std::string::npos) {
+        chunked_request += "0\r\n\r\n";
+      }
+
+      iqxmlrpc::http::Packet_reader reader;
+      reader.set_verification_level(iqxmlrpc::http::HTTP_CHECK_WEAK);
+      reader.set_max_size(fuzz::MAX_INPUT_SIZE * 2);
+
+      std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader.read_request(chunked_request));
+      if (pkt) {
+        (void)pkt->header();
+        (void)pkt->content();
+        (void)pkt->dump();
+      }
+    } catch (...) {
+      // Exceptions expected for malformed chunked encoding
+    }
+  }
+
+  // Test raw chunked input (not constructed, direct fuzz)
+  // This catches issues with malformed chunk headers
+  if (size > 0) {
+    try {
+      // Prepend a minimal chunked request header to fuzz input
+      std::string raw_chunked =
+          "POST /RPC2 HTTP/1.1\r\n"
+          "Host: localhost\r\n"
+          "Transfer-Encoding: chunked\r\n"
+          "\r\n" + input;
+
+      iqxmlrpc::http::Packet_reader reader;
+      reader.set_verification_level(iqxmlrpc::http::HTTP_CHECK_WEAK);
+      reader.set_max_size(fuzz::MAX_INPUT_SIZE * 2);
+
+      std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader.read_request(raw_chunked));
+      if (pkt) {
+        (void)pkt->content();
+      }
+    } catch (...) {
+      // Expected for malformed chunks
+    }
+  }
+
   return 0;
 }

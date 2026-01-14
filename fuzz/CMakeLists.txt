@@ -42,6 +42,8 @@ set(FUZZ_TARGETS
   fuzz_serialize
   fuzz_num_conv
   fuzz_xheaders
+  fuzz_inet_addr
+  fuzz_dispatcher
 )
 
 foreach(target ${FUZZ_TARGETS})
