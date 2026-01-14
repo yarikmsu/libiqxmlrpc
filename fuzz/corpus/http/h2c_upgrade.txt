@@ -1,0 +1,6 @@
+GET /RPC2 HTTP/1.1
+Host: localhost:8080
+Upgrade: h2c
+Connection: Upgrade, HTTP2-Settings
+HTTP2-Settings: AAMAAABkAARAAAAAAAIAAAAA
+

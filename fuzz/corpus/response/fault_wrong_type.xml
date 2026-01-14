@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<methodResponse>
+<fault>
+<value><struct>
+<member><name>faultCode</name><value><string>not-an-integer</string></value></member>
+<member><name>faultString</name><value><i4>123</i4></value></member>
+</struct></value>
+</fault>
+</methodResponse>

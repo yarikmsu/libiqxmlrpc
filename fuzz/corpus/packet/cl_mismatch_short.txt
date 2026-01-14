@@ -1,0 +1,6 @@
+POST /RPC2 HTTP/1.1
+Host: localhost:8080
+Content-Type: text/xml
+Content-Length: 1000
+
+<?xml version="1.0"?><methodCall><methodName>test</methodName></methodCall>
