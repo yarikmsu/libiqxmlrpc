@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<methodCall>
+<methodName>test</methodName>
+<params><param><value><i4>42</i4></value></param></params>
+</methodCall>

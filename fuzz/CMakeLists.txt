@@ -13,10 +13,15 @@ cmake_minimum_required(VERSION 3.10)
 #   ./fuzz_response -dict=../fuzz/xml.dict corpus/response/
 #   ./fuzz_http -dict=../fuzz/http.dict corpus/http/
 #   ./fuzz_value -dict=../fuzz/xml.dict corpus/value/
+#   ./fuzz_packet -dict=../fuzz/http.dict corpus/packet/
+#   ./fuzz_base64 corpus/base64/
 #
 # Dictionaries:
 #   xml.dict  - XML-RPC tokens for fuzz_request, fuzz_response, fuzz_value
-#   http.dict - HTTP tokens for fuzz_http
+#   http.dict - HTTP tokens for fuzz_http, fuzz_packet
+#
+# Seed corpus:
+#   fuzz/corpus/ contains initial seed inputs for each fuzzer
 
 # Validate that LIB_FUZZING_ENGINE is set
 if(NOT DEFINED LIB_FUZZING_ENGINE OR "${LIB_FUZZING_ENGINE}" STREQUAL "")
@@ -29,11 +34,13 @@ set(FUZZ_TARGETS
   fuzz_response
   fuzz_http
   fuzz_value
+  fuzz_packet
+  fuzz_base64
 )
 
 foreach(target ${FUZZ_TARGETS})
   # EXCLUDE_FROM_ALL prevents building fuzz targets in normal builds
-  # Build explicitly with: make fuzz_request fuzz_response fuzz_http fuzz_value
+  # Build explicitly with: make fuzz_request fuzz_response fuzz_http fuzz_value fuzz_packet fuzz_base64
   add_executable(${target} EXCLUDE_FROM_ALL ${target}.cc)
   target_link_libraries(${target} iqxmlrpc ${LIB_FUZZING_ENGINE})
   target_include_directories(${target} PRIVATE ${CMAKE_SOURCE_DIR})

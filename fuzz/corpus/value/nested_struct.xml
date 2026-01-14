@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<methodCall>
+<methodName>test</methodName>
+<params><param><value><struct>
+<member><name>outer</name><value><struct>
+<member><name>inner</name><value><array><data>
+<value><i4>1</i4></value>
+<value><string>nested</string></value>
+</data></array></value></member>
+</struct></value></member>
+</struct></value></param></params>
+</methodCall>
