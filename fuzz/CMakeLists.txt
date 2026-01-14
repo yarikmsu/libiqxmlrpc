@@ -1,7 +1,22 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Fuzz targets for libiqxmlrpc
-# These are built when FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION is defined
+#
+# Build requirements:
+#   - LIB_FUZZING_ENGINE must be set (e.g., -fsanitize=fuzzer for libFuzzer)
+#   - Recommend building with ASan/UBSan for maximum bug detection:
+#     cmake -DCMAKE_CXX_FLAGS="-fsanitize=fuzzer-no-link,address,undefined" \
+#           -DLIB_FUZZING_ENGINE="-fsanitize=fuzzer" ..
+#
+# Running fuzzers:
+#   ./fuzz_request -dict=../fuzz/xml.dict corpus/request/
+#   ./fuzz_response -dict=../fuzz/xml.dict corpus/response/
+#   ./fuzz_http -dict=../fuzz/http.dict corpus/http/
+#   ./fuzz_value -dict=../fuzz/xml.dict corpus/value/
+#
+# Dictionaries:
+#   xml.dict  - XML-RPC tokens for fuzz_request, fuzz_response, fuzz_value
+#   http.dict - HTTP tokens for fuzz_http
 
 set(FUZZ_TARGETS
   fuzz_request
