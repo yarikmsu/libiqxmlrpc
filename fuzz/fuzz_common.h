@@ -5,6 +5,7 @@
 #define IQXMLRPC_FUZZ_COMMON_H
 
 #include "libiqxmlrpc/value.h"
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
