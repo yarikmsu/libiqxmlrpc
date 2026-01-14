@@ -77,5 +77,24 @@
 "false"
 "2147483647"
 "-2147483648"
+"9223372036854775807"
+"-9223372036854775808"
 "3.14159"
 "1.0e308"
+"1.0e-308"
+""
+
+# XML entity references
+"&lt;"
+"&gt;"
+"&amp;"
+"&apos;"
+"&quot;"
+
+# CDATA sections
+"<![CDATA["
+"]]>"
+
+# Namespace declarations
+"xmlns="
+"xmlns:ex="

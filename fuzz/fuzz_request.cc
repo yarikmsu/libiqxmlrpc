@@ -5,6 +5,7 @@
 #include "libiqxmlrpc/request.h"
 #include <cstdint>
 #include <cstddef>
+#include <memory>
 #include <string>
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
@@ -13,7 +14,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   try {
     std::string input(reinterpret_cast<const char*>(data), size);
-    iqxmlrpc::Request* req = iqxmlrpc::parse_request(input);
+    std::unique_ptr<iqxmlrpc::Request> req(iqxmlrpc::parse_request(input));
     if (req) {
       // Exercise the parsed request
       (void)req->get_name();
@@ -23,7 +24,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       for (size_t i = 0; i < params.size(); ++i) {
         fuzz::exercise_value(params[i]);
       }
-      delete req;
     }
   } catch (...) {
     // Exceptions are expected for malformed input
