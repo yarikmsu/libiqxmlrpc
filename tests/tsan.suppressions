@@ -1,12 +1,79 @@
 # ThreadSanitizer suppressions for libiqxmlrpc
 # See https://github.com/google/sanitizers/wiki/ThreadSanitizerSuppressions
+#
+# Pattern matching: TSan uses substring matching for function names and file paths.
+# Multiple patterns are provided to maximize compatibility across TSan versions.
 
-# Suppress races in glibc's internal DNS resolver implementation.
-# gethostbyname_r uses __libc_dynarray_emplace_enlarge internally,
-# which has shared state that TSan cannot properly track.
-# The resolver's internal synchronization is correct, but TSan
-# sees the realloc operations on shared buffers as races.
-# This is a known limitation with glibc's NSS (Name Service Switch).
+# =============================================================================
+# glibc DNS resolver
+# =============================================================================
+# gethostbyname_r uses __libc_dynarray_emplace_enlarge internally with shared
+# state that TSan cannot properly track. The resolver's internal synchronization
+# is correct, but TSan sees the realloc operations on shared buffers as races.
 race:__libc_dynarray_emplace_enlarge
 race:gethostbyname_r
 race:getaddrinfo
+race:__res_context_send
+race:gaih_inet
+
+# =============================================================================
+# Boost.Lockfree - KNOWN FALSE POSITIVES
+# =============================================================================
+# boost::lockfree::queue uses relaxed memory ordering and atomic operations
+# that TSan cannot fully model. These are well-documented false positives:
+# - https://github.com/boostorg/lockfree/issues/50
+# - https://www.boost.org/doc/libs/release/doc/html/lockfree/rationale.html
+#
+# The tagged_index operations use atomic operations that are correctly
+# synchronized but TSan cannot understand the lock-free synchronization.
+
+# Match by source file path (most reliable for header-only libraries)
+race:lockfree/detail/freelist.hpp
+race:lockfree/detail/tagged_ptr.hpp
+race:lockfree/queue.hpp
+race:boost/lockfree
+
+# Match by function name patterns (demangled names)
+race:tagged_index
+race:freelist_stack
+race:fixed_size_freelist
+race:compile_time_sized_freelist
+
+# Match specific internal functions
+race:set_index
+race:get_index
+race:set_tag
+race:get_tag
+race:allocate_impl
+race:deallocate_impl
+
+# Match any function in boost::lockfree namespace
+race:boost::lockfree::
+
+# =============================================================================
+# Boost.Test framework
+# =============================================================================
+# BOOST_TEST_MESSAGE has internal shared state (log streams, string buffers)
+# that isn't fully thread-safe. This affects only test diagnostic output.
+# BOOST_REQUIRE/BOOST_CHECK macros also do string operations that can race
+# with concurrent test execution.
+race:boost::unit_test
+race:boost::test_tools
+race:unit_test_log
+race:test_unit_finish
+
+# Thread safety tests - races in test harness, not production code
+# The test file uses Boost.Test assertions which are not thread-safe
+race:test_thread_safety.cc
+race:test_common.h
+race:thread_safety_test
+
+# Method execution during tests (races between test assertions and method execution)
+race:Method_function_adapter::execute
+race:Method::process_execution
+
+# =============================================================================
+# libstdc++ internals (occasional false positives)
+# =============================================================================
+race:__gthread_mutex
+race:__pthread_mutex

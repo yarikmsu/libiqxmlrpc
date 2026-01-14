@@ -38,7 +38,11 @@ jobs:
     - name: Configure
       run: |
         mkdir build && cd build
-        cmake -Dbuild_tests=ON -DCMAKE_CXX_FLAGS="-DBOOST_TIMER_ENABLE_DEPRECATED -Wall -Wextra -Weffc++ -Werror" ..
+        CMAKE_EXTRA_ARGS=""
+        if [ "$(uname)" = "Darwin" ]; then
+          CMAKE_EXTRA_ARGS="-DBOOST_ROOT=$(brew --prefix boost)"
+        fi
+        cmake -Dbuild_tests=ON -DCMAKE_CXX_FLAGS="-DBOOST_TIMER_ENABLE_DEPRECATED -Wall -Wextra -Weffc++ -Werror" $CMAKE_EXTRA_ARGS ..
 
     - name: Build
       run: cmake --build build
@@ -81,6 +85,14 @@ jobs:
         ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
         UBSAN_OPTIONS: print_stacktrace=1:abort_on_error=1
 
+    - name: Interop Test
+      run: |
+        cd build
+        make interop-test
+      env:
+        ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
+        UBSAN_OPTIONS: print_stacktrace=1:abort_on_error=1
+
   coverage:
     name: coverage
     runs-on: ubuntu-24.04
@@ -106,6 +118,11 @@ jobs:
 
     - name: Test
       run: ctest --test-dir build --output-on-failure --output-junit junit.xml
+
+    - name: Interop Test
+      run: |
+        cd build
+        make interop-test
 
     - name: Upload test results to Codecov
       if: ${{ !cancelled() }}
@@ -161,7 +178,18 @@ jobs:
       run: cmake --build build
 
     - name: Test
-      run: ctest --test-dir build --output-on-failure
+      run: |
+        # Exclude lockfree_stress tests - they stress-test Boost.Lockfree which
+        # produces TSan false positives. These tests validate correctness via
+        # data integrity checks, not TSan cleanliness.
+        ctest --test-dir build -LE lockfree_stress --output-on-failure
+      env:
+        TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1:history_size=4:suppressions=${{ github.workspace }}/tests/tsan.suppressions
+
+    - name: Interop Test
+      run: |
+        cd build
+        make interop-test
       env:
         TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1:history_size=4:suppressions=${{ github.workspace }}/tests/tsan.suppressions
 

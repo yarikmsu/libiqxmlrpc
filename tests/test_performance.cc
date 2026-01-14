@@ -1116,6 +1116,224 @@ void benchmark_reactor_handler_list() {
 }
 
 // ============================================================================
+// N. Lock-Free Queue Benchmark (Before/After Comparison)
+// Proves lock-free implementation has better tail latency under contention
+// ============================================================================
+
+#include <boost/lockfree/queue.hpp>
+#include <condition_variable>
+#include <deque>
+#include <thread>
+
+// Wrapper for mutex-based queue (OLD implementation)
+class MutexQueue {
+  std::deque<int64_t> queue_;
+  mutable std::mutex lock_;
+
+public:
+  MutexQueue() : queue_(), lock_() {}
+
+  void push(int64_t item) {
+    std::lock_guard<std::mutex> lk(lock_);
+    queue_.push_back(item);
+  }
+
+  bool try_pop(int64_t& item) {
+    std::lock_guard<std::mutex> lk(lock_);
+    if (queue_.empty()) return false;
+    item = queue_.front();
+    queue_.pop_front();
+    return true;
+  }
+
+  void clear() {
+    std::lock_guard<std::mutex> lk(lock_);
+    queue_.clear();
+  }
+};
+
+// Wrapper for lock-free queue (NEW implementation)
+class LockFreeQueue {
+  boost::lockfree::queue<int64_t, boost::lockfree::capacity<8192>> queue_;
+
+public:
+  LockFreeQueue() : queue_() {}
+
+  void push(int64_t item) {
+    while (!queue_.push(item)) {
+      std::this_thread::yield();
+    }
+  }
+
+  bool try_pop(int64_t& item) {
+    return queue_.pop(item);
+  }
+
+  void clear() {
+    int64_t dummy;
+    while (queue_.pop(dummy)) {}
+  }
+};
+
+void benchmark_lockfree_queue() {
+  perf::section("Lock-Free Queue Comparison (Latency Percentiles)");
+
+  using Clock = std::chrono::high_resolution_clock;
+
+  // Configuration
+  const size_t NUM_PRODUCERS = 4;
+  const size_t NUM_CONSUMERS = 2;
+  const size_t ITEMS_PER_PRODUCER = 25000;
+  const size_t TOTAL_ITEMS = NUM_PRODUCERS * ITEMS_PER_PRODUCER;
+
+  std::cout << "\nScenario: " << NUM_PRODUCERS << " producers, "
+            << NUM_CONSUMERS << " consumers, "
+            << ITEMS_PER_PRODUCER << " items/producer\n";
+  std::cout << "Total items: " << TOTAL_ITEMS << "\n\n";
+
+  // --- Benchmark mutex-based queue ---
+  perf::LatencyStats mutex_stats;
+  mutex_stats.reserve(TOTAL_ITEMS);
+  {
+    MutexQueue queue;
+    std::atomic<size_t> produced{0};
+    std::atomic<size_t> consumed{0};
+    std::atomic<bool> done{false};
+
+    // Producers: push timestamp as payload
+    auto producer = [&]() {
+      for (size_t i = 0; i < ITEMS_PER_PRODUCER; ++i) {
+        auto now = Clock::now().time_since_epoch().count();
+        queue.push(now);
+        produced++;
+      }
+    };
+
+    // Consumers: pop and measure latency
+    std::mutex stats_lock;
+    auto consumer = [&]() {
+      while (!done || consumed < TOTAL_ITEMS) {
+        int64_t enqueue_time;
+        if (queue.try_pop(enqueue_time)) {
+          auto now = Clock::now().time_since_epoch().count();
+          auto latency = now - enqueue_time;
+          {
+            std::lock_guard<std::mutex> lk(stats_lock);
+            mutex_stats.add(latency);
+          }
+          consumed++;
+        } else {
+          std::this_thread::yield();
+        }
+      }
+    };
+
+    auto start = Clock::now();
+
+    std::vector<std::thread> producers;
+    for (size_t i = 0; i < NUM_PRODUCERS; ++i) {
+      producers.emplace_back(producer);
+    }
+
+    std::vector<std::thread> consumers;
+    for (size_t i = 0; i < NUM_CONSUMERS; ++i) {
+      consumers.emplace_back(consumer);
+    }
+
+    for (auto& t : producers) t.join();
+    done = true;
+    for (auto& t : consumers) t.join();
+
+    auto end = Clock::now();
+    double ms = std::chrono::duration<double, std::milli>(end - start).count();
+    double throughput = static_cast<double>(TOTAL_ITEMS) / (ms / 1000.0);
+
+    std::cout << "[Mutex Queue]     Total time: " << std::fixed << std::setprecision(2)
+              << ms << " ms, Throughput: " << std::setprecision(0) << throughput << " ops/s\n";
+  }
+
+  // --- Benchmark lock-free queue ---
+  perf::LatencyStats lockfree_stats;
+  lockfree_stats.reserve(TOTAL_ITEMS);
+  {
+    LockFreeQueue queue;
+    std::atomic<size_t> produced{0};
+    std::atomic<size_t> consumed{0};
+    std::atomic<bool> done{false};
+
+    // Producers: push timestamp as payload
+    auto producer = [&]() {
+      for (size_t i = 0; i < ITEMS_PER_PRODUCER; ++i) {
+        auto now = Clock::now().time_since_epoch().count();
+        queue.push(now);
+        produced++;
+      }
+    };
+
+    // Consumers: pop and measure latency
+    std::mutex stats_lock;
+    auto consumer = [&]() {
+      while (!done || consumed < TOTAL_ITEMS) {
+        int64_t enqueue_time;
+        if (queue.try_pop(enqueue_time)) {
+          auto now = Clock::now().time_since_epoch().count();
+          auto latency = now - enqueue_time;
+          {
+            std::lock_guard<std::mutex> lk(stats_lock);
+            lockfree_stats.add(latency);
+          }
+          consumed++;
+        } else {
+          std::this_thread::yield();
+        }
+      }
+    };
+
+    auto start = Clock::now();
+
+    std::vector<std::thread> producers;
+    for (size_t i = 0; i < NUM_PRODUCERS; ++i) {
+      producers.emplace_back(producer);
+    }
+
+    std::vector<std::thread> consumers;
+    for (size_t i = 0; i < NUM_CONSUMERS; ++i) {
+      consumers.emplace_back(consumer);
+    }
+
+    for (auto& t : producers) t.join();
+    done = true;
+    for (auto& t : consumers) t.join();
+
+    auto end = Clock::now();
+    double ms = std::chrono::duration<double, std::milli>(end - start).count();
+    double throughput = static_cast<double>(TOTAL_ITEMS) / (ms / 1000.0);
+
+    std::cout << "[Lock-Free Queue] Total time: " << std::fixed << std::setprecision(2)
+              << ms << " ms, Throughput: " << std::setprecision(0) << throughput << " ops/s\n";
+  }
+
+  // --- Print comparison table ---
+  perf::print_latency_comparison(
+    "Queue Implementation Comparison (Enqueue-to-Dequeue Latency)",
+    "Mutex Queue", mutex_stats,
+    "Lock-Free", lockfree_stats
+  );
+
+  // Record p99 latencies as benchmark results for baseline tracking
+  auto mutex_p99 = mutex_stats.p99();
+  auto lockfree_p99 = lockfree_stats.p99();
+  if (mutex_p99 > 0) {
+    perf::ResultCollector::instance().add_result(
+      perf::BenchmarkResult("perf_mutex_queue_p99_latency", mutex_p99 / 1e6, 1));
+  }
+  if (lockfree_p99 > 0) {
+    perf::ResultCollector::instance().add_result(
+      perf::BenchmarkResult("perf_lockfree_queue_p99_latency", lockfree_p99 / 1e6, 1));
+  }
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 
@@ -1147,6 +1365,7 @@ int main(int /*argc*/, char* /*argv*/[]) {
   benchmark_cipher_throughput();
   benchmark_exception_vs_return_code();
   benchmark_reactor_handler_list();
+  benchmark_lockfree_queue();
 
   // Save baseline
   std::strftime(time_buf, sizeof(time_buf), "%Y%m%d_%H%M%S", std::localtime(&now));
