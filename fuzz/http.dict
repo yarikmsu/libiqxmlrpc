@@ -160,3 +160,27 @@
 
 # Null byte testing
 "\x00"
+
+# URL encoding
+"%20"
+"%00"
+"%2F"
+"%3A"
+"%3F"
+"%26"
+"%3D"
+
+# Query strings and fragments
+"?param=value"
+"?a=1&b=2"
+"#fragment"
+"/path?query#frag"
+
+# Content-Type parameters
+"text/xml; charset=utf-8"
+"application/xml; charset=ISO-8859-1"
+"boundary="
+
+# Multiple header values
+"Accept: text/xml, application/xml"
+"Accept-Encoding: gzip, deflate"

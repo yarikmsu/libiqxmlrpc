@@ -3,6 +3,7 @@
 
 #include "fuzz_common.h"
 #include "libiqxmlrpc/http.h"
+#include "libiqxmlrpc/xheaders.h"
 #include <cstdint>
 #include <cstddef>
 #include <string>
@@ -28,6 +29,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       std::string user, password;
       req_hdr.get_authinfo(user, password);
     }
+    // Exercise X-headers parsing
+    iqxmlrpc::XHeaders xhdrs;
+    req_hdr.get_xheaders(xhdrs);
   } catch (...) {
     // Exceptions are expected for malformed input
   }
@@ -49,6 +53,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     (void)resp_hdr.code();
     (void)resp_hdr.phrase();
     (void)resp_hdr.content_length();
+    (void)resp_hdr.conn_keep_alive();
     (void)resp_hdr.server();
   } catch (...) {
     // Exceptions are expected for malformed input
