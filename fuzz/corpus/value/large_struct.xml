@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<methodCall>
+<methodName>v</methodName>
+<params><param><value><struct>
+<member><name>k0</name><value><i4>0</i4></value></member>
+<member><name>k1</name><value><i4>1</i4></value></member>
+<member><name>k2</name><value><i4>2</i4></value></member>
+<member><name>k3</name><value><i4>3</i4></value></member>
+<member><name>k4</name><value><i4>4</i4></value></member>
+<member><name>k5</name><value><i4>5</i4></value></member>
+<member><name>k6</name><value><i4>6</i4></value></member>
+<member><name>k7</name><value><i4>7</i4></value></member>
+<member><name>k8</name><value><i4>8</i4></value></member>
+<member><name>k9</name><value><i4>9</i4></value></member>
+<member><name>k10</name><value><i4>10</i4></value></member>
+<member><name>k11</name><value><i4>11</i4></value></member>
+<member><name>k12</name><value><i4>12</i4></value></member>
+<member><name>k13</name><value><i4>13</i4></value></member>
+<member><name>k14</name><value><i4>14</i4></value></member>
+<member><name>k15</name><value><i4>15</i4></value></member>
+</struct></value></param></params>
+</methodCall>
