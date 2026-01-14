@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<methodResponse>
+<fault>
+<value><struct>
+<member><name>faultCode</name><value><i4>-2147483648</i4></value></member>
+<member><name>faultString</name><value><string>Minimum int fault code</string></value></member>
+</struct></value>
+</fault>
+</methodResponse>

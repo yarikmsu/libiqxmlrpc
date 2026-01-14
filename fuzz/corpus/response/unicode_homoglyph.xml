@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<methodResponse>
+<params>
+<param><value><string>Cyrillic а vs Latin a</string></value></param>
+<param><value><string>Greek α vs Latin a</string></value></param>
+</params>
+</methodResponse>

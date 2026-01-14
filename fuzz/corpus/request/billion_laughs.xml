@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<!DOCTYPE methodCall [
+  <!ENTITY lol "lol">
+  <!ENTITY lol1 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">
+  <!ENTITY lol2 "&lol1;&lol1;&lol1;&lol1;&lol1;&lol1;&lol1;&lol1;&lol1;&lol1;">
+  <!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">
+]>
+<methodCall>
+<methodName>test.bomb</methodName>
+<params>
+<param><value><string>&lol3;</string></value></param>
+</params>
+</methodCall>

@@ -1,0 +1,265 @@
+# XML-RPC dictionary for fuzzing
+# Helps libFuzzer find interesting inputs faster
+
+# XML declaration
+"<?xml"
+"version="
+"\"1.0\""
+"encoding="
+"\"UTF-8\""
+"?>"
+
+# UTF-8 BOM (common in real-world XML files)
+"\xEF\xBB\xBF"
+
+# Numeric character references
+"&#65;"
+"&#x41;"
+"&#0;"
+"&#x0;"
+"&#10;"
+"&#13;"
+
+# Method call/response
+"<methodCall>"
+"</methodCall>"
+"<methodName>"
+"</methodName>"
+"<methodResponse>"
+"</methodResponse>"
+
+# Parameters
+"<params>"
+"</params>"
+"<param>"
+"</param>"
+
+# Values
+"<value>"
+"</value>"
+
+# Scalar types
+"<i4>"
+"</i4>"
+"<i8>"
+"</i8>"
+"<int>"
+"</int>"
+"<boolean>"
+"</boolean>"
+"<string>"
+"</string>"
+"<double>"
+"</double>"
+"<dateTime.iso8601>"
+"</dateTime.iso8601>"
+"<base64>"
+"</base64>"
+"<nil/>"
+"<nil>"
+"</nil>"
+"<ex:nil/>"
+"<ex:nil>"
+"</ex:nil>"
+
+# Compound types
+"<array>"
+"</array>"
+"<data>"
+"</data>"
+"<struct>"
+"</struct>"
+"<member>"
+"</member>"
+"<name>"
+"</name>"
+
+# Fault handling
+"<fault>"
+"</fault>"
+"faultCode"
+"faultString"
+
+# Common values
+"0"
+"1"
+"-1"
+"true"
+"false"
+"2147483647"
+"-2147483648"
+"9223372036854775807"
+"-9223372036854775808"
+"3.14159"
+"1.0e308"
+"1.0e-308"
+"NaN"
+"Infinity"
+"-Infinity"
+"+0.0"
+"-0.0"
+
+# DateTime edge cases
+"19700101T00:00:00"
+"20380119T03:14:07"
+"99991231T23:59:59"
+"00010101T00:00:00"
+
+# XML entity references
+"&lt;"
+"&gt;"
+"&amp;"
+"&apos;"
+"&quot;"
+
+# CDATA sections
+"<![CDATA["
+"]]>"
+
+# Namespace declarations
+"xmlns="
+"xmlns:ex="
+
+# XML comments
+"<!--"
+"-->"
+
+# Self-closing element variants
+"<value/>"
+"<string/>"
+"<int/>"
+"<i4/>"
+"<i8/>"
+"<boolean/>"
+"<double/>"
+"<array/>"
+"<struct/>"
+"<data/>"
+"<params/>"
+"<param/>"
+
+# XXE/DTD tokens (for security testing)
+"<!DOCTYPE"
+"<!ENTITY"
+"SYSTEM"
+"PUBLIC"
+"file://"
+"http://"
+"<!ATTLIST"
+"<!ELEMENT"
+"]>"
+
+# UTF-8 edge cases (encoding vulnerabilities)
+"\xC0\xAF"
+"\xE0\x80\xAF"
+"\xF0\x80\x80\xAF"
+"\xED\xA0\x80"
+"\xED\xBF\xBF"
+"\xF4\x90\x80\x80"
+"\xFF\xFE"
+
+# XML bomb / billion laughs patterns (entity expansion)
+"&lol;"
+"&lol1;"
+"&lol2;"
+"<!ENTITY lol \"lol\">"
+"<!ENTITY lol1 \"&lol;&lol;&lol;&lol;&lol;\">"
+"<!ENTITY lol2 \"&lol1;&lol1;&lol1;&lol1;&lol1;\">"
+
+# Parameter entities (DTD injection)
+"%entity;"
+"<!ENTITY % dtd"
+"%dtd;"
+"<!ENTITY % file SYSTEM"
+
+# Processing instructions
+"<?xml-stylesheet"
+"type=\"text/xsl\""
+"href=\""
+# "?>" - already defined above (line 10)
+
+# External DTD URL schemes
+"gopher://"
+"ftp://"
+"jar:"
+"netdoc:"
+
+# Null byte in content
+"\x00"
+
+# XInclude patterns (XML inclusion attacks)
+"<xi:include"
+"xmlns:xi=\"http://www.w3.org/2001/XInclude\""
+# "href=\"" - already defined above (line 178)
+"parse=\"xml\""
+"parse=\"text\""
+"xpointer=\""
+"</xi:include>"
+"<xi:fallback>"
+"</xi:fallback>"
+
+# Encoding declarations (parser confusion attacks)
+"encoding=\"UTF-16\""
+"encoding=\"UTF-32\""
+"encoding=\"ISO-8859-1\""
+"encoding=\"US-ASCII\""
+"encoding=\"windows-1252\""
+"standalone=\"yes\""
+"standalone=\"no\""
+
+# UTF-16 BOM patterns
+# "\xFF\xFE" - already defined above (line 159)
+"\xFE\xFF"
+
+# UTF-32 BOM patterns
+"\x00\x00\xFE\xFF"
+"\xFF\xFE\x00\x00"
+
+# XML 1.1 declaration (different parsing rules)
+"version=\"1.1\""
+
+# Namespace confusion
+"xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\""
+"xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\""
+"xsi:type=\""
+
+# Recursive entity definitions (DoS)
+"<!ENTITY a \"&b;&b;&b;&b;&b;\">"
+"<!ENTITY b \"&c;&c;&c;&c;&c;\">"
+"<!ENTITY c \"&d;&d;&d;&d;&d;\">"
+
+# External entity with different protocols
+"php://filter"
+"expect://"
+"data:"
+"file:///etc/passwd"
+"file:///c:/windows/win.ini"
+
+# Unicode normalization attacks
+# Homoglyphs (visually similar characters)
+"\xD0\xB0"
+"\xCE\xB1"
+"\xE2\x80\x8B"
+"\xE2\x80\x8C"
+"\xE2\x80\x8D"
+# "\xEF\xBB\xBF" - UTF-8 BOM already defined above (line 13)
+
+# Bidirectional text control characters
+"\xE2\x80\xAE"
+"\xE2\x80\xAD"
+"\xE2\x80\xAA"
+"\xE2\x80\xAB"
+"\xE2\x80\xAC"
+
+# Unicode replacement character
+"\xEF\xBF\xBD"
+
+# Mathematical symbols that look like operators
+"\xE2\x88\x92"
+"\xC3\x97"
+"\xC3\xB7"
+
+# Full-width characters
+"\xEF\xBC\x9C"
+"\xEF\xBC\x9E"
+"\xEF\xBC\x86"

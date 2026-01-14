@@ -1,0 +1,296 @@
+# HTTP dictionary for fuzzing
+# Helps libFuzzer find interesting inputs faster
+
+# HTTP versions
+"HTTP/1.0"
+"HTTP/1.1"
+
+# Methods
+"GET "
+"POST "
+"PUT "
+"DELETE "
+"HEAD "
+"OPTIONS "
+"PATCH "
+"CONNECT "
+
+# Common headers
+"Content-Type:"
+"Content-Length:"
+"Connection:"
+"Host:"
+"User-Agent:"
+"Accept:"
+"Transfer-Encoding:"
+"Authorization:"
+"Expect:"
+"Server:"
+"Date:"
+
+# Content types
+"text/xml"
+"application/xml"
+"application/json"
+
+# Connection values
+"keep-alive"
+"close"
+"Keep-Alive"
+"Close"
+"100-continue"
+
+# Status codes - 1xx Informational
+"100 Continue"
+"101 Switching Protocols"
+
+# Status codes - 2xx Success
+"200 OK"
+"201 Created"
+"204 No Content"
+
+# Status codes - 3xx Redirection
+"301 Moved Permanently"
+"302 Found"
+"304 Not Modified"
+"307 Temporary Redirect"
+
+# Status codes - 4xx Client Error
+"400 Bad Request"
+"401 Unauthorized"
+"403 Forbidden"
+"404 Not Found"
+"405 Method Not Allowed"
+"408 Request Timeout"
+"413 Payload Too Large"
+
+# Status codes - 5xx Server Error
+"500 Internal Server Error"
+"502 Bad Gateway"
+"503 Service Unavailable"
+"504 Gateway Timeout"
+
+# Line endings (note: pure CRLF entries removed - libFuzzer rejects whitespace-only)
+# CRLF sequences are included as part of other tokens like chunk terminators
+
+# Common paths
+"/RPC2"
+"/xmlrpc"
+"/"
+
+# Numbers for Content-Length
+"0"
+"100"
+"1000"
+"65535"
+"-1"
+"4294967295"
+"4294967296"
+"9999999999"
+
+# Transfer-Encoding values
+"chunked"
+"identity"
+"gzip"
+"deflate"
+
+# Chunk size tokens (hex) - use \x0d\x0a for CRLF
+"0\x0d\x0a"
+"a\x0d\x0a"
+"10\x0d\x0a"
+"ff\x0d\x0a"
+
+# Cookie headers
+"Cookie:"
+"Set-Cookie:"
+
+# Cache headers
+"Cache-Control:"
+"Pragma:"
+"ETag:"
+"If-None-Match:"
+"If-Modified-Since:"
+"Last-Modified:"
+"Expires:"
+"no-cache"
+"no-store"
+"max-age="
+
+# Security headers
+"X-Frame-Options:"
+"X-Content-Type-Options:"
+"nosniff"
+
+# Authorization tokens (for Base64 parsing)
+"Basic "
+"Digest "
+"Bearer "
+"dXNlcjpwYXNz"
+"dXNlcjo="
+"YWRtaW46YWRtaW4="
+"======"
+"aaa="
+"YQ=="
+
+# Header injection testing
+"\x0d\x0aX-Injected:"
+# Note: pure "\n" removed - libFuzzer rejects whitespace-only entries
+
+# Content-Length edge cases
+"-0"
+"00"
+"+0"
+"+100"
+
+# Request smuggling patterns (conflicting headers)
+"Transfer-Encoding: chunked\x0d\x0aContent-Length: 0"
+"Content-Length: 0\x0d\x0aContent-Length: 100"
+" chunked"
+"chunked, identity"
+
+# HTTP/0.9 and edge versions
+"HTTP/0.9"
+"HTTP/2"
+"HTTP/3"
+
+# Folded headers (obsolete RFC 2616)
+"Header:\x0d\x0a value"
+"Header:\x0d\x0a\x09value"
+
+# Null byte testing
+"\x00"
+
+# URL encoding
+"%20"
+"%00"
+"%2F"
+"%3A"
+"%3F"
+"%26"
+"%3D"
+
+# Query strings and fragments
+"?param=value"
+"?a=1&b=2"
+"#fragment"
+"/path?query#frag"
+
+# Content-Type parameters
+"text/xml; charset=utf-8"
+"application/xml; charset=ISO-8859-1"
+"boundary="
+
+# Multiple header values
+"Accept: text/xml, application/xml"
+"Accept-Encoding: gzip, deflate"
+
+# Long header tokens (buffer overflow testing)
+"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+"X-Very-Long-Header-Name-That-Might-Overflow:"
+
+# Conflicting Connection values
+"Connection: close, keep-alive"
+"Connection: upgrade"
+
+# Host header variations
+"Host: 127.0.0.1:8080"
+"Host: [::1]:8080"
+"Host: localhost"
+
+# Carriage return without line feed
+# Note: pure "\r" removed - libFuzzer rejects whitespace-only entries
+
+# HTTP/1.0 quirks
+"Proxy-Connection:"
+
+# TRACE method (security-sensitive)
+"TRACE "
+
+# Content-Encoding header
+"Content-Encoding:"
+"Content-Encoding: gzip"
+"Content-Encoding: identity"
+
+# Unicode homograph in headers
+"\xE2\x80\x8B"
+
+# Host header attacks (SSRF, cache poisoning)
+"Host: evil.com"
+"Host: 169.254.169.254"
+"Host: 127.0.0.1"
+"Host: 0.0.0.0"
+"Host: [::ffff:127.0.0.1]"
+"X-Forwarded-Host:"
+"X-Original-URL:"
+"X-Rewrite-URL:"
+"X-Forwarded-For:"
+"X-Real-IP:"
+"X-Originating-IP:"
+"X-Client-IP:"
+
+# Cache poisoning headers
+"X-Forwarded-Proto:"
+"X-Forwarded-Scheme:"
+"X-HTTP-Method-Override:"
+"X-Method-Override:"
+"X-Original-Method:"
+"Pragma: no-cache"
+"Cache-Control: no-cache, no-store"
+"Vary:"
+"Age:"
+
+# Additional smuggling patterns
+"Transfer-Encoding: chunked"
+"Transfer-Encoding:\x09chunked"
+"Transfer-Encoding : chunked"
+"Transfer-Encoding: xchunked"
+"Transfer-Encoding: chunked\x0d\x0aTransfer-Encoding: x"
+" Transfer-Encoding: chunked"
+"X-Transfer-Encoding: chunked"
+"Transfer-encoding: chunked"
+
+# Chunked body patterns
+"0\x0d\x0a\x0d\x0a"
+"1\x0d\x0aX\x0d\x0a0\x0d\x0a\x0d\x0a"
+"FFFFFFFF\x0d\x0a"
+
+# WebSocket upgrade (protocol confusion)
+"Upgrade: websocket"
+"Upgrade: h2c"
+"Connection: Upgrade"
+"Sec-WebSocket-Key:"
+"Sec-WebSocket-Version:"
+
+# HTTP/2 pseudo-headers (downgrade attacks)
+":method"
+":path"
+":authority"
+":scheme"
+
+# Response splitting
+"\x0d\x0aSet-Cookie: session=evil"
+"\x0d\x0aLocation: http://evil.com"
+
+# Multipart boundary attacks
+"multipart/form-data"
+"boundary=----"
+"--boundary--"
+
+# Unicode normalization in headers
+# Zero-width characters (header value smuggling)
+# "\xE2\x80\x8B" - already defined above (line 215)
+"\xE2\x80\x8C"
+"\xE2\x80\x8D"
+"\xEF\xBB\xBF"
+
+# Bidirectional text (visual spoofing)
+"\xE2\x80\xAE"
+"\xE2\x80\xAD"
+
+# Homoglyphs for header names
+"\xD0\xB0"
+"\xCE\xB1"
+
+# Full-width colon and space (parser confusion)
+"\xEF\xBC\x9A"
+"\xE3\x80\x80"

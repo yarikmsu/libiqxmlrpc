@@ -1,0 +1,6 @@
+GET /RPC2 HTTP/1.1
+Host: localhost:8080
+User-Agent: libiqxmlrpc/1.0
+Accept: text/xml
+Connection: keep-alive
+

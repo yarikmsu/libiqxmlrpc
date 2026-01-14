@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<methodCall>
+<methodName>v</methodName>
+<params>
+<param><value><array><data></data></array></value></param>
+<param><value><struct></struct></value></param>
+<param><value><array><data><value><struct></struct></value></data></array></value></param>
+<param><value><struct><member><name>empty</name><value><array><data></data></array></value></member></struct></value></param>
+</params>
+</methodCall>

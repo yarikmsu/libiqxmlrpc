@@ -1,0 +1,6 @@
+POST /RPC2 HTTP/1.1
+Host: lоcalhost:8080
+Content-Type: text/xml
+Content-Length: 0
+User-Agent: test/1.0
+
