@@ -184,3 +184,33 @@
 # Multiple header values
 "Accept: text/xml, application/xml"
 "Accept-Encoding: gzip, deflate"
+
+# Long header tokens (buffer overflow testing)
+"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+"X-Very-Long-Header-Name-That-Might-Overflow:"
+
+# Conflicting Connection values
+"Connection: close, keep-alive"
+"Connection: upgrade"
+
+# Host header variations
+"Host: 127.0.0.1:8080"
+"Host: [::1]:8080"
+"Host: localhost"
+
+# Carriage return without line feed
+"\r"
+
+# HTTP/1.0 quirks
+"Proxy-Connection:"
+
+# TRACE method (security-sensitive)
+"TRACE "
+
+# Content-Encoding header
+"Content-Encoding:"
+"Content-Encoding: gzip"
+"Content-Encoding: identity"
+
+# Unicode homograph in headers
+"\xE2\x80\x8B"
