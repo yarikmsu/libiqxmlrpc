@@ -7,6 +7,7 @@ set(FUZZ_TARGETS
   fuzz_request
   fuzz_response
   fuzz_http
+  fuzz_value
 )
 
 foreach(target ${FUZZ_TARGETS})

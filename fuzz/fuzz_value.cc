@@ -1,8 +1,8 @@
-// Fuzz target for XML-RPC request parsing
+// Fuzz target for XML-RPC Value type handling
 // Copyright (C) 2026 libiqxmlrpc contributors
 
-#include "libiqxmlrpc/request.h"
 #include "libiqxmlrpc/value.h"
+#include "libiqxmlrpc/request.h"
 #include <cstdint>
 #include <cstddef>
 #include <string>
@@ -29,6 +29,7 @@ static void exercise_value(const iqxmlrpc::Value& v, int depth = 0) {
   try { (void)v.get_bool(); } catch (...) {}
   try { (void)v.get_string(); } catch (...) {}
   try { (void)v.get_binary(); } catch (...) {}
+  try { (void)v.get_datetime(); } catch (...) {}
 
   // Recursively exercise arrays
   if (v.is_array()) {
@@ -44,6 +45,11 @@ static void exercise_value(const iqxmlrpc::Value& v, int depth = 0) {
   if (v.is_struct()) {
     try {
       (void)v.size();
+      // Try accessing with common member names
+      try { exercise_value(v["faultCode"], depth + 1); } catch (...) {}
+      try { exercise_value(v["faultString"], depth + 1); } catch (...) {}
+      try { exercise_value(v["name"], depth + 1); } catch (...) {}
+      try { exercise_value(v["value"], depth + 1); } catch (...) {}
     } catch (...) {}
   }
 }
@@ -52,15 +58,16 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   // Limit input size to prevent slow units
   if (size > 64 * 1024) return 0;
 
-  try {
-    std::string input(reinterpret_cast<const char*>(data), size);
-    iqxmlrpc::Request* req = iqxmlrpc::parse_request(input);
-    if (req) {
-      // Exercise the parsed request
-      (void)req->get_name();
-      const iqxmlrpc::Param_list& params = req->get_params();
+  // Wrap input in a minimal XML-RPC request to get Value parsing
+  std::string input(reinterpret_cast<const char*>(data), size);
+  std::string wrapped =
+    "<?xml version=\"1.0\"?><methodCall><methodName>x</methodName>"
+    "<params><param><value>" + input + "</value></param></params></methodCall>";
 
-      // Deep traversal of all parameters
+  try {
+    iqxmlrpc::Request* req = iqxmlrpc::parse_request(wrapped);
+    if (req) {
+      const iqxmlrpc::Param_list& params = req->get_params();
       for (size_t i = 0; i < params.size(); ++i) {
         exercise_value(params[i]);
       }
@@ -69,5 +76,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   } catch (...) {
     // Exceptions are expected for malformed input
   }
+
   return 0;
 }

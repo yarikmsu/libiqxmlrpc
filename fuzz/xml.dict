@@ -1,0 +1,76 @@
+# XML-RPC dictionary for fuzzing
+# Helps libFuzzer find interesting inputs faster
+
+# XML declaration
+"<?xml"
+"version="
+"\"1.0\""
+"encoding="
+"\"UTF-8\""
+"?>"
+
+# Method call/response
+"<methodCall>"
+"</methodCall>"
+"<methodName>"
+"</methodName>"
+"<methodResponse>"
+"</methodResponse>"
+
+# Parameters
+"<params>"
+"</params>"
+"<param>"
+"</param>"
+
+# Values
+"<value>"
+"</value>"
+
+# Scalar types
+"<i4>"
+"</i4>"
+"<int>"
+"</int>"
+"<boolean>"
+"</boolean>"
+"<string>"
+"</string>"
+"<double>"
+"</double>"
+"<dateTime.iso8601>"
+"</dateTime.iso8601>"
+"<base64>"
+"</base64>"
+"<nil/>"
+"<nil>"
+"</nil>"
+
+# Compound types
+"<array>"
+"</array>"
+"<data>"
+"</data>"
+"<struct>"
+"</struct>"
+"<member>"
+"</member>"
+"<name>"
+"</name>"
+
+# Fault handling
+"<fault>"
+"</fault>"
+"faultCode"
+"faultString"
+
+# Common values
+"0"
+"1"
+"-1"
+"true"
+"false"
+"2147483647"
+"-2147483648"
+"3.14159"
+"1.0e308"
