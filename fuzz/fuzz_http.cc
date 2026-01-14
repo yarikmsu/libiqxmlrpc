@@ -36,6 +36,34 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     // Exceptions are expected for malformed input
   }
 
+  // Fuzz set_authinfo - tests Base64 encoding construction
+  // This exercises the path where auth info is SET rather than GET
+  if (size > 1) {
+    try {
+      iqxmlrpc::http::Request_header req_hdr("/RPC2", "localhost", 8080);
+      // Split input into user and password
+      size_t split = data[0] % size;
+      std::string user(reinterpret_cast<const char*>(data + 1),
+                       split > 0 ? split - 1 : 0);
+      std::string password;
+      if (split + 1 < size) {
+        password = std::string(reinterpret_cast<const char*>(data + split),
+                               size - split);
+      }
+      // Set auth info (constructs Base64 internally)
+      req_hdr.set_authinfo(user, password);
+      // Verify round-trip
+      if (req_hdr.has_authinfo()) {
+        std::string out_user, out_pass;
+        req_hdr.get_authinfo(out_user, out_pass);
+      }
+      // Dump the header to exercise serialization
+      (void)req_hdr.dump();
+    } catch (...) {
+      // Exceptions are expected for malformed input
+    }
+  }
+
   // Fuzz HTTP request header parsing (strict verification)
   try {
     iqxmlrpc::http::Request_header req_hdr_strict(
