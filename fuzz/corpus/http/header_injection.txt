@@ -1,0 +1,7 @@
+POST /RPC2 HTTP/1.1
+Host: localhost:8080
+Content-Type: text/xml
+X-Custom: value
+X-Injected: evil
+Content-Length: 0
+

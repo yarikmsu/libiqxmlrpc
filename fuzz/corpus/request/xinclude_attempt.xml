@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<methodCall xmlns:xi="http://www.w3.org/2001/XInclude">
+<methodName>test.xinclude</methodName>
+<params>
+<param><value><string><xi:include href="file:///etc/passwd" parse="text"/></string></value></param>
+</params>
+</methodCall>
