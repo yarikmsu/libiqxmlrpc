@@ -214,6 +214,7 @@ jobs:
           -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address" \
           -DLIB_FUZZING_ENGINE="-fsanitize=fuzzer" \
           -Dbuild_fuzzers=ON \
+          -Dbuild_tests=OFF \
           ..
 
     - name: Build
