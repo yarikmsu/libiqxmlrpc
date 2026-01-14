@@ -2886,9 +2886,9 @@ public:
   SimpleMockProxy() = default;
   ~SimpleMockProxy() { stop(); }
 
-  void start(int port) {
-    port_ = port;
+  void start(int port = 0) {
     server_sock_.bind(Inet_addr("127.0.0.1", port));
+    port_ = server_sock_.get_addr().get_port();  // Get actual port (handles port=0)
     server_sock_.listen(5);
     running_ = true;
 
@@ -2933,7 +2933,10 @@ public:
 
   void stop() {
     running_ = false;
-    try { Socket s; s.connect(Inet_addr("127.0.0.1", port_)); s.close(); } catch (...) {}
+    // Wake up accept() by connecting (only if port was assigned)
+    if (port_ > 0) {
+      try { Socket s; s.connect(Inet_addr("127.0.0.1", port_)); s.close(); } catch (...) {}
+    }
     if (worker_.joinable()) worker_.join();
     try { server_sock_.close(); } catch (...) {}
   }
@@ -2947,7 +2950,7 @@ public:
 BOOST_AUTO_TEST_CASE(http_proxy_client_through_mock)
 {
   SimpleMockProxy proxy;
-  proxy.start(17600);
+  proxy.start();  // Uses OS-assigned port to avoid conflicts
 
   try {
     // Create HTTP client with proxy
@@ -2980,8 +2983,19 @@ BOOST_AUTO_TEST_CASE(http_proxy_client_through_mock)
 // Covers http_client.cc lines 61-62 (connection closed handling)
 BOOST_AUTO_TEST_CASE(http_proxy_connection_closed)
 {
+  // RAII guard for cleanup
+  struct ProxyGuard {
+    Socket& sock;
+    std::thread& thr;
+    ~ProxyGuard() {
+      if (thr.joinable()) thr.join();
+      try { sock.close(); } catch (...) {}
+    }
+  };
+
   Socket proxy_sock;
-  proxy_sock.bind(Inet_addr("127.0.0.1", 17601));
+  proxy_sock.bind(Inet_addr("127.0.0.1", 0));  // OS-assigned port
+  int port = proxy_sock.get_addr().get_port();
   proxy_sock.listen(1);
 
   std::thread proxy_thread([&proxy_sock]() {
@@ -2989,34 +3003,30 @@ BOOST_AUTO_TEST_CASE(http_proxy_connection_closed)
       Socket client = proxy_sock.accept();
       char buf[1024];
       client.recv(buf, sizeof(buf));
-
-      // Just close without sending a response
-      client.close();
+      client.close();  // Close without response
     } catch (...) {}
   });
+
+  ProxyGuard guard{proxy_sock, proxy_thread};  // Ensures cleanup on any exit
 
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
   bool got_error = false;
   try {
     Inet_addr target("example.com", 80);
-    Inet_addr proxy("127.0.0.1", 17601);
+    Inet_addr proxy("127.0.0.1", port);
 
     Client<Http_client_connection> client(target);
     client.set_proxy(proxy);
     client.set_timeout(5);
     client.execute("test", Value("x"));
   } catch (const iqnet::network_error&) {
-    // Expected - connection closed by peer
-    got_error = true;
+    got_error = true;  // Expected - connection closed by peer
   } catch (const std::exception&) {
-    // Any exception is acceptable - code path was exercised
-    got_error = true;
+    got_error = true;  // Any exception acceptable - code path exercised
   }
 
   BOOST_CHECK(got_error);
-  proxy_thread.join();
-  proxy_sock.close();
 }
 
 // NOTE: HTTPS proxy tests (https_proxy_connect_tunnel, https_proxy_error_response,
