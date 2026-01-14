@@ -121,3 +121,24 @@
 "X-Frame-Options:"
 "X-Content-Type-Options:"
 "nosniff"
+
+# Authorization tokens (for Base64 parsing)
+"Basic "
+"Digest "
+"Bearer "
+"dXNlcjpwYXNz"
+"dXNlcjo="
+"YWRtaW46YWRtaW4="
+"======"
+"aaa="
+"YQ=="
+
+# Header injection testing
+"\r\nX-Injected:"
+"\n"
+
+# Content-Length edge cases
+"-0"
+"00"
+"+0"
+"+100"

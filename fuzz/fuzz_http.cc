@@ -41,7 +41,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     // Exceptions are expected for malformed input
   }
 
-  // Fuzz HTTP response header parsing
+  // Fuzz HTTP response header parsing (weak verification)
   try {
     iqxmlrpc::http::Response_header resp_hdr(
       iqxmlrpc::http::HTTP_CHECK_WEAK, input);
@@ -49,6 +49,17 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     (void)resp_hdr.phrase();
     (void)resp_hdr.content_length();
     (void)resp_hdr.server();
+  } catch (...) {
+    // Exceptions are expected for malformed input
+  }
+
+  // Fuzz HTTP response header parsing (strict verification)
+  try {
+    iqxmlrpc::http::Response_header resp_hdr_strict(
+      iqxmlrpc::http::HTTP_CHECK_STRICT, input);
+    (void)resp_hdr_strict.code();
+    (void)resp_hdr_strict.phrase();
+    (void)resp_hdr_strict.content_length();
   } catch (...) {
     // Exceptions are expected for malformed input
   }
