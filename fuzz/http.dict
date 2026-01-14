@@ -214,3 +214,65 @@
 
 # Unicode homograph in headers
 "\xE2\x80\x8B"
+
+# Host header attacks (SSRF, cache poisoning)
+"Host: evil.com"
+"Host: 169.254.169.254"
+"Host: 127.0.0.1"
+"Host: 0.0.0.0"
+"Host: [::ffff:127.0.0.1]"
+"X-Forwarded-Host:"
+"X-Original-URL:"
+"X-Rewrite-URL:"
+"X-Forwarded-For:"
+"X-Real-IP:"
+"X-Originating-IP:"
+"X-Client-IP:"
+
+# Cache poisoning headers
+"X-Forwarded-Proto:"
+"X-Forwarded-Scheme:"
+"X-HTTP-Method-Override:"
+"X-Method-Override:"
+"X-Original-Method:"
+"Pragma: no-cache"
+"Cache-Control: no-cache, no-store"
+"Vary:"
+"Age:"
+
+# Additional smuggling patterns
+"Transfer-Encoding: chunked"
+"Transfer-Encoding:\tchunked"
+"Transfer-Encoding : chunked"
+"Transfer-Encoding: xchunked"
+"Transfer-Encoding: chunked\r\nTransfer-Encoding: x"
+" Transfer-Encoding: chunked"
+"X-Transfer-Encoding: chunked"
+"Transfer-encoding: chunked"
+
+# Chunked body patterns
+"0\r\n\r\n"
+"1\r\nX\r\n0\r\n\r\n"
+"FFFFFFFF\r\n"
+
+# WebSocket upgrade (protocol confusion)
+"Upgrade: websocket"
+"Upgrade: h2c"
+"Connection: Upgrade"
+"Sec-WebSocket-Key:"
+"Sec-WebSocket-Version:"
+
+# HTTP/2 pseudo-headers (downgrade attacks)
+":method"
+":path"
+":authority"
+":scheme"
+
+# Response splitting
+"\r\nSet-Cookie: session=evil"
+"\r\nLocation: http://evil.com"
+
+# Multipart boundary attacks
+"multipart/form-data"
+"boundary=----"
+"--boundary--"
