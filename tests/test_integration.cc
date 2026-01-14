@@ -2877,8 +2877,8 @@ BOOST_FIXTURE_TEST_CASE(server_feedback_normal_paths, IntegrationFixture)
 // Mock HTTP proxy server for testing proxy client
 namespace {
 class SimpleMockProxy {
-  Socket server_sock_;
-  std::thread worker_;
+  Socket server_sock_{};
+  std::thread worker_{};
   std::atomic<bool> running_{false};
   int port_ = 0;
 
