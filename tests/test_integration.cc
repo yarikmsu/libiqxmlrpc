@@ -23,6 +23,7 @@
 
 #include "methods.h"
 #include "test_common.h"
+#include "test_integration_common.h"
 
 #include <atomic>
 #include <memory>
@@ -32,46 +33,7 @@ using namespace iqxmlrpc;
 using namespace iqnet;
 using namespace iqxmlrpc_test;
 
-namespace {
-
-// Simple auth plugin for testing
-class TestAuthPlugin : public Auth_Plugin_base {
-  bool allow_anonymous_;
-public:
-  explicit TestAuthPlugin(bool allow_anonymous = true)
-    : allow_anonymous_(allow_anonymous) {}
-
-  bool do_authenticate(const std::string& user, const std::string& password) const override {
-    return user == "testuser" && password == "testpass";
-  }
-
-  bool do_authenticate_anonymous() const override {
-    return allow_anonymous_;
-  }
-};
-
-// Firewall that blocks all connections
-class BlockAllFirewall : public Firewall_base {
-public:
-  bool grant(const Inet_addr&) override { return false; }
-};
-
-// Firewall with custom message
-class CustomMessageFirewall : public Firewall_base {
-public:
-  bool grant(const Inet_addr&) override { return false; }
-  std::string message() override { return "HTTP/1.0 403 Custom Forbidden\r\n\r\n"; }
-};
-
-// Firewall that allows all connections
-class AllowAllFirewall : public Firewall_base {
-public:
-  bool grant(const Inet_addr&) override { return true; }
-};
-
-} // anonymous namespace
-
-// IntegrationFixture is now provided by test_common.h
+// Auth plugins and HTTPS fixtures are now provided by test_integration_common.h
 
 //=============================================================================
 // Acceptor Tests
@@ -1267,218 +1229,9 @@ BOOST_AUTO_TEST_SUITE_END()
 // The HTTPS handshake tests use an embedded self-signed certificate.
 //=============================================================================
 
-#include <fstream>
-#include <cstdio>
-
-namespace {
-
-// Embedded self-signed certificate for testing
-// Generated with: openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 36500 -nodes -subj "/CN=localhost"
-const char* EMBEDDED_TEST_CERT = R"(-----BEGIN CERTIFICATE-----
-MIIDCzCCAfOgAwIBAgIUXzkbleG5HOcIm3Ke/qrw3JCCCVMwDQYJKoZIhvcNAQEL
-BQAwFDESMBAGA1UEAwwJbG9jYWxob3N0MCAXDTI2MDEwOTIxMTYxNVoYDzIxMjUx
-MjE2MjExNjE1WjAUMRIwEAYDVQQDDAlsb2NhbGhvc3QwggEiMA0GCSqGSIb3DQEB
-AQUAA4IBDwAwggEKAoIBAQDWUSUBs2Am6ptXHZkz3zZAwzA06jF+r5PMCFmhf2ZY
-o54a0dUgh2XElgpo7saEWFNnt5EgTxJQpUCRHs7QKkB39/6itjg/4rmR7C7nXj1n
-q1jkYUXiPXlihkHwycXp4jUh0zgLFAtQNYBl6AajlsZcxkLUB+4pFxTmtCXuOX6E
-fh4iiougQgkzUL89dNC/+PViUOKkO3WxZ3ZcuLEaiyBEBfuqLH/YBKp45nIaFr8H
-iFyEx6Y5nuZ1grPDDbZZ4MXmdm+aC6OUNTrIYtSzaP2wO3BiJhLVshDB/cIDmYsX
-H80aB3zbrKWClTTAVxFgn/y83lNAIciP90XvDQSP59EDAgMBAAGjUzBRMB0GA1Ud
-DgQWBBQo6uxnhPB3W3xFzqQ42Xgzg//+wjAfBgNVHSMEGDAWgBQo6uxnhPB3W3xF
-zqQ42Xgzg//+wjAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQCa
-iBhA4uamOdZAulJQV3/VKOlqzCPyzokSwh+D7H2fgvJRf4dt4CvZYlFtM2iK7+EW
-h7wYNJ5qo4pq88/iAfDgIe8Vbpbr9IpwcHw1hLfVxqOys845Z4bXRrvFaE4GaaAa
-Nx+Zbr+asm0eL2w/df8HHcp78vHYZSDZL04skyv1Ybx1buoFY3G59kl/I2v7SRXi
-73m7JurSbDWaVXV9M2k/znSPifdx9bqOKHX8zX7liitHcSyVGG9DWl1yB+2iP0dM
-0eioGoqxoNt3Gws8wSieB11r2k5cfqcGFLbjEfV6YDenjRs2FB2xVfrmocBrbJ9V
-5ntzlSfNSe7ZowUs1202
------END CERTIFICATE-----
-)";
-
-const char* EMBEDDED_TEST_KEY = R"(-----BEGIN PRIVATE KEY-----
-MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDWUSUBs2Am6ptX
-HZkz3zZAwzA06jF+r5PMCFmhf2ZYo54a0dUgh2XElgpo7saEWFNnt5EgTxJQpUCR
-Hs7QKkB39/6itjg/4rmR7C7nXj1nq1jkYUXiPXlihkHwycXp4jUh0zgLFAtQNYBl
-6AajlsZcxkLUB+4pFxTmtCXuOX6Efh4iiougQgkzUL89dNC/+PViUOKkO3WxZ3Zc
-uLEaiyBEBfuqLH/YBKp45nIaFr8HiFyEx6Y5nuZ1grPDDbZZ4MXmdm+aC6OUNTrI
-YtSzaP2wO3BiJhLVshDB/cIDmYsXH80aB3zbrKWClTTAVxFgn/y83lNAIciP90Xv
-DQSP59EDAgMBAAECggEAUcqzIGSIUCHeOg+SPgE0j9/OQIuWax5v/gC70E4yTabX
-+q1VNO5nkPCgNW7XNYAOCLm+ecGjoEKJEzlaPYi6hO6Q8CEx83PAVaf5OJS3Q57Z
-tINJK/BBKLBLby1aSonptCiLrXKvZKOehoXYLsumlZaWv5vtMSJdeDSNe07W8ZIL
-VxlKFsVANHPMP9wK/NIx2z0G+Qd/e8UJukuLccN5G+oL/oPfGdMtxY3onHlSQdL0
-X20v5dcbTKRwO+kYMK9nLz6ZF9sL/MDi3/AmlCyPQ87Vaz/LTw2t8JlSe9hqHoZ9
-hJat8c6KRnRvL6hhs3YFuXnh5uecs6SdsltXrf6UBQKBgQD0Bg6rP1OTv/BIFY3p
-CT8M/Eop49eM3d5jIkWGEo0LDZp6TVQ6geWIhTYXB24D7zzk/FlhUiWrYlCSJhjc
-NFff7ysdbZft0gVtYRddepEgN2JafJqs8R1+GoYubrxUcFz/v4qIkt8NXs54Z+J3
-TCQqIf8aEK0XO1gN3qlITzZS9wKBgQDg1dlMFDGrSUdu19vnXK85t/dQvroyrnKZ
-MyObUceSLSkYNbOJAplI48LMTVApmUccG370WNg/qGiZhBdw90UxdHLPdt3Ca/C5
-3wmGUNakg5bDfdFhmHsooQlh6wvbJ1SX3O9UApWDqLMstSaUZqppbVgjpbrHG9AV
-e/94Vo2jVQKBgQC7Ye9ftsgh+9CyOcL4QL5m5VC57Bi4NiMwMr/6XUJrS23lHn5g
-UyED/W70riLf6JT1LYYhAmiku2EtaQ3MAnG8JrcP6PkyiQTb4iOEB7trZrwiye4o
-gRppnEqPWz9JA+OWC+qAR2/6n2Oi9/riKtjWdbajuEyCO3K5a9LIEPOhLwKBgQCk
-P/Wn25TRgg4aTr2Kjq4/50JYjY0vGzwC6VYY0KyQAEfmNMz8yZY7ppAXel+WlDBb
-u0aKsSEBmEEZ7WLGlw3IbD63iynEL+DDmMm3gvTbaHpKRG8i8ib+7m4RR4n4xwnI
-i5GXeO/LKAIFJi2R+lKCBGyAVkFV1d6040olmm2MpQKBgBEkhuUdBaSkNBt8YJxM
-BU2PiriNuFw5UMWFRRcysMKO3oA9UWeXEHEX7z4jyThCmLl2+X0Q9KvAezhKdRjP
-H/+tEBbXrHM9aOHqPvhkMe6foDk3VZdXwiU/XO+gBidrsQVoHRuz3TA5xMYflvHg
-rK0fmiWyi5lQX70lb9kyDkqP
------END PRIVATE KEY-----
-)";
-
-// Write embedded cert/key to temp files and return their paths
-std::pair<std::string, std::string> create_temp_cert_files() {
-  std::string cert_path = "/tmp/iqxmlrpc_test_cert.pem";
-  std::string key_path = "/tmp/iqxmlrpc_test_key.pem";
-
-  std::ofstream cert_file(cert_path);
-  cert_file << EMBEDDED_TEST_CERT;
-  cert_file.close();
-
-  std::ofstream key_file(key_path);
-  key_file << EMBEDDED_TEST_KEY;
-  key_file.close();
-
-  return std::make_pair(cert_path, key_path);
-}
-
-// Verifier that tracks how many times it was called
-class TrackingVerifier : public iqnet::ssl::ConnectionVerifier {
-  mutable std::atomic<int> call_count_{0};
-
-  int do_verify(bool, X509_STORE_CTX*) const override {
-    ++call_count_;
-    return 1;  // Accept all
-  }
-
-public:
-  int get_call_count() const { return call_count_.load(); }
-  void reset() { call_count_ = 0; }
-};
-
-// HTTPS integration test fixture with embedded certificates
-class HttpsIntegrationFixture {
-protected:
-  std::unique_ptr<Https_server> server_;
-  std::unique_ptr<Executor_factory_base> exec_factory_;
-  std::thread server_thread_;
-  std::mutex ready_mutex_;
-  std::condition_variable ready_cond_;
-  bool server_ready_ = false;
-  std::atomic<bool> server_running_{false};
-  int port_ = 19950;
-  iqnet::ssl::Ctx* saved_ctx_ = nullptr;
-  iqnet::ssl::Ctx* test_ctx_ = nullptr;
-  std::string temp_cert_path_;
-  std::string temp_key_path_;
-
-public:
-  HttpsIntegrationFixture(const HttpsIntegrationFixture&) = delete;
-  HttpsIntegrationFixture& operator=(const HttpsIntegrationFixture&) = delete;
-
-  HttpsIntegrationFixture()
-    : server_()
-    , exec_factory_()
-    , server_thread_()
-    , ready_mutex_()
-    , ready_cond_()
-    , saved_ctx_(iqnet::ssl::ctx)
-    , temp_cert_path_()
-    , temp_key_path_()
-  {}
-
-  ~HttpsIntegrationFixture() {
-    stop_server();
-    cleanup_ssl();
-    cleanup_temp_files();
-  }
-
-  bool setup_ssl_context() {
-    try {
-      auto paths = create_temp_cert_files();
-      temp_cert_path_ = paths.first;
-      temp_key_path_ = paths.second;
-
-      test_ctx_ = iqnet::ssl::Ctx::client_server(temp_cert_path_, temp_key_path_);
-      iqnet::ssl::ctx = test_ctx_;
-      return true;
-    } catch (...) {
-      return false;
-    }
-  }
-
-  void cleanup_ssl() {
-    iqnet::ssl::ctx = saved_ctx_;
-    if (test_ctx_) {
-      delete test_ctx_;
-      test_ctx_ = nullptr;
-    }
-  }
-
-  void cleanup_temp_files() {
-    if (!temp_cert_path_.empty()) std::remove(temp_cert_path_.c_str());
-    if (!temp_key_path_.empty()) std::remove(temp_key_path_.c_str());
-  }
-
-  void start_server(int port_offset = 0) {
-    port_ = 19950 + port_offset;
-
-    exec_factory_.reset(new Serial_executor_factory);
-
-    server_.reset(new Https_server(
-      Inet_addr("127.0.0.1", port_),
-      exec_factory_.get()));
-
-    register_user_methods(*server_);
-
-    server_running_ = true;
-    server_thread_ = std::thread([this]() {
-      {
-        std::unique_lock<std::mutex> lk(ready_mutex_);
-        server_ready_ = true;
-        ready_cond_.notify_one();
-      }
-      server_->work();
-      server_running_ = false;
-    });
-
-    std::unique_lock<std::mutex> lk(ready_mutex_);
-    ready_cond_.wait_for(lk,
-      std::chrono::seconds(5),
-      [this]{ return server_ready_; });
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  }
-
-  void stop_server() {
-    if (server_ && server_running_) {
-      server_->set_exit_flag();
-      server_->interrupt();
-      if (server_thread_.joinable()) {
-        server_thread_.join();
-      }
-    }
-    server_.reset();
-    exec_factory_.reset();
-    server_ready_ = false;
-    server_running_ = false;
-  }
-
-  std::unique_ptr<Client_base> create_client() {
-    return std::unique_ptr<Client_base>(
-      new Client<Https_client_connection>(Inet_addr("127.0.0.1", port_)));
-  }
-
-  iqnet::ssl::Ctx* get_context() { return test_ctx_; }
-};
-
-// Check if external test certificates are available (for backward compat tests)
-bool ssl_certs_available() {
-  std::ifstream cert("../tests/data/cert.pem");
-  std::ifstream key("../tests/data/pk.pem");
-  return cert.good() && key.good();
-}
-
-}
+// Embedded certificates, HttpsIntegrationFixture, TrackingVerifier,
+// create_temp_cert_files(), and ssl_certs_available() are now provided
+// by test_integration_common.h
 
 BOOST_AUTO_TEST_SUITE(ssl_tests)
 
@@ -1751,6 +1504,10 @@ BOOST_FIXTURE_TEST_CASE(ssl_cert_fingerprint_stability, HttpsIntegrationFixture)
     BOOST_CHECK_EQUAL(r.value().get_int(), i);
   }
 }
+
+// Note: The https_proxy_ssl_factory_* tests in coverage_improvement_tests provide
+// good coverage of the tunnel code path (https_client.cc) using inline proxy
+// patterns with SslFactoryTestProxyGuard from test_integration_common.h.
 
 BOOST_AUTO_TEST_SUITE_END()
 
@@ -3377,15 +3134,7 @@ BOOST_AUTO_TEST_CASE(https_proxy_tunnel_timeout)
 
 #ifdef IQXMLRPC_TESTING
 
-// RAII guard for mock proxy socket and thread cleanup
-struct SslFactoryTestProxyGuard {
-  Socket& sock;
-  std::thread& thr;
-  ~SslFactoryTestProxyGuard() {
-    if (thr.joinable()) thr.join();
-    try { sock.close(); } catch (...) {}
-  }
-};
+// SslFactoryTestProxyGuard is now provided by test_integration_common.h
 
 // Test successful tunnel setup with mock SSL factory
 // Covers https_client.cc lines 54-61 (do_process_session with factory)
