@@ -5,6 +5,8 @@
 #define IQXMLRPC_FUZZ_COMMON_H
 
 #include "libiqxmlrpc/value.h"
+#include <cstdint>
+#include <string>
 
 namespace fuzz {
 
@@ -43,6 +45,13 @@ inline void exercise_value(const iqxmlrpc::Value& v, int depth = 0) {
   try { (void)v.get_string(); } catch (...) {}
   try { (void)v.get_binary(); } catch (...) {}
   try { (void)v.get_datetime(); } catch (...) {}
+
+  // Exercise conversion operators (different code path than get_* methods)
+  try { (void)static_cast<int>(v); } catch (...) {}
+  try { (void)static_cast<int64_t>(v); } catch (...) {}
+  try { (void)static_cast<double>(v); } catch (...) {}
+  try { (void)static_cast<bool>(v); } catch (...) {}
+  try { (void)static_cast<std::string>(v); } catch (...) {}
 
   // Recursively exercise arrays
   if (v.is_array()) {
