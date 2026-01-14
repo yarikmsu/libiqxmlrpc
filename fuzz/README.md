@@ -57,7 +57,7 @@ make -j$(nproc)
 cd ..
 
 # Compile a fuzz target with test harness
-clang++ -std=c++11 -DBOOST_TIMER_ENABLE_DEPRECATED \
+clang++ -std=c++17 -DBOOST_TIMER_ENABLE_DEPRECATED \
     -I. \
     fuzz/fuzz_request.cc fuzz/test_harness.cc \
     -o test_fuzz_request \

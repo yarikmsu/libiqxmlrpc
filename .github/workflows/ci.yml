@@ -209,9 +209,9 @@ jobs:
         cmake \
           -DCMAKE_C_COMPILER=clang \
           -DCMAKE_CXX_COMPILER=clang++ \
-          -DCMAKE_CXX_FLAGS="-DBOOST_TIMER_ENABLE_DEPRECATED -fsanitize=fuzzer-no-link,address -fno-omit-frame-pointer" \
-          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address" \
-          -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address" \
+          -DCMAKE_CXX_FLAGS="-DBOOST_TIMER_ENABLE_DEPRECATED -fsanitize=fuzzer-no-link,address,undefined -fno-omit-frame-pointer" \
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
+          -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined" \
           -DLIB_FUZZING_ENGINE="-fsanitize=fuzzer" \
           -Dbuild_fuzzers=ON \
           -Dbuild_tests=OFF \
@@ -246,6 +246,25 @@ jobs:
         timeout 60 ./fuzz_http ../../corpus/http/ 2>&1 || true
       env:
         ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
+        UBSAN_OPTIONS: print_stacktrace=1:abort_on_error=1
+
+    - name: Check for crashes
+      run: |
+        if ls build/fuzz/crash-* build/fuzz/oom-* 2>/dev/null; then
+          echo "::error::Fuzzer found crashes!"
+          exit 1
+        fi
+        echo "No crashes found"
+
+    - name: Upload crash artifacts
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: fuzzer-crashes
+        path: |
+          build/fuzz/crash-*
+          build/fuzz/oom-*
+        if-no-files-found: ignore
 
   cppcheck:
     name: cppcheck

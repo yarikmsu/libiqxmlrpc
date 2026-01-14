@@ -26,9 +26,9 @@
       "cacheVariables": {
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
-        "CMAKE_CXX_FLAGS": "-DBOOST_TIMER_ENABLE_DEPRECATED -fsanitize=fuzzer-no-link,address -fno-omit-frame-pointer",
-        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address",
-        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address",
+        "CMAKE_CXX_FLAGS": "-DBOOST_TIMER_ENABLE_DEPRECATED -fsanitize=fuzzer-no-link,address,undefined -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address,undefined",
         "LIB_FUZZING_ENGINE": "-fsanitize=fuzzer",
         "build_fuzzers": true,
         "build_tests": false
@@ -48,9 +48,9 @@
       "cacheVariables": {
         "CMAKE_C_COMPILER": "/opt/homebrew/opt/llvm/bin/clang",
         "CMAKE_CXX_COMPILER": "/opt/homebrew/opt/llvm/bin/clang++",
-        "CMAKE_CXX_FLAGS": "-DBOOST_TIMER_ENABLE_DEPRECATED -fsanitize=fuzzer-no-link,address -fno-omit-frame-pointer",
-        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address -L/opt/homebrew/opt/llvm/lib/c++ -Wl,-rpath,/opt/homebrew/opt/llvm/lib/c++",
-        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address -L/opt/homebrew/opt/llvm/lib/c++ -Wl,-rpath,/opt/homebrew/opt/llvm/lib/c++",
+        "CMAKE_CXX_FLAGS": "-DBOOST_TIMER_ENABLE_DEPRECATED -fsanitize=fuzzer-no-link,address,undefined -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined -L/opt/homebrew/opt/llvm/lib/c++ -Wl,-rpath,/opt/homebrew/opt/llvm/lib/c++",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address,undefined -L/opt/homebrew/opt/llvm/lib/c++ -Wl,-rpath,/opt/homebrew/opt/llvm/lib/c++",
         "LIB_FUZZING_ENGINE": "-fsanitize=fuzzer",
         "build_fuzzers": true,
         "build_tests": false
@@ -70,9 +70,9 @@
       "cacheVariables": {
         "CMAKE_C_COMPILER": "/usr/local/opt/llvm/bin/clang",
         "CMAKE_CXX_COMPILER": "/usr/local/opt/llvm/bin/clang++",
-        "CMAKE_CXX_FLAGS": "-DBOOST_TIMER_ENABLE_DEPRECATED -fsanitize=fuzzer-no-link,address -fno-omit-frame-pointer",
-        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address -L/usr/local/opt/llvm/lib/c++ -Wl,-rpath,/usr/local/opt/llvm/lib/c++",
-        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address -L/usr/local/opt/llvm/lib/c++ -Wl,-rpath,/usr/local/opt/llvm/lib/c++",
+        "CMAKE_CXX_FLAGS": "-DBOOST_TIMER_ENABLE_DEPRECATED -fsanitize=fuzzer-no-link,address,undefined -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined -L/usr/local/opt/llvm/lib/c++ -Wl,-rpath,/usr/local/opt/llvm/lib/c++",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address,undefined -L/usr/local/opt/llvm/lib/c++ -Wl,-rpath,/usr/local/opt/llvm/lib/c++",
         "LIB_FUZZING_ENGINE": "-fsanitize=fuzzer",
         "build_fuzzers": true,
         "build_tests": false
@@ -121,6 +121,10 @@
     {
       "name": "fuzzing-macos",
       "configurePreset": "fuzzing-macos"
+    },
+    {
+      "name": "fuzzing-macos-intel",
+      "configurePreset": "fuzzing-macos-intel"
     },
     {
       "name": "asan",
