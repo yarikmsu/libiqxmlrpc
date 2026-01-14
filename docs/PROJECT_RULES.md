@@ -24,7 +24,7 @@ make perf-test                                     # Run benchmarks
 
 ## CI Checks
 
-PRs must pass: ubuntu-24.04, ubi8, macos builds | ASan/UBSan | TSan | coverage | cppcheck | CodeQL
+PRs must pass: ubuntu-24.04, ubi8, macos | ASan/UBSan | TSan | Fuzz | coverage | cppcheck | CodeQL
 
 ## Architecture
 
