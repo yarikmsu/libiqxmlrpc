@@ -83,6 +83,17 @@
 "1.0e308"
 "1.0e-308"
 ""
+"NaN"
+"Infinity"
+"-Infinity"
+"+0.0"
+"-0.0"
+
+# DateTime edge cases
+"19700101T00:00:00"
+"20380119T03:14:07"
+"99991231T23:59:59"
+"00010101T00:00:00"
 
 # XML entity references
 "&lt;"
