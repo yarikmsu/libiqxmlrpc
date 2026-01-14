@@ -36,6 +36,7 @@ inline void exercise_value(const iqxmlrpc::Value& v, int depth = 0) {
   (void)v.is_datetime();
   (void)v.is_array();
   (void)v.is_struct();
+  (void)v.type_name();
 
   // Exercise all type conversion methods (each may throw on type mismatch)
   try { (void)v.get_int(); } catch (...) {}

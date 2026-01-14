@@ -142,3 +142,21 @@
 "00"
 "+0"
 "+100"
+
+# Request smuggling patterns (conflicting headers)
+"Transfer-Encoding: chunked\r\nContent-Length: 0"
+"Content-Length: 0\r\nContent-Length: 100"
+" chunked"
+"chunked, identity"
+
+# HTTP/0.9 and edge versions
+"HTTP/0.9"
+"HTTP/2"
+"HTTP/3"
+
+# Folded headers (obsolete RFC 2616)
+"Header:\r\n value"
+"Header:\r\n\tvalue"
+
+# Null byte testing
+"\x00"

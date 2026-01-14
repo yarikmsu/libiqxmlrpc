@@ -32,7 +32,9 @@ set(FUZZ_TARGETS
 )
 
 foreach(target ${FUZZ_TARGETS})
-  add_executable(${target} ${target}.cc)
+  # EXCLUDE_FROM_ALL prevents building fuzz targets in normal builds
+  # Build explicitly with: make fuzz_request fuzz_response fuzz_http fuzz_value
+  add_executable(${target} EXCLUDE_FROM_ALL ${target}.cc)
   target_link_libraries(${target} iqxmlrpc ${LIB_FUZZING_ENGINE})
   target_include_directories(${target} PRIVATE ${CMAKE_SOURCE_DIR})
 endforeach()
