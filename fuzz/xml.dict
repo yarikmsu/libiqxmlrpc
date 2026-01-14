@@ -236,3 +236,32 @@
 "data:"
 "file:///etc/passwd"
 "file:///c:/windows/win.ini"
+
+# Unicode normalization attacks
+# Homoglyphs (visually similar characters)
+"\xD0\xB0"
+"\xCE\xB1"
+"\xE2\x80\x8B"
+"\xE2\x80\x8C"
+"\xE2\x80\x8D"
+"\xEF\xBB\xBF"
+
+# Bidirectional text control characters
+"\xE2\x80\xAE"
+"\xE2\x80\xAD"
+"\xE2\x80\xAA"
+"\xE2\x80\xAB"
+"\xE2\x80\xAC"
+
+# Unicode replacement character
+"\xEF\xBF\xBD"
+
+# Mathematical symbols that look like operators
+"\xE2\x88\x92"
+"\xC3\x97"
+"\xC3\xB7"
+
+# Full-width characters
+"\xEF\xBC\x9C"
+"\xEF\xBC\x9E"
+"\xEF\xBC\x86"

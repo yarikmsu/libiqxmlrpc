@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<methodCall>
+<methodName>test.datetimeEdge</methodName>
+<params>
+<param><value><dateTime.iso8601>19700101T00:00:00</dateTime.iso8601></value></param>
+<param><value><dateTime.iso8601>20380119T03:14:07</dateTime.iso8601></value></param>
+<param><value><dateTime.iso8601>99991231T23:59:59</dateTime.iso8601></value></param>
+<param><value><dateTime.iso8601>00010101T00:00:00</dateTime.iso8601></value></param>
+<param><value><dateTime.iso8601>20000229T12:00:00</dateTime.iso8601></value></param>
+<param><value><dateTime.iso8601>19000228T23:59:59</dateTime.iso8601></value></param>
+</params>
+</methodCall>
