@@ -222,7 +222,7 @@ jobs:
 
     - name: Create corpus directories
       run: |
-        mkdir -p corpus/request corpus/response corpus/http
+        mkdir -p corpus/request corpus/response corpus/http corpus/value
         # Seed corpus for request fuzzer
         echo '<?xml version="1.0"?><methodCall><methodName>test</methodName></methodCall>' > corpus/request/seed1.xml
         echo '<?xml version="1.0"?><methodCall><methodName>sum</methodName><params><param><value><i4>1</i4></value></param></params></methodCall>' > corpus/request/seed2.xml
@@ -232,18 +232,25 @@ jobs:
         # Seed corpus for HTTP fuzzer
         printf 'POST /RPC2 HTTP/1.1\r\nHost: localhost\r\nContent-Length: 100\r\n\r\n' > corpus/http/seed1.txt
         printf 'HTTP/1.1 200 OK\r\nContent-Type: text/xml\r\nContent-Length: 50\r\n\r\n' > corpus/http/seed2.txt
+        # Seed corpus for value fuzzer (raw value content)
+        echo '<i4>42</i4>' > corpus/value/seed1.xml
+        echo '<array><data><value><string>test</string></value></data></array>' > corpus/value/seed2.xml
+        echo '<struct><member><name>key</name><value><boolean>1</boolean></value></member></struct>' > corpus/value/seed3.xml
 
     - name: Run fuzzers
       run: |
         cd build/fuzz
-        echo "=== Running fuzz_request (60s) ==="
-        timeout 60 ./fuzz_request ../../corpus/request/ 2>&1 || true
+        echo "=== Running fuzz_request (45s) ==="
+        timeout 45 ./fuzz_request -dict=../../fuzz/xml.dict ../../corpus/request/ 2>&1 || true
         echo ""
-        echo "=== Running fuzz_response (60s) ==="
-        timeout 60 ./fuzz_response ../../corpus/response/ 2>&1 || true
+        echo "=== Running fuzz_response (45s) ==="
+        timeout 45 ./fuzz_response -dict=../../fuzz/xml.dict ../../corpus/response/ 2>&1 || true
         echo ""
-        echo "=== Running fuzz_http (60s) ==="
-        timeout 60 ./fuzz_http ../../corpus/http/ 2>&1 || true
+        echo "=== Running fuzz_http (45s) ==="
+        timeout 45 ./fuzz_http -dict=../../fuzz/http.dict ../../corpus/http/ 2>&1 || true
+        echo ""
+        echo "=== Running fuzz_value (45s) ==="
+        timeout 45 ./fuzz_value -dict=../../fuzz/xml.dict ../../corpus/value/ 2>&1 || true
       env:
         ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
         UBSAN_OPTIONS: print_stacktrace=1:abort_on_error=1

@@ -1,0 +1,60 @@
+# HTTP dictionary for fuzzing
+# Helps libFuzzer find interesting inputs faster
+
+# HTTP versions
+"HTTP/1.0"
+"HTTP/1.1"
+
+# Methods
+"GET "
+"POST "
+"PUT "
+"DELETE "
+"HEAD "
+"OPTIONS "
+
+# Common headers
+"Content-Type:"
+"Content-Length:"
+"Connection:"
+"Host:"
+"User-Agent:"
+"Accept:"
+"Transfer-Encoding:"
+
+# Content types
+"text/xml"
+"application/xml"
+"application/json"
+
+# Connection values
+"keep-alive"
+"close"
+"Keep-Alive"
+"Close"
+
+# Status codes
+"200 OK"
+"201 Created"
+"400 Bad Request"
+"401 Unauthorized"
+"403 Forbidden"
+"404 Not Found"
+"500 Internal Server Error"
+"502 Bad Gateway"
+"503 Service Unavailable"
+
+# Line endings
+"\r\n"
+"\r\n\r\n"
+
+# Common paths
+"/RPC2"
+"/xmlrpc"
+"/"
+
+# Numbers for Content-Length
+"0"
+"100"
+"1000"
+"65535"
