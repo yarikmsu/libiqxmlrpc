@@ -30,6 +30,8 @@
 # Scalar types
 "<i4>"
 "</i4>"
+"<i8>"
+"</i8>"
 "<int>"
 "</int>"
 "<boolean>"
@@ -45,6 +47,9 @@
 "<nil/>"
 "<nil>"
 "</nil>"
+"<ex:nil/>"
+"<ex:nil>"
+"</ex:nil>"
 
 # Compound types
 "<array>"
