@@ -12,7 +12,8 @@
 namespace fuzz {
 
 // Maximum recursion depth to prevent stack overflow
-constexpr int MAX_DEPTH = 100;
+// Matches library's MAX_PARSE_DEPTH in value_parser.cc
+constexpr int MAX_DEPTH = 32;
 
 // Maximum input size to prevent slow units
 constexpr size_t MAX_INPUT_SIZE = 64 * 1024;

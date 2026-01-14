@@ -163,3 +163,32 @@
 "\xED\xBF\xBF"
 "\xF4\x90\x80\x80"
 "\xFF\xFE"
+
+# XML bomb / billion laughs patterns (entity expansion)
+"&lol;"
+"&lol1;"
+"&lol2;"
+"<!ENTITY lol \"lol\">"
+"<!ENTITY lol1 \"&lol;&lol;&lol;&lol;&lol;\">"
+"<!ENTITY lol2 \"&lol1;&lol1;&lol1;&lol1;&lol1;\">"
+
+# Parameter entities (DTD injection)
+"%entity;"
+"<!ENTITY % dtd"
+"%dtd;"
+"<!ENTITY % file SYSTEM"
+
+# Processing instructions
+"<?xml-stylesheet"
+"type=\"text/xsl\""
+"href=\""
+"?>"
+
+# External DTD URL schemes
+"gopher://"
+"ftp://"
+"jar:"
+"netdoc:"
+
+# Null byte in content
+"\x00"
