@@ -18,6 +18,12 @@ cmake_minimum_required(VERSION 3.10)
 #   xml.dict  - XML-RPC tokens for fuzz_request, fuzz_response, fuzz_value
 #   http.dict - HTTP tokens for fuzz_http
 
+# Validate that LIB_FUZZING_ENGINE is set
+if(NOT DEFINED LIB_FUZZING_ENGINE OR "${LIB_FUZZING_ENGINE}" STREQUAL "")
+  message(WARNING "LIB_FUZZING_ENGINE not set. Fuzz targets will not link correctly. "
+                  "Set -DLIB_FUZZING_ENGINE=\"-fsanitize=fuzzer\" for libFuzzer.")
+endif()
+
 set(FUZZ_TARGETS
   fuzz_request
   fuzz_response

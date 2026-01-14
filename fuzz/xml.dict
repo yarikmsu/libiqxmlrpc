@@ -9,6 +9,17 @@
 "\"UTF-8\""
 "?>"
 
+# UTF-8 BOM (common in real-world XML files)
+"\xEF\xBB\xBF"
+
+# Numeric character references
+"&#65;"
+"&#x41;"
+"&#0;"
+"&#x0;"
+"&#10;"
+"&#13;"
+
 # Method call/response
 "<methodCall>"
 "</methodCall>"
