@@ -14,6 +14,9 @@ constexpr int MAX_DEPTH = 100;
 // Maximum input size to prevent slow units
 constexpr size_t MAX_INPUT_SIZE = 64 * 1024;
 
+// Maximum array elements to iterate (prevents slow units on huge arrays)
+constexpr size_t MAX_ARRAY_ELEMENTS = 1000;
+
 // Recursively exercise all Value type conversions and accessors
 // This ensures fuzzing covers the entire Value API surface
 inline void exercise_value(const iqxmlrpc::Value& v, int depth = 0) {
@@ -45,7 +48,7 @@ inline void exercise_value(const iqxmlrpc::Value& v, int depth = 0) {
   if (v.is_array()) {
     try {
       size_t sz = v.size();
-      for (size_t i = 0; i < sz && i < 1000; ++i) {
+      for (size_t i = 0; i < sz && i < MAX_ARRAY_ELEMENTS; ++i) {
         exercise_value(v[i], depth + 1);
       }
     } catch (...) {}

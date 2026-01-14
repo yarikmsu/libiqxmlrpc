@@ -65,3 +65,23 @@
 "100"
 "1000"
 "65535"
+"-1"
+"4294967295"
+"4294967296"
+"9999999999"
+
+# Transfer-Encoding values
+"chunked"
+"identity"
+"gzip"
+"deflate"
+
+# Chunk size tokens (hex)
+"0\r\n"
+"a\r\n"
+"10\r\n"
+"ff\r\n"
+
+# Cookie headers
+"Cookie:"
+"Set-Cookie:"
