@@ -57,7 +57,20 @@ set_tests_properties(thread-safety-test PROPERTIES
     LABELS "lockfree_stress")
 
 # Integration test (in-process server/client testing)
-iqxmlrpc_test(integration-test test_integration.cc methods.cc)
+# Split into multiple files for faster incremental compilation
+set(INTEGRATION_TEST_SOURCES
+    test_integration.cc
+    test_integration_security.cc
+    test_integration_server.cc
+    test_integration_client.cc
+    test_integration_connection.cc
+    test_integration_ssl.cc
+    test_integration_errors.cc
+    test_integration_reactor.cc
+    test_integration_advanced.cc
+    methods.cc
+)
+iqxmlrpc_test(integration-test ${INTEGRATION_TEST_SOURCES})
 set_tests_properties(integration-test PROPERTIES TIMEOUT 120)
 
 # Run tests with: make check (or cmake --build . --target check)
