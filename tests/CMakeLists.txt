@@ -65,6 +65,9 @@ set(INTEGRATION_TEST_SOURCES
     test_integration_client.cc
     test_integration_connection.cc
     test_integration_ssl.cc
+    test_integration_errors.cc
+    test_integration_reactor.cc
+    test_integration_advanced.cc
     methods.cc
 )
 iqxmlrpc_test(integration-test ${INTEGRATION_TEST_SOURCES})
