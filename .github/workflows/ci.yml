@@ -193,6 +193,79 @@ jobs:
       env:
         TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1:history_size=4:suppressions=${{ github.workspace }}/tests/tsan.suppressions
 
+  fuzz:
+    name: Fuzz Testing
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y clang libboost-dev libboost-date-time-dev libboost-thread-dev libxml2-dev libssl-dev
+
+    - name: Configure
+      run: |
+        mkdir build && cd build
+        cmake \
+          -DCMAKE_C_COMPILER=clang \
+          -DCMAKE_CXX_COMPILER=clang++ \
+          -DCMAKE_CXX_FLAGS="-DBOOST_TIMER_ENABLE_DEPRECATED -fsanitize=fuzzer-no-link,address,undefined -fno-omit-frame-pointer" \
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
+          -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined" \
+          -DLIB_FUZZING_ENGINE="-fsanitize=fuzzer" \
+          -Dbuild_fuzzers=ON \
+          -Dbuild_tests=OFF \
+          ..
+
+    - name: Build
+      run: cmake --build build
+
+    - name: Create corpus directories
+      run: |
+        mkdir -p corpus/request corpus/response corpus/http
+        # Seed corpus for request fuzzer
+        echo '<?xml version="1.0"?><methodCall><methodName>test</methodName></methodCall>' > corpus/request/seed1.xml
+        echo '<?xml version="1.0"?><methodCall><methodName>sum</methodName><params><param><value><i4>1</i4></value></param></params></methodCall>' > corpus/request/seed2.xml
+        # Seed corpus for response fuzzer
+        echo '<?xml version="1.0"?><methodResponse><params><param><value><string>OK</string></value></param></params></methodResponse>' > corpus/response/seed1.xml
+        echo '<?xml version="1.0"?><methodResponse><fault><value><struct><member><name>faultCode</name><value><int>1</int></value></member></struct></value></fault></methodResponse>' > corpus/response/seed2.xml
+        # Seed corpus for HTTP fuzzer
+        printf 'POST /RPC2 HTTP/1.1\r\nHost: localhost\r\nContent-Length: 100\r\n\r\n' > corpus/http/seed1.txt
+        printf 'HTTP/1.1 200 OK\r\nContent-Type: text/xml\r\nContent-Length: 50\r\n\r\n' > corpus/http/seed2.txt
+
+    - name: Run fuzzers
+      run: |
+        cd build/fuzz
+        echo "=== Running fuzz_request (60s) ==="
+        timeout 60 ./fuzz_request ../../corpus/request/ 2>&1 || true
+        echo ""
+        echo "=== Running fuzz_response (60s) ==="
+        timeout 60 ./fuzz_response ../../corpus/response/ 2>&1 || true
+        echo ""
+        echo "=== Running fuzz_http (60s) ==="
+        timeout 60 ./fuzz_http ../../corpus/http/ 2>&1 || true
+      env:
+        ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
+        UBSAN_OPTIONS: print_stacktrace=1:abort_on_error=1
+
+    - name: Check for crashes
+      run: |
+        if ls build/fuzz/crash-* 2>/dev/null || ls build/fuzz/oom-* 2>/dev/null; then
+          echo "::error::Fuzzer found crashes!"
+          exit 1
+        fi
+        echo "No crashes found"
+
+    - name: Upload crash artifacts
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: fuzzer-crashes
+        path: |
+          build/fuzz/crash-*
+          build/fuzz/oom-*
+        if-no-files-found: ignore
+
   cppcheck:
     name: cppcheck
     runs-on: ubuntu-latest

@@ -16,6 +16,34 @@ This directory contains fuzz targets for testing libiqxmlrpc with various fuzzin
 - Boost libraries
 - libxml2
 - OpenSSL
+- CMake 3.21+ (for presets)
+
+### Quick Start with CMake Presets (Recommended)
+
+The easiest way to build fuzzers is using CMake presets:
+
+```bash
+# Linux
+cmake --preset fuzzing
+cmake --build build-fuzz
+
+# macOS (Apple Silicon) - requires: brew install llvm
+cmake --preset fuzzing-macos
+cmake --build build-fuzz
+
+# macOS (Intel) - requires: brew install llvm
+cmake --preset fuzzing-macos-intel
+cmake --build build-fuzz
+
+# Run a fuzzer
+mkdir -p corpus/request
+./build-fuzz/fuzz/fuzz_request corpus/request/
+```
+
+List available presets with:
+```bash
+cmake --list-presets
+```
 
 ### Quick Test with Test Harness
 
@@ -29,7 +57,7 @@ make -j$(nproc)
 cd ..
 
 # Compile a fuzz target with test harness
-clang++ -std=c++11 -DBOOST_TIMER_ENABLE_DEPRECATED \
+clang++ -std=c++17 -DBOOST_TIMER_ENABLE_DEPRECATED \
     -I. \
     fuzz/fuzz_request.cc fuzz/test_harness.cc \
     -o test_fuzz_request \
