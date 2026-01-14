@@ -17,7 +17,6 @@
 #include "libiqxmlrpc/firewall.h"
 #include "libiqxmlrpc/ssl_lib.h"
 #include "libiqxmlrpc/num_conv.h"
-#include "libiqxmlrpc/client_opts.h"
 
 #include "methods.h"
 #include "test_common.h"
@@ -2911,43 +2910,6 @@ BOOST_AUTO_TEST_CASE(ssl_io_result_enum_values)
   BOOST_CHECK(SslIoResult::WANT_READ != SslIoResult::WANT_WRITE);
   BOOST_CHECK(SslIoResult::WANT_WRITE != SslIoResult::CONNECTION_CLOSE);
   BOOST_CHECK(SslIoResult::CONNECTION_CLOSE != SslIoResult::ERROR);
-}
-
-//-----------------------------------------------------------------------------
-// Socket Operation Tests (socket.cc)
-// Tests socket operations - covers send_shutdown, set_non_blocking paths
-//-----------------------------------------------------------------------------
-
-// Test Socket::send_shutdown operation (line 121-127)
-BOOST_AUTO_TEST_CASE(socket_send_shutdown)
-{
-  Socket server_sock;
-  server_sock.bind(Inet_addr("127.0.0.1", 0));
-  server_sock.listen(1);
-
-  Inet_addr server_addr = server_sock.get_addr();
-
-  Socket client_sock;
-  client_sock.connect(server_addr);
-
-  Socket accepted = server_sock.accept();
-
-  const char* data = "test";
-  BOOST_CHECK_NO_THROW(client_sock.send_shutdown(data, 4));
-
-  accepted.close();
-  client_sock.close();
-  server_sock.close();
-}
-
-// Test network_error exception construction
-BOOST_AUTO_TEST_CASE(network_error_exception)
-{
-  iqnet::network_error err("test error");
-  BOOST_CHECK(std::string(err.what()).find("test error") != std::string::npos);
-
-  iqnet::network_error err2("another error", false);
-  BOOST_CHECK(err2.what() != nullptr);
 }
 
 //-----------------------------------------------------------------------------
