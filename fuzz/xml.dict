@@ -93,7 +93,6 @@
 "3.14159"
 "1.0e308"
 "1.0e-308"
-""
 "NaN"
 "Infinity"
 "-Infinity"
@@ -150,11 +149,6 @@
 "<!ELEMENT"
 "]>"
 
-# Whitespace variations
-"\t"
-"\n"
-"  "
-
 # UTF-8 edge cases (encoding vulnerabilities)
 "\xC0\xAF"
 "\xE0\x80\xAF"
@@ -182,7 +176,7 @@
 "<?xml-stylesheet"
 "type=\"text/xsl\""
 "href=\""
-"?>"
+# "?>" - already defined above (line 10)
 
 # External DTD URL schemes
 "gopher://"
@@ -196,7 +190,7 @@
 # XInclude patterns (XML inclusion attacks)
 "<xi:include"
 "xmlns:xi=\"http://www.w3.org/2001/XInclude\""
-"href=\""
+# "href=\"" - already defined above (line 178)
 "parse=\"xml\""
 "parse=\"text\""
 "xpointer=\""
@@ -214,7 +208,7 @@
 "standalone=\"no\""
 
 # UTF-16 BOM patterns
-"\xFF\xFE"
+# "\xFF\xFE" - already defined above (line 159)
 "\xFE\xFF"
 
 # UTF-32 BOM patterns
@@ -248,7 +242,7 @@
 "\xE2\x80\x8B"
 "\xE2\x80\x8C"
 "\xE2\x80\x8D"
-"\xEF\xBB\xBF"
+# "\xEF\xBB\xBF" - UTF-8 BOM already defined above (line 13)
 
 # Bidirectional text control characters
 "\xE2\x80\xAE"

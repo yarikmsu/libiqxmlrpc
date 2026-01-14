@@ -70,9 +70,8 @@
 "503 Service Unavailable"
 "504 Gateway Timeout"
 
-# Line endings
-"\r\n"
-"\r\n\r\n"
+# Line endings (note: pure CRLF entries removed - libFuzzer rejects whitespace-only)
+# CRLF sequences are included as part of other tokens like chunk terminators
 
 # Common paths
 "/RPC2"
@@ -95,11 +94,11 @@
 "gzip"
 "deflate"
 
-# Chunk size tokens (hex)
-"0\r\n"
-"a\r\n"
-"10\r\n"
-"ff\r\n"
+# Chunk size tokens (hex) - use \x0d\x0a for CRLF
+"0\x0d\x0a"
+"a\x0d\x0a"
+"10\x0d\x0a"
+"ff\x0d\x0a"
 
 # Cookie headers
 "Cookie:"
@@ -134,8 +133,8 @@
 "YQ=="
 
 # Header injection testing
-"\r\nX-Injected:"
-"\n"
+"\x0d\x0aX-Injected:"
+# Note: pure "\n" removed - libFuzzer rejects whitespace-only entries
 
 # Content-Length edge cases
 "-0"
@@ -144,8 +143,8 @@
 "+100"
 
 # Request smuggling patterns (conflicting headers)
-"Transfer-Encoding: chunked\r\nContent-Length: 0"
-"Content-Length: 0\r\nContent-Length: 100"
+"Transfer-Encoding: chunked\x0d\x0aContent-Length: 0"
+"Content-Length: 0\x0d\x0aContent-Length: 100"
 " chunked"
 "chunked, identity"
 
@@ -155,8 +154,8 @@
 "HTTP/3"
 
 # Folded headers (obsolete RFC 2616)
-"Header:\r\n value"
-"Header:\r\n\tvalue"
+"Header:\x0d\x0a value"
+"Header:\x0d\x0a\x09value"
 
 # Null byte testing
 "\x00"
@@ -199,7 +198,7 @@
 "Host: localhost"
 
 # Carriage return without line feed
-"\r"
+# Note: pure "\r" removed - libFuzzer rejects whitespace-only entries
 
 # HTTP/1.0 quirks
 "Proxy-Connection:"
@@ -242,18 +241,18 @@
 
 # Additional smuggling patterns
 "Transfer-Encoding: chunked"
-"Transfer-Encoding:\tchunked"
+"Transfer-Encoding:\x09chunked"
 "Transfer-Encoding : chunked"
 "Transfer-Encoding: xchunked"
-"Transfer-Encoding: chunked\r\nTransfer-Encoding: x"
+"Transfer-Encoding: chunked\x0d\x0aTransfer-Encoding: x"
 " Transfer-Encoding: chunked"
 "X-Transfer-Encoding: chunked"
 "Transfer-encoding: chunked"
 
 # Chunked body patterns
-"0\r\n\r\n"
-"1\r\nX\r\n0\r\n\r\n"
-"FFFFFFFF\r\n"
+"0\x0d\x0a\x0d\x0a"
+"1\x0d\x0aX\x0d\x0a0\x0d\x0a\x0d\x0a"
+"FFFFFFFF\x0d\x0a"
 
 # WebSocket upgrade (protocol confusion)
 "Upgrade: websocket"
@@ -269,8 +268,8 @@
 ":scheme"
 
 # Response splitting
-"\r\nSet-Cookie: session=evil"
-"\r\nLocation: http://evil.com"
+"\x0d\x0aSet-Cookie: session=evil"
+"\x0d\x0aLocation: http://evil.com"
 
 # Multipart boundary attacks
 "multipart/form-data"
@@ -279,7 +278,7 @@
 
 # Unicode normalization in headers
 # Zero-width characters (header value smuggling)
-"\xE2\x80\x8B"
+# "\xE2\x80\x8B" - already defined above (line 215)
 "\xE2\x80\x8C"
 "\xE2\x80\x8D"
 "\xEF\xBB\xBF"
