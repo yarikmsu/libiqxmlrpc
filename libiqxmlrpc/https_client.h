@@ -10,6 +10,7 @@
 #include "reactor.h"
 #include "ssl_connection.h"
 
+#include <functional>
 #include <memory>
 
 namespace iqxmlrpc
@@ -22,6 +23,19 @@ class LIBIQXMLRPC_API Https_proxy_client_connection:
   public iqnet::Connection
 {
 public:
+#ifdef IQXMLRPC_TESTING
+#pragma message("WARNING: IQXMLRPC_TESTING enabled - SSL factory injection available. NOT FOR PRODUCTION!")
+  //! Factory function type for creating SSL connections.
+  //! @warning Testing only - bypasses SSL security! Not available in release builds.
+  using SslConnectionFactory = std::function<http::Packet*(
+    const iqnet::Socket&, bool non_blocking, const std::string& request)>;
+
+  //! Set custom SSL connection factory for testing.
+  //! @warning This bypasses all SSL/TLS security! Only available when
+  //!          compiled with -DIQXMLRPC_TESTING. Do not use in production.
+  void set_ssl_factory(SslConnectionFactory factory) { ssl_factory_ = std::move(factory); }
+#endif // IQXMLRPC_TESTING
+
   Https_proxy_client_connection( const iqnet::Socket&, bool non_block_flag );
 
   Https_proxy_client_connection(const Https_proxy_client_connection&) = delete;
@@ -39,6 +53,11 @@ protected:
   std::unique_ptr<http::Packet> resp_packet;
   bool non_blocking;
   std::string out_str;
+
+private:
+#ifdef IQXMLRPC_TESTING
+  SslConnectionFactory ssl_factory_{};  //!< Optional factory for testing
+#endif // IQXMLRPC_TESTING
 };
 
 //! XML-RPC \b HTTPS client's connection.

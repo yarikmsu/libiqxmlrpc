@@ -55,6 +55,13 @@ http::Packet* Https_proxy_client_connection::do_process_session( const std::stri
 {
   setup_tunnel();
 
+#ifdef IQXMLRPC_TESTING
+  // Use factory if provided (for testing), otherwise create real SSL connection
+  if (ssl_factory_) {
+    return ssl_factory_(sock, non_blocking, s);
+  }
+#endif
+
   Https_client_connection https_conn(sock, non_blocking);
   https_conn.post_connect();
 
