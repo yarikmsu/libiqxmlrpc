@@ -250,7 +250,7 @@ jobs:
 
     - name: Check for crashes
       run: |
-        if ls build/fuzz/crash-* build/fuzz/oom-* 2>/dev/null; then
+        if ls build/fuzz/crash-* 2>/dev/null || ls build/fuzz/oom-* 2>/dev/null; then
           echo "::error::Fuzzer found crashes!"
           exit 1
         fi
