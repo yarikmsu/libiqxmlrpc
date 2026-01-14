@@ -192,3 +192,47 @@
 
 # Null byte in content
 "\x00"
+
+# XInclude patterns (XML inclusion attacks)
+"<xi:include"
+"xmlns:xi=\"http://www.w3.org/2001/XInclude\""
+"href=\""
+"parse=\"xml\""
+"parse=\"text\""
+"xpointer=\""
+"</xi:include>"
+"<xi:fallback>"
+"</xi:fallback>"
+
+# Encoding declarations (parser confusion attacks)
+"encoding=\"UTF-16\""
+"encoding=\"UTF-32\""
+"encoding=\"ISO-8859-1\""
+"encoding=\"US-ASCII\""
+"encoding=\"windows-1252\""
+"standalone=\"yes\""
+"standalone=\"no\""
+
+# UTF-16 BOM patterns
+"\xFF\xFE"
+"\xFE\xFF"
+
+# XML 1.1 declaration (different parsing rules)
+"version=\"1.1\""
+
+# Namespace confusion
+"xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\""
+"xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\""
+"xsi:type=\""
+
+# Recursive entity definitions (DoS)
+"<!ENTITY a \"&b;&b;&b;&b;&b;\">"
+"<!ENTITY b \"&c;&c;&c;&c;&c;\">"
+"<!ENTITY c \"&d;&d;&d;&d;&d;\">"
+
+# External entity with different protocols
+"php://filter"
+"expect://"
+"data:"
+"file:///etc/passwd"
+"file:///c:/windows/win.ini"
