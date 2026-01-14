@@ -22,6 +22,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     (void)req_hdr.conn_keep_alive();
     (void)req_hdr.host();
     (void)req_hdr.agent();
+    (void)req_hdr.expect_continue();
     // Exercise auth parsing - security-critical Base64 decoding
     if (req_hdr.has_authinfo()) {
       std::string user, password;
