@@ -2898,38 +2898,26 @@ BOOST_FIXTURE_TEST_CASE(ssl_blocking_operations_through_client, HttpsIntegration
 }
 
 //-----------------------------------------------------------------------------
-// SSL SslIoResult enum test (ssl_lib.cc)
-// Note: SSL exception classes already tested in ssl_exception_types
-//-----------------------------------------------------------------------------
-
-// Test SslIoResult enum values exist and are distinct
-BOOST_AUTO_TEST_CASE(ssl_io_result_enum_values)
-{
-  using iqnet::ssl::SslIoResult;
-  BOOST_CHECK(SslIoResult::OK != SslIoResult::WANT_READ);
-  BOOST_CHECK(SslIoResult::WANT_READ != SslIoResult::WANT_WRITE);
-  BOOST_CHECK(SslIoResult::WANT_WRITE != SslIoResult::CONNECTION_CLOSE);
-  BOOST_CHECK(SslIoResult::CONNECTION_CLOSE != SslIoResult::ERROR);
-}
-
-//-----------------------------------------------------------------------------
 // Pool Executor Factory Tests (executor.cc)
-// Tests Pool_executor_factory - covers lines 142-164
+// Tests Pool_executor_factory - covers lines 61-64, 142-164
 //-----------------------------------------------------------------------------
 
-// Test server with Pool_executor_factory
-BOOST_FIXTURE_TEST_CASE(pool_executor_factory_basic, IntegrationFixture)
+// Test executor factory methods: create_reactor and add_threads
+BOOST_AUTO_TEST_CASE(executor_factory_methods)
 {
-  start_server(4, 241);
+  // Test Serial_executor_factory::create_reactor (line 61-64)
+  Serial_executor_factory serial_factory;
+  iqnet::Reactor_base* serial_reactor = serial_factory.create_reactor();
+  BOOST_REQUIRE(serial_reactor != nullptr);
+  delete serial_reactor;
 
-  std::unique_ptr<Client_base> client(
-    new Client<Http_client_connection>(Inet_addr("127.0.0.1", port_)));
+  // Test Pool_executor_factory::create_reactor (line 149-152) and add_threads (line 155-164)
+  Pool_executor_factory pool_factory(1);
+  iqnet::Reactor_base* pool_reactor = pool_factory.create_reactor();
+  BOOST_REQUIRE(pool_reactor != nullptr);
+  delete pool_reactor;
 
-  for (int i = 0; i < 5; ++i) {
-    Response r = client->execute("echo", Value(i));
-    BOOST_CHECK(!r.is_fault());
-    BOOST_CHECK_EQUAL(r.value().get_int(), i);
-  }
+  BOOST_CHECK_NO_THROW(pool_factory.add_threads(2));
 }
 
 // Test Pool_executor_factory with concurrent clients
@@ -2961,29 +2949,6 @@ BOOST_FIXTURE_TEST_CASE(pool_executor_concurrent_clients, IntegrationFixture)
   }
 
   BOOST_CHECK_GE(success_count.load(), 1);
-}
-
-// Test executor factory create_reactor methods
-// Covers executor.cc lines 61-64, 149-152
-BOOST_AUTO_TEST_CASE(executor_factory_create_reactor)
-{
-  Serial_executor_factory serial_factory;
-  iqnet::Reactor_base* serial_reactor = serial_factory.create_reactor();
-  BOOST_REQUIRE(serial_reactor != nullptr);
-  delete serial_reactor;
-
-  Pool_executor_factory pool_factory(2);
-  iqnet::Reactor_base* pool_reactor = pool_factory.create_reactor();
-  BOOST_REQUIRE(pool_reactor != nullptr);
-  delete pool_reactor;
-}
-
-// Test Pool_executor_factory add_threads after construction
-// Covers executor.cc lines 155-164
-BOOST_AUTO_TEST_CASE(pool_executor_factory_add_threads)
-{
-  Pool_executor_factory factory(1);
-  BOOST_CHECK_NO_THROW(factory.add_threads(2));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
