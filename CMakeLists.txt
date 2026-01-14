@@ -22,9 +22,19 @@ if(ENABLE_COVERAGE)
     endif()
 endif()
 
+# Test hooks option - must be set before library compilation
+option(build_tests "Build tests?" ON)
+option(ENABLE_TESTING_HOOKS "Enable test hooks for SSL factory injection (test builds only)" OFF)
+if(ENABLE_TESTING_HOOKS)
+    if(NOT build_tests)
+        message(WARNING "ENABLE_TESTING_HOOKS is enabled but build_tests is OFF. "
+                        "Testing hooks are only useful when tests are built.")
+    endif()
+    add_compile_definitions(IQXMLRPC_TESTING)
+endif()
+
 add_subdirectory(libiqxmlrpc)
 
-option(build_tests "Build tests?" ON)
 if (build_tests)
 	enable_testing()
 	add_subdirectory(tests)
