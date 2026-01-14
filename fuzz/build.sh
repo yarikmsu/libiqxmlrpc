@@ -31,7 +31,7 @@ cmake .. \
     -DCMAKE_C_COMPILER=$CC \
     -DCMAKE_CXX_COMPILER=$CXX \
     -DCMAKE_C_FLAGS="$CFLAGS" \
-    -DCMAKE_CXX_FLAGS="$CXXFLAGS -std=c++11 -DBOOST_TIMER_ENABLE_DEPRECATED -I$LIBXML2_INCLUDE_SRC -I$LIBXML2_INCLUDE_BUILD" \
+    -DCMAKE_CXX_FLAGS="$CXXFLAGS -std=c++17 -DBOOST_TIMER_ENABLE_DEPRECATED -I$LIBXML2_INCLUDE_SRC -I$LIBXML2_INCLUDE_BUILD" \
     -DBUILD_SHARED_LIBS=OFF \
     -Dbuild_tests=OFF \
     -DLIBXML2_INCLUDE_DIR="$LIBXML2_INCLUDE_SRC;$LIBXML2_INCLUDE_BUILD" \
@@ -43,7 +43,7 @@ cd ..
 # Build fuzz targets with static linking
 for fuzzer in fuzz/fuzz_*.cc; do
     name=$(basename "$fuzzer" .cc)
-    $CXX $CXXFLAGS -std=c++11 -DBOOST_TIMER_ENABLE_DEPRECATED \
+    $CXX $CXXFLAGS -std=c++17 -DBOOST_TIMER_ENABLE_DEPRECATED \
         -I. -I"$LIBXML2_INCLUDE_SRC" -I"$LIBXML2_INCLUDE_BUILD" \
         "$fuzzer" \
         -o "$OUT/$name" \
@@ -110,8 +110,97 @@ cat > "$OUT/fuzz_response_seed_corpus/sample2.xml" << 'EOF'
 </methodResponse>
 EOF
 
-# Zip seed corpora
+# Create seed corpus for fuzz_http
+mkdir -p "$OUT/fuzz_http_seed_corpus"
+cat > "$OUT/fuzz_http_seed_corpus/request.http" << 'EOF'
+POST /RPC2 HTTP/1.1
+Host: localhost:8080
+Content-Type: text/xml
+Content-Length: 100
+
+EOF
+
+cat > "$OUT/fuzz_http_seed_corpus/response.http" << 'EOF'
+HTTP/1.1 200 OK
+Content-Type: text/xml
+Content-Length: 100
+Connection: keep-alive
+
+EOF
+
+# Create seed corpus for fuzz_value
+mkdir -p "$OUT/fuzz_value_seed_corpus"
+cat > "$OUT/fuzz_value_seed_corpus/int.xml" << 'EOF'
+<int>42</int>
+EOF
+
+cat > "$OUT/fuzz_value_seed_corpus/string.xml" << 'EOF'
+<string>Hello World</string>
+EOF
+
+cat > "$OUT/fuzz_value_seed_corpus/struct.xml" << 'EOF'
+<struct><member><name>key</name><value><string>value</string></value></member></struct>
+EOF
+
+cat > "$OUT/fuzz_value_seed_corpus/array.xml" << 'EOF'
+<array><data><value><i4>1</i4></value><value><i4>2</i4></value></data></array>
+EOF
+
+# Create seed corpus for fuzz_packet
+mkdir -p "$OUT/fuzz_packet_seed_corpus"
+cat > "$OUT/fuzz_packet_seed_corpus/full_request.http" << 'EOF'
+POST /RPC2 HTTP/1.1
+Host: localhost:8080
+Content-Type: text/xml
+Content-Length: 39
+
+<?xml version="1.0"?><methodCall/>
+EOF
+
+# Create seed corpus for fuzz_base64
+mkdir -p "$OUT/fuzz_base64_seed_corpus"
+echo -n "SGVsbG8gV29ybGQ=" > "$OUT/fuzz_base64_seed_corpus/hello.b64"
+echo -n "dGVzdA==" > "$OUT/fuzz_base64_seed_corpus/test.b64"
+echo -n "YQ==" > "$OUT/fuzz_base64_seed_corpus/single.b64"
+
+# Create seed corpus for fuzz_serialize
+mkdir -p "$OUT/fuzz_serialize_seed_corpus"
+cat > "$OUT/fuzz_serialize_seed_corpus/request.xml" << 'EOF'
+<?xml version="1.0"?>
+<methodCall>
+  <methodName>test.method</methodName>
+  <params>
+    <param><value><string>test</string></value></param>
+  </params>
+</methodCall>
+EOF
+
+cat > "$OUT/fuzz_serialize_seed_corpus/response.xml" << 'EOF'
+<?xml version="1.0"?>
+<methodResponse>
+  <params>
+    <param><value><string>result</string></value></param>
+  </params>
+</methodResponse>
+EOF
+
+# Create seed corpus for fuzz_num_conv
+mkdir -p "$OUT/fuzz_num_conv_seed_corpus"
+echo -n "42" > "$OUT/fuzz_num_conv_seed_corpus/int.txt"
+echo -n "-123456789" > "$OUT/fuzz_num_conv_seed_corpus/negative.txt"
+echo -n "3.14159265358979" > "$OUT/fuzz_num_conv_seed_corpus/double.txt"
+echo -n "9223372036854775807" > "$OUT/fuzz_num_conv_seed_corpus/int64_max.txt"
+
+# Create seed corpus for fuzz_xheaders
+mkdir -p "$OUT/fuzz_xheaders_seed_corpus"
+echo -n "X-Custom-Header-Value" > "$OUT/fuzz_xheaders_seed_corpus/valid.txt"
+echo -n "value with spaces" > "$OUT/fuzz_xheaders_seed_corpus/spaces.txt"
+
+# Zip all seed corpora
 cd "$OUT"
-zip -q fuzz_request_seed_corpus.zip fuzz_request_seed_corpus/*
-zip -q fuzz_response_seed_corpus.zip fuzz_response_seed_corpus/*
-rm -rf fuzz_request_seed_corpus fuzz_response_seed_corpus
+for corpus_dir in fuzz_*_seed_corpus; do
+    if [ -d "$corpus_dir" ]; then
+        zip -q "${corpus_dir}.zip" "$corpus_dir"/*
+        rm -rf "$corpus_dir"
+    fi
+done

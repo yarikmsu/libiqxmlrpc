@@ -33,6 +33,24 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     // Exceptions are expected for malformed input
   }
 
+  // Fuzz Packet_reader with continue_sent state toggled
+  // This exercises the 100-continue response path
+  try {
+    iqxmlrpc::http::Packet_reader reader;
+    reader.set_verification_level(iqxmlrpc::http::HTTP_CHECK_WEAK);
+    reader.set_max_size(fuzz::MAX_INPUT_SIZE);
+    // Toggle continue_sent state before parsing
+    reader.set_continue_sent();
+
+    std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader.read_request(input));
+    if (pkt) {
+      (void)pkt->header();
+      (void)pkt->content();
+    }
+  } catch (...) {
+    // Exceptions are expected for malformed input
+  }
+
   // Fuzz Packet_reader for HTTP request parsing (strict verification)
   try {
     iqxmlrpc::http::Packet_reader reader_strict;
