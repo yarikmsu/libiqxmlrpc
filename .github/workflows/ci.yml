@@ -290,3 +290,48 @@ jobs:
           --inline-suppr \
           --error-exitcode=1 \
           libiqxmlrpc/
+
+  clang-tidy:
+    name: clang-tidy
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang clang-tidy libboost-dev libboost-date-time-dev \
+          libboost-thread-dev libboost-test-dev libboost-program-options-dev \
+          libboost-chrono-dev libxml2-dev libssl-dev
+
+    - name: Generate compile_commands.json
+      run: |
+        mkdir build && cd build
+        cmake -Dbuild_tests=ON \
+          -DCMAKE_C_COMPILER=clang \
+          -DCMAKE_CXX_COMPILER=clang++ \
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+          -DCMAKE_CXX_FLAGS="-DBOOST_TIMER_ENABLE_DEPRECATED" \
+          ..
+
+    - name: Run clang-tidy
+      run: |
+        # Run clang-tidy on library sources only (not tests or fuzz targets)
+        find libiqxmlrpc -name '*.cc' | \
+          xargs clang-tidy -p build --warnings-as-errors='' 2>&1 | tee clang-tidy-output.txt
+
+        # Check for errors (not warnings)
+        if grep -E "error:" clang-tidy-output.txt; then
+          echo "::error::clang-tidy found errors"
+          exit 1
+        fi
+        echo "clang-tidy passed"
+
+    - name: Upload clang-tidy output
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: clang-tidy-output
+        path: clang-tidy-output.txt
+        if-no-files-found: ignore

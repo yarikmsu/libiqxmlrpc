@@ -156,6 +156,7 @@ T* Value::cast() const
 
 const Value& Value::operator =( const Value& v )
 {
+  if (this == &v) return *this;
   Value_type* tmp = v.value->clone();
   delete value;
   value = tmp;
