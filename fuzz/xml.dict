@@ -19,6 +19,20 @@
 "&#x0;"
 "&#10;"
 "&#13;"
+# Character entity references with leading zeros (XML 1.0 5th edition)
+"&#00065;"
+"&#x0041;"
+"&#000000065;"
+
+# Internal DTD subset
+"<!DOCTYPE methodCall [<!ENTITY test 'test'>]>"
+
+# XML-RPC introspection methods (trigger different code paths)
+"system.listMethods"
+"system.methodHelp"
+"system.methodSignature"
+"system.getCapabilities"
+"system.multicall"
 
 # Method call/response
 "<methodCall>"

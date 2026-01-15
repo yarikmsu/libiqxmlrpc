@@ -73,7 +73,19 @@ inline void exercise_value(const iqxmlrpc::Value& v, int depth = 0) {
       const iqxmlrpc::Struct& s = v.the_struct();
       size_t count = 0;
       for (auto it = s.begin(); it != s.end() && count < MAX_ARRAY_ELEMENTS; ++it, ++count) {
+        // Exercise has_field with existing keys
+        (void)v.has_field(it->first);
         exercise_value(*(it->second), depth + 1);
+      }
+      // Test has_field with non-existent key
+      (void)v.has_field("__fuzz_nonexistent_key__");
+      // Test operator[] with existing keys (if any)
+      if (s.begin() != s.end()) {
+        auto first_it = s.begin();
+        try {
+          const iqxmlrpc::Value& field_val = v[first_it->first];
+          (void)field_val.type_name();
+        } catch (...) {}
       }
     } catch (...) {}
   }
