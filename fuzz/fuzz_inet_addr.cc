@@ -16,6 +16,15 @@
 #include <cstddef>
 #include <string>
 
+namespace {
+
+// Helper to extract a port number from two fuzz bytes (little-endian)
+int extract_port(const uint8_t* data) {
+  return (data[0] | (data[1] << 8)) % 65536;
+}
+
+} // namespace
+
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   // Limit input size to prevent slow units
   if (size > fuzz::MAX_INPUT_SIZE) return 0;
@@ -26,10 +35,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   // Test 1: Parse input directly as hostname with fuzzed port
   // This tests CRLF injection rejection and hostname validation
   {
-    int port = 80;
-    if (size >= 2) {
-      port = (data[0] | (data[1] << 8)) % 65536;
-    }
+    int port = (size >= 2) ? extract_port(data) : 80;
 
     try {
       iqnet::Inet_addr addr(input, port);
@@ -51,10 +57,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       std::snprintf(ip_buf, sizeof(ip_buf), "%d.%d.%d.%d",
                     data[0], data[1], data[2], data[3]);
 
-      int port = 8080;
-      if (size >= 6) {
-        port = (data[4] | (data[5] << 8)) % 65536;
-      }
+      int port = (size >= 6) ? extract_port(data + 4) : 8080;
 
       iqnet::Inet_addr addr(std::string(ip_buf), port);
       (void)addr.get_host_name();
@@ -68,7 +71,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   // Test 3: Test port-only constructor
   if (size >= 2) {
     try {
-      int port = (data[0] | (data[1] << 8)) % 65536;
+      int port = extract_port(data);
       iqnet::Inet_addr addr(port);
       (void)addr.get_port();
       (void)addr.get_sockaddr();
@@ -90,10 +93,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
     if (size >= 1) {
       size_t idx = data[0] % (sizeof(safe_hosts) / sizeof(safe_hosts[0]));
-      int port = 8080;
-      if (size >= 3) {
-        port = (data[1] | (data[2] << 8)) % 65536;
-      }
+      int port = (size >= 3) ? extract_port(data + 1) : 8080;
 
       try {
         iqnet::Inet_addr addr(safe_hosts[idx], port);
