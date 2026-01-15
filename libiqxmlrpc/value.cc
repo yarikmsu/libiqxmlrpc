@@ -3,6 +3,7 @@
 
 #include <optional>
 #include <stdexcept>
+#include <utility>
 
 #include "value.h"
 #include "value_type_visitor.h"
@@ -156,10 +157,10 @@ T* Value::cast() const
 
 const Value& Value::operator =( const Value& v )
 {
-  if (this == &v) return *this;
-  Value_type* tmp = v.value->clone();
-  delete value;
-  value = tmp;
+  // Copy-and-swap idiom: provides strong exception safety and
+  // automatically handles self-assignment correctly
+  Value tmp(v);
+  std::swap(value, tmp.value);
   return *this;
 }
 

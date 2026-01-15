@@ -318,8 +318,9 @@ jobs:
     - name: Run clang-tidy
       run: |
         # Run clang-tidy on library sources only (not tests or fuzz targets)
-        find libiqxmlrpc -name '*.cc' | \
-          xargs clang-tidy -p build --warnings-as-errors='' 2>&1 | tee clang-tidy-output.txt
+        # Use -print0/-0 to handle filenames with spaces safely
+        find libiqxmlrpc -name '*.cc' -print0 | \
+          xargs -0 clang-tidy -p build --warnings-as-errors='' 2>&1 | tee clang-tidy-output.txt
 
         # Check for errors (not warnings)
         if grep -E "error:" clang-tidy-output.txt; then
