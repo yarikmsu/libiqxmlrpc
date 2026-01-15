@@ -336,3 +336,54 @@ jobs:
         name: clang-tidy-output
         path: clang-tidy-output.txt
         if-no-files-found: ignore
+
+  valgrind:
+    name: Valgrind
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y valgrind libboost-dev libboost-date-time-dev \
+          libboost-thread-dev libboost-test-dev libboost-program-options-dev \
+          libboost-chrono-dev libxml2-dev libssl-dev
+
+    - name: Configure
+      run: |
+        mkdir build && cd build
+        cmake -Dbuild_tests=ON \
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_CXX_FLAGS="-DBOOST_TIMER_ENABLE_DEPRECATED -g -O1" \
+          ..
+
+    - name: Build
+      run: cmake --build build
+
+    - name: Run Valgrind on unit tests
+      run: |
+        cd build/tests
+        # Run each unit test under Valgrind with uninitialized memory tracking
+        # Using --error-exitcode=1 to fail on any Valgrind errors
+        # Using -O1 optimization to reduce false positives while keeping debug info
+        for test in value-types-extended-test parser-test http-test \
+                    request-response-test method-dispatch-test \
+                    exceptions-test safe-math-test perf-utils-test; do
+          echo "=== Running Valgrind on $test ==="
+          valgrind --track-origins=yes \
+                   --leak-check=full \
+                   --show-leak-kinds=definite,possible \
+                   --errors-for-leak-kinds=definite \
+                   --error-exitcode=1 \
+                   ./$test 2>&1 | tee valgrind-$test.log
+        done
+
+    - name: Upload Valgrind logs
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: valgrind-logs
+        path: build/tests/valgrind-*.log
+        if-no-files-found: ignore
