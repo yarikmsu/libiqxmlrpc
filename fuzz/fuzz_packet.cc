@@ -8,6 +8,20 @@
 #include <string>
 #include <memory>
 
+namespace {
+
+// Helper to create a configured Packet_reader, reducing setup duplication
+std::unique_ptr<iqxmlrpc::http::Packet_reader> create_reader(
+    iqxmlrpc::http::Verification_level level,
+    size_t max_size = fuzz::MAX_INPUT_SIZE) {
+  auto reader = std::make_unique<iqxmlrpc::http::Packet_reader>();
+  reader->set_verification_level(level);
+  reader->set_max_size(max_size);
+  return reader;
+}
+
+} // namespace
+
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   // Limit input size to prevent slow units
   if (size > fuzz::MAX_INPUT_SIZE) return 0;
@@ -17,18 +31,15 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   // Fuzz Packet_reader for HTTP request parsing (weak verification)
   // This tests incremental/streaming packet construction
   try {
-    iqxmlrpc::http::Packet_reader reader;
-    reader.set_verification_level(iqxmlrpc::http::HTTP_CHECK_WEAK);
-    reader.set_max_size(fuzz::MAX_INPUT_SIZE);
-
-    std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader.read_request(input));
+    auto reader = create_reader(iqxmlrpc::http::HTTP_CHECK_WEAK);
+    std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader->read_request(input));
     if (pkt) {
       (void)pkt->header();
       (void)pkt->content();
       (void)pkt->dump();
     }
     // Check if reader expects 100-continue
-    (void)reader.expect_continue();
+    (void)reader->expect_continue();
   } catch (...) {
     // Exceptions are expected for malformed input
   }
@@ -36,13 +47,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   // Fuzz Packet_reader with continue_sent state toggled
   // This exercises the 100-continue response path
   try {
-    iqxmlrpc::http::Packet_reader reader;
-    reader.set_verification_level(iqxmlrpc::http::HTTP_CHECK_WEAK);
-    reader.set_max_size(fuzz::MAX_INPUT_SIZE);
-    // Toggle continue_sent state before parsing
-    reader.set_continue_sent();
-
-    std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader.read_request(input));
+    auto reader = create_reader(iqxmlrpc::http::HTTP_CHECK_WEAK);
+    reader->set_continue_sent();  // Toggle continue_sent state before parsing
+    std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader->read_request(input));
     if (pkt) {
       (void)pkt->header();
       (void)pkt->content();
@@ -53,11 +60,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   // Fuzz Packet_reader for HTTP request parsing (strict verification)
   try {
-    iqxmlrpc::http::Packet_reader reader_strict;
-    reader_strict.set_verification_level(iqxmlrpc::http::HTTP_CHECK_STRICT);
-    reader_strict.set_max_size(fuzz::MAX_INPUT_SIZE);
-
-    std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader_strict.read_request(input));
+    auto reader = create_reader(iqxmlrpc::http::HTTP_CHECK_STRICT);
+    std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader->read_request(input));
     if (pkt) {
       (void)pkt->header();
       (void)pkt->content();
@@ -68,11 +72,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   // Fuzz Packet_reader for HTTP response parsing (weak, full packet)
   try {
-    iqxmlrpc::http::Packet_reader reader;
-    reader.set_verification_level(iqxmlrpc::http::HTTP_CHECK_WEAK);
-    reader.set_max_size(fuzz::MAX_INPUT_SIZE);
-
-    std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader.read_response(input, false));
+    auto reader = create_reader(iqxmlrpc::http::HTTP_CHECK_WEAK);
+    std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader->read_response(input, false));
     if (pkt) {
       (void)pkt->header();
       (void)pkt->content();
@@ -84,11 +85,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   // Fuzz Packet_reader for HTTP response parsing (weak, header only)
   try {
-    iqxmlrpc::http::Packet_reader reader;
-    reader.set_verification_level(iqxmlrpc::http::HTTP_CHECK_WEAK);
-    reader.set_max_size(fuzz::MAX_INPUT_SIZE);
-
-    std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader.read_response(input, true));
+    auto reader = create_reader(iqxmlrpc::http::HTTP_CHECK_WEAK);
+    std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader->read_response(input, true));
     if (pkt) {
       (void)pkt->header();
     }
@@ -98,11 +96,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   // Fuzz Packet_reader for HTTP response parsing (strict verification)
   try {
-    iqxmlrpc::http::Packet_reader reader_strict;
-    reader_strict.set_verification_level(iqxmlrpc::http::HTTP_CHECK_STRICT);
-    reader_strict.set_max_size(fuzz::MAX_INPUT_SIZE);
-
-    std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader_strict.read_response(input, false));
+    auto reader = create_reader(iqxmlrpc::http::HTTP_CHECK_STRICT);
+    std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader->read_response(input, false));
     if (pkt) {
       (void)pkt->header();
       (void)pkt->content();
@@ -115,14 +110,11 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   // This simulates real network conditions where data arrives in pieces
   if (size > 1) {
     try {
-      iqxmlrpc::http::Packet_reader reader;
-      reader.set_verification_level(iqxmlrpc::http::HTTP_CHECK_WEAK);
-      reader.set_max_size(fuzz::MAX_INPUT_SIZE);
-
+      auto reader = create_reader(iqxmlrpc::http::HTTP_CHECK_WEAK);
       // Feed data incrementally (byte-by-byte)
       for (size_t i = 1; i <= size; ++i) {
         std::string partial(reinterpret_cast<const char*>(data), i);
-        std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader.read_request(partial));
+        std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader->read_request(partial));
         if (pkt) {
           // Packet is complete
           (void)pkt->header();
@@ -139,10 +131,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   // This catches bugs that only manifest with specific split points
   if (size > 4) {
     try {
-      iqxmlrpc::http::Packet_reader reader;
-      reader.set_verification_level(iqxmlrpc::http::HTTP_CHECK_WEAK);
-      reader.set_max_size(fuzz::MAX_INPUT_SIZE);
-
+      auto reader = create_reader(iqxmlrpc::http::HTTP_CHECK_WEAK);
       // Use first bytes as chunk size seeds
       size_t chunk_size = (data[0] % 64) + 1;  // 1-64 byte chunks
       size_t offset = 0;
@@ -152,7 +141,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         if (end > size) end = size;
 
         std::string partial(reinterpret_cast<const char*>(data), end);
-        std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader.read_request(partial));
+        std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader->read_request(partial));
         if (pkt) {
           (void)pkt->header();
           (void)pkt->content();
@@ -174,12 +163,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   // This tests state reset behavior between packets
   if (size > 2) {
     try {
-      iqxmlrpc::http::Packet_reader reader;
-      reader.set_verification_level(iqxmlrpc::http::HTTP_CHECK_WEAK);
-      reader.set_max_size(fuzz::MAX_INPUT_SIZE);
-
+      auto reader = create_reader(iqxmlrpc::http::HTTP_CHECK_WEAK);
       // First packet attempt
-      std::unique_ptr<iqxmlrpc::http::Packet> pkt1(reader.read_request(input));
+      std::unique_ptr<iqxmlrpc::http::Packet> pkt1(reader->read_request(input));
       if (pkt1) {
         (void)pkt1->header();
         (void)pkt1->content();
@@ -188,7 +174,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       // Reuse reader for second packet (split input differently)
       size_t split = size / 2;
       std::string second_input(reinterpret_cast<const char*>(data + split), size - split);
-      std::unique_ptr<iqxmlrpc::http::Packet> pkt2(reader.read_request(second_input));
+      std::unique_ptr<iqxmlrpc::http::Packet> pkt2(reader->read_request(second_input));
       if (pkt2) {
         (void)pkt2->header();
         (void)pkt2->content();
@@ -245,11 +231,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         chunked_request += "0\r\n\r\n";
       }
 
-      iqxmlrpc::http::Packet_reader reader;
-      reader.set_verification_level(iqxmlrpc::http::HTTP_CHECK_WEAK);
-      reader.set_max_size(fuzz::MAX_INPUT_SIZE * 2);
-
-      std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader.read_request(chunked_request));
+      auto reader = create_reader(iqxmlrpc::http::HTTP_CHECK_WEAK, fuzz::MAX_INPUT_SIZE * 2);
+      std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader->read_request(chunked_request));
       if (pkt) {
         (void)pkt->header();
         (void)pkt->content();
@@ -271,11 +254,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
           "Transfer-Encoding: chunked\r\n"
           "\r\n" + input;
 
-      iqxmlrpc::http::Packet_reader reader;
-      reader.set_verification_level(iqxmlrpc::http::HTTP_CHECK_WEAK);
-      reader.set_max_size(fuzz::MAX_INPUT_SIZE * 2);
-
-      std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader.read_request(raw_chunked));
+      auto reader = create_reader(iqxmlrpc::http::HTTP_CHECK_WEAK, fuzz::MAX_INPUT_SIZE * 2);
+      std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader->read_request(raw_chunked));
       if (pkt) {
         (void)pkt->content();
       }
