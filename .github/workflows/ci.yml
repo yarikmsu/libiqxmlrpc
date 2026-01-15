@@ -368,9 +368,13 @@ jobs:
         # Run each unit test under Valgrind with uninitialized memory tracking
         # Using --error-exitcode=1 to fail on any Valgrind errors
         # Using -O1 optimization to reduce false positives while keeping debug info
-        for test in value-types-extended-test parser-test http-test \
-                    request-response-test method-dispatch-test \
-                    exceptions-test safe-math-test perf-utils-test; do
+        # Unit tests that don't require network I/O
+        # Excluded: integration-test, client-test, server-test, client-stress-test,
+        #           socket-test, wire-compatibility-test (require running server)
+        #           thread-safety-test (covered by TSan), performance-test (benchmarks)
+        for test in value-types-extended-test value-test parser-test http-test \
+                    request-response-test method-dispatch-test xheaders-test \
+                    exceptions-test safe-math-test perf-utils-test inet-addr-test; do
           echo "=== Running Valgrind on $test ==="
           valgrind --track-origins=yes \
                    --leak-check=full \
