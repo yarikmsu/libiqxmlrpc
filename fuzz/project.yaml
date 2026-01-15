@@ -9,6 +9,8 @@ sanitizers:
   - address
   - undefined
   - memory
+  # Coverage mode for guided fuzzing without sanitizer overhead
+  - coverage
 fuzzing_engines:
   - libfuzzer
   - afl

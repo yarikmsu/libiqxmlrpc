@@ -1,0 +1,68 @@
+# Fuzz dictionary for method dispatcher
+# Covers XML-RPC method names and introspection
+
+# System introspection methods
+"system.listMethods"
+"system.methodHelp"
+"system.methodSignature"
+"system.getCapabilities"
+"system.multicall"
+
+# Common method prefixes
+"system."
+"test."
+"examples."
+"sample."
+
+# Method name components
+"get"
+"set"
+"add"
+"remove"
+"update"
+"delete"
+"list"
+"create"
+
+# XML-RPC request structure
+"<?xml version=\"1.0\"?>"
+"<methodCall>"
+"</methodCall>"
+"<methodName>"
+"</methodName>"
+"<params>"
+"</params>"
+"<param>"
+"</param>"
+"<value>"
+"</value>"
+
+# Common value types
+"<string>"
+"</string>"
+"<int>"
+"</int>"
+"<i4>"
+"</i4>"
+"<boolean>"
+"</boolean>"
+"<double>"
+"</double>"
+
+# Special characters in method names
+"."
+"_"
+"-"
+":"
+
+# Injection patterns
+"/"
+"\\"
+".."
+"../"
+"...\\"
+
+# Empty/boundary cases
+""
+" "
+"\x00"

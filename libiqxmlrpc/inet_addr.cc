@@ -116,6 +116,11 @@ Inet_addr::Impl::init_sockaddr() const
     IQXMLRPC_GETHOSTBYNAME(host.c_str());
     sa->sin_family = PF_INET;
     sa->sin_port = htons(port);
+    // Validate h_length to prevent buffer overflow from malformed DNS response
+    if (hent->h_length < 0 ||
+        static_cast<size_t>(hent->h_length) > sizeof(struct in_addr)) {
+      throw network_error("Invalid address length from DNS lookup", false);
+    }
     memcpy( static_cast<void*>(&(sa->sin_addr)), static_cast<const void*>(hent->h_addr), hent->h_length );
   }
 }

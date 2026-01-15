@@ -116,6 +116,15 @@
 "no-store"
 "max-age="
 
+# RFC 9110 HTTP Semantics (newer patterns)
+"TE: trailers"
+"Trailer:"
+"Priority: u=5"
+"Priority: u=0, i"
+"Early-Data: 1"
+"Alt-Svc:"
+"Alt-Used:"
+
 # Security headers
 "X-Frame-Options:"
 "X-Content-Type-Options:"
