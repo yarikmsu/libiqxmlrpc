@@ -3,8 +3,8 @@
 # Must be run from the repository root directory.
 #
 # Uses tiered thresholds:
-#   - Default: 20% for most benchmarks
-#   - Relaxed: 100% for high-variance benchmarks (queue latency P90/P95)
+#   - Default: 15% for most benchmarks
+#   - Relaxed: 75% for high-variance benchmarks (queue latency, sub-ns measurements)
 #
 # Usage:
 #   ./scripts/local_benchmark_compare.sh [threshold] [base_branch]
@@ -27,7 +27,7 @@ if ! command -v bc &>/dev/null; then
     exit 2
 fi
 
-THRESHOLD=${1:-20}
+THRESHOLD=${1:-15}
 BASE_BRANCH=${2:-master}
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -37,7 +37,8 @@ TMP_SCRIPTS="/tmp/benchmark_scripts_$$"
 # These 3 benchmarks have demonstrated CI failures due to inherent variance:
 # - perf_lockfree_queue_p90/p95_latency: Thread scheduling noise (50-95% variance)
 # - perf_string_to_int_new: Sub-nanosecond measurement (~1ns, 69% variance observed)
-RELAXED_THRESHOLD=100
+# 75% threshold catches real regressions while tolerating normal CI variance (~11%)
+RELAXED_THRESHOLD=75
 RELAXED_BENCHMARKS="perf_lockfree_queue_p90_latency,perf_lockfree_queue_p95_latency,perf_string_to_int_new"
 
 # Cross-platform nproc
