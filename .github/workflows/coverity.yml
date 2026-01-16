@@ -31,6 +31,8 @@ jobs:
     runs-on: ubuntu-24.04
     # Don't run on forks (they won't have the secrets)
     if: github.repository == 'yarikmsu/libiqxmlrpc'
+    permissions:
+      contents: read
 
     steps:
     - name: Checkout
@@ -46,15 +48,24 @@ jobs:
     - name: Download Coverity Build Tool
       run: |
         curl -fsSL https://scan.coverity.com/download/linux64 \
-          --data "token=${{ secrets.COVERITY_SCAN_TOKEN }}&project=yarikmsu%2Flibiqxmlrpc" \
+          --data "token=${COV_TOKEN}&project=yarikmsu%2Flibiqxmlrpc" \
           -o coverity_tool.tgz
+        # Verify download succeeded
+        if [ ! -s coverity_tool.tgz ]; then
+          echo "::error::Failed to download Coverity tool"
+          exit 1
+        fi
         mkdir -p coverity_tool
         tar xzf coverity_tool.tgz --strip-components=1 -C coverity_tool
+      env:
+        COV_TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
 
     - name: Configure
       run: |
         mkdir build && cd build
-        cmake -DCMAKE_CXX_FLAGS="-DBOOST_TIMER_ENABLE_DEPRECATED" ..
+        cmake -Dbuild_tests=ON \
+          -DCMAKE_CXX_FLAGS="-DBOOST_TIMER_ENABLE_DEPRECATED -Wall -Wextra" \
+          ..
 
     - name: Build with Coverity
       run: |
@@ -67,9 +78,12 @@ jobs:
         cd build
         tar czvf libiqxmlrpc-cov.tgz cov-int
         curl -fsSL \
-          --form token=${{ secrets.COVERITY_SCAN_TOKEN }} \
-          --form email=${{ secrets.COVERITY_SCAN_EMAIL }} \
+          --form "token=${COV_TOKEN}" \
+          --form "email=${COV_EMAIL}" \
           --form file=@libiqxmlrpc-cov.tgz \
           --form version="$(git rev-parse --short HEAD)" \
           --form description="Automated Coverity Scan from GitHub Actions" \
           https://scan.coverity.com/builds?project=yarikmsu%2Flibiqxmlrpc
+      env:
+        COV_TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
+        COV_EMAIL: ${{ secrets.COVERITY_SCAN_EMAIL }}
