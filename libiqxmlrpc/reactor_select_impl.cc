@@ -65,7 +65,8 @@ bool Reactor_select_impl::poll(HandlerStateList& out, Reactor_base::Timeout to_m
     if( !code )
       return false;
 
-  } while (false);
+    break;  // Success - exit loop to process results
+  } while (true);
 
   for (const auto& handler : hs)
   {
