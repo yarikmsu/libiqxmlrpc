@@ -85,6 +85,52 @@ public:
   void verify_client(bool require_certificate, ConnectionVerifier*);
   void prepare_verify(SSL*, bool server);
 
+  //! Configure SSL session caching.
+  /*! Session caching speeds up reconnects from returning clients.
+      \param enable Whether to enable session caching (default: true for servers)
+      \param cache_size Maximum number of sessions to cache (default: 1024)
+      \param timeout_sec Session lifetime in seconds (default: 300)
+  */
+  void set_session_cache(bool enable, int cache_size = 1024, int timeout_sec = 300);
+
+  //! Load trusted CA certificates from file and/or directory.
+  /*! SECURITY: Required for proper certificate chain verification.
+      \param ca_file Path to CA certificate file (PEM format), or empty string
+      \param ca_dir Path to directory containing CA certificates, or empty string
+      \return true on success, false on failure
+  */
+  bool load_verify_locations(const std::string& ca_file, const std::string& ca_dir = "");
+
+  //! Use system default CA certificate store.
+  /*! SECURITY: Loads the default trusted CA certificates from the operating system.
+      \return true on success, false on failure
+  */
+  bool use_default_verify_paths();
+
+  //! Enable hostname verification for client connections.
+  /*! SECURITY: Verifies that server certificate matches the expected hostname.
+      Checks both Common Name (CN) and Subject Alternative Names (SAN).
+      Only effective with OpenSSL 1.1.0+; earlier versions log a warning.
+      \param enable Whether to enable hostname verification (default: true)
+  */
+  void set_hostname_verification(bool enable);
+
+  //! Set the expected hostname for verification.
+  /*! Call this before connecting to set the hostname to verify against.
+      Must be called per-connection if hostnames differ.
+      \param hostname The expected server hostname
+  */
+  void set_expected_hostname(const std::string& hostname);
+
+  //! Prepare hostname verification on SSL connection (internal use).
+  void prepare_hostname_verify(SSL* ssl);
+
+  //! Set SNI (Server Name Indication) on SSL connection (internal use).
+  /*! SECURITY: SNI tells the server which hostname the client is connecting to,
+      enabling proper virtual hosting and certificate selection.
+  */
+  void prepare_sni(SSL* ssl);
+
 private:
   Ctx( const std::string&, const std::string&, bool init_client );
   Ctx();

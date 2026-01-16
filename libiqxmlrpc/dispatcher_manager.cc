@@ -142,6 +142,13 @@ void Method_dispatcher_manager::push_back(Method_dispatcher_base* mdisp)
 
 Method* Method_dispatcher_manager::create_method(const Method::Data& mdata)
 {
+  // SECURITY: Reject excessively long method names early to prevent
+  // memory exhaustion from malicious requests
+  constexpr size_t MAX_METHOD_NAME_LEN = 256;
+  if (mdata.method_name.length() > MAX_METHOD_NAME_LEN) {
+    throw Unknown_method(mdata.method_name);  // Sanitized in exception
+  }
+
   typedef Impl::DispatchersSet::iterator I;
   for (I i = impl_->dispatchers.begin(); i != impl_->dispatchers.end(); ++i)
   {

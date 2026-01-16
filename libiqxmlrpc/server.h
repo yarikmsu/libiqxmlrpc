@@ -113,6 +113,8 @@ protected:
   iqnet::Accepted_conn_factory* get_conn_factory();
 
 private:
+  void check_idle_timeouts();
+
   class Impl;
   Impl *impl;
 };

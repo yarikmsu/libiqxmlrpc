@@ -191,6 +191,12 @@ void Server::register_connection(Server_connection* conn)
 
 void Server::unregister_connection(Server_connection* conn)
 {
+  // SECURITY: Notify firewall that connection is closing for accurate tracking
+  iqnet::Firewall_base* fw = impl->firewall.load();
+  if (fw) {
+    fw->release(conn->get_peer_addr());
+  }
+
   std::lock_guard<std::mutex> lock(impl->connections_mutex);
   impl->connections.erase(conn);
 }
@@ -306,6 +312,34 @@ void Server::set_firewall( iqnet::Firewall_base* _firewall )
     impl->acceptor->set_firewall(_firewall);
 }
 
+void Server::check_idle_timeouts()
+{
+  const auto timeout_ms = impl->idle_timeout_ms.load();
+  if (timeout_ms <= 0)
+    return;
+
+  // Collect expired connections first to avoid modifying set during iteration
+  std::vector<Server_connection*> expired;
+  auto timeout = std::chrono::milliseconds(timeout_ms);
+  {
+    std::lock_guard<std::mutex> lock(impl->connections_mutex);
+    std::copy_if(impl->connections.begin(), impl->connections.end(),
+                 std::back_inserter(expired),
+                 // cppcheck-suppress constParameterPointer
+                 [timeout](Server_connection* conn) {
+                   return conn->is_idle_timeout_expired(timeout);
+                 });
+  }
+
+  // Terminate expired connections (outside lock)
+  for (auto* conn : expired)
+  {
+    log_err_msg("Connection idle timeout expired for " +
+                conn->get_peer_addr().get_host_name());
+    conn->terminate_idle();
+  }
+}
+
 void Server::work()
 {
   // Lock to prevent race with set_firewall() accessing acceptor
@@ -328,32 +362,7 @@ void Server::work()
       break;
 
     have_handlers = get_reactor()->handle_events(poll_timeout_ms);
-
-    // Check for idle connection timeouts
-    const auto timeout_ms = impl->idle_timeout_ms.load();
-    if (timeout_ms > 0)
-    {
-      // Collect expired connections first to avoid modifying set during iteration
-      std::vector<Server_connection*> expired;
-      auto timeout = std::chrono::milliseconds(timeout_ms);
-      {
-        std::lock_guard<std::mutex> lock(impl->connections_mutex);
-        std::copy_if(impl->connections.begin(), impl->connections.end(),
-                     std::back_inserter(expired),
-                     // cppcheck-suppress constParameterPointer
-                     [timeout](Server_connection* conn) {
-                       return conn->is_idle_timeout_expired(timeout);
-                     });
-      }
-
-      // Terminate expired connections (outside lock)
-      for (auto* conn : expired)
-      {
-        log_err_msg("Connection idle timeout expired for " +
-                    conn->get_peer_addr().get_host_name());
-        conn->terminate_idle();
-      }
-    }
+    check_idle_timeouts();
   }
 
   // Lock to prevent race with set_firewall() accessing acceptor
