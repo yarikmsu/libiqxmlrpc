@@ -1,0 +1,75 @@
+# Coverity Scan - Deep Static Analysis
+# Free for open source projects at https://scan.coverity.com
+#
+# Setup required by project owner:
+# 1. Register project at https://scan.coverity.com/projects/new
+# 2. Add COVERITY_SCAN_TOKEN secret to GitHub repository settings
+# 3. Add COVERITY_SCAN_EMAIL secret (email used for Coverity registration)
+#
+# Coverity has submission limits for free projects, so this runs:
+# - Weekly on schedule
+# - On manual trigger (workflow_dispatch)
+# - On pushes to master (limited to avoid hitting quota)
+
+name: Coverity Scan
+
+on:
+  schedule:
+    # Run weekly on Sunday at 00:00 UTC
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+    # Allow manual trigger
+  push:
+    branches: [master]
+    paths:
+      # Only run on changes to library source code
+      - 'libiqxmlrpc/**'
+
+jobs:
+  coverity:
+    name: Coverity Scan
+    runs-on: ubuntu-24.04
+    # Don't run on forks (they won't have the secrets)
+    if: github.repository == 'yarikmsu/libiqxmlrpc'
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libboost-dev libboost-date-time-dev \
+          libboost-thread-dev libboost-test-dev libboost-program-options-dev \
+          libboost-chrono-dev libxml2-dev libssl-dev curl
+
+    - name: Download Coverity Build Tool
+      run: |
+        curl -fsSL https://scan.coverity.com/download/linux64 \
+          --data "token=${{ secrets.COVERITY_SCAN_TOKEN }}&project=yarikmsu%2Flibiqxmlrpc" \
+          -o coverity_tool.tgz
+        mkdir -p coverity_tool
+        tar xzf coverity_tool.tgz --strip-components=1 -C coverity_tool
+
+    - name: Configure
+      run: |
+        mkdir build && cd build
+        cmake -DCMAKE_CXX_FLAGS="-DBOOST_TIMER_ENABLE_DEPRECATED" ..
+
+    - name: Build with Coverity
+      run: |
+        export PATH="$(pwd)/coverity_tool/bin:$PATH"
+        cd build
+        cov-build --dir cov-int make -j$(nproc)
+
+    - name: Submit to Coverity Scan
+      run: |
+        cd build
+        tar czvf libiqxmlrpc-cov.tgz cov-int
+        curl -fsSL \
+          --form token=${{ secrets.COVERITY_SCAN_TOKEN }} \
+          --form email=${{ secrets.COVERITY_SCAN_EMAIL }} \
+          --form file=@libiqxmlrpc-cov.tgz \
+          --form version="$(git rev-parse --short HEAD)" \
+          --form description="Automated Coverity Scan from GitHub Actions" \
+          https://scan.coverity.com/builds?project=yarikmsu%2Flibiqxmlrpc
