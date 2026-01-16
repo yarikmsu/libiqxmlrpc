@@ -60,7 +60,8 @@ bool Reactor_poll_impl::poll(HandlerStateList& out, Reactor_base::Timeout to_ms)
     if( !code )
       return false;
 
-  } while (false);
+    break;  // Success - exit loop to process results
+  } while (true);
 
   for( unsigned i = 0; i < impl->pfd.size(); i++ )
   {
