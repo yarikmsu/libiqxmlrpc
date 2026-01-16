@@ -166,27 +166,29 @@ inline std::pair<std::string, std::string> create_temp_cert_files() {
 
   // Create cert file with O_EXCL to prevent TOCTOU/symlink attacks
   // Certificate can be world-readable (0644)
+  size_t cert_len = strlen(EMBEDDED_TEST_CERT);
   int cert_fd = open(cert_path.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0644);
   if (cert_fd < 0) {
     throw std::runtime_error("Failed to create temp cert file (may already exist): " + cert_path);
   }
-  ssize_t cert_written = write(cert_fd, EMBEDDED_TEST_CERT, strlen(EMBEDDED_TEST_CERT));
+  ssize_t cert_written = write(cert_fd, EMBEDDED_TEST_CERT, cert_len);
   close(cert_fd);
-  if (cert_written < 0) {
+  if (cert_written < 0 || static_cast<size_t>(cert_written) != cert_len) {
     std::remove(cert_path.c_str());
     throw std::runtime_error("Failed to write temp cert file: " + cert_path);
   }
 
   // Create key file with O_EXCL and restrictive permissions (0600)
   // Private keys must NOT be world-readable
+  size_t key_len = strlen(EMBEDDED_TEST_KEY);
   int key_fd = open(key_path.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
   if (key_fd < 0) {
     std::remove(cert_path.c_str());
     throw std::runtime_error("Failed to create temp key file (may already exist): " + key_path);
   }
-  ssize_t key_written = write(key_fd, EMBEDDED_TEST_KEY, strlen(EMBEDDED_TEST_KEY));
+  ssize_t key_written = write(key_fd, EMBEDDED_TEST_KEY, key_len);
   close(key_fd);
-  if (key_written < 0) {
+  if (key_written < 0 || static_cast<size_t>(key_written) != key_len) {
     std::remove(cert_path.c_str());
     std::remove(key_path.c_str());
     throw std::runtime_error("Failed to write temp key file: " + key_path);
