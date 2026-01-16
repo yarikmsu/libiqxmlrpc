@@ -26,6 +26,8 @@ make perf-test                                     # Run benchmarks
 
 PRs must pass: ubuntu-24.04, ubi8, macos | ASan/UBSan | TSan | Valgrind | Fuzz | coverage | cppcheck | clang-tidy | CodeQL
 
+Additional (non-blocking): Coverity Scan - weekly deep static analysis, results reviewed periodically
+
 ## Architecture
 
 | Component | Files | Purpose |
@@ -51,3 +53,4 @@ PRs must pass: ubuntu-24.04, ubi8, macos | ASan/UBSan | TSan | Valgrind | Fuzz |
 | Performance rules | `docs/PERFORMANCE_GUIDE.md` |
 | SSL/HTTPS testing | `docs/SSL_TESTING.md` |
 | Debugging tips | `docs/DEBUGGING.md` |
+| Coverity Scan setup | `docs/COVERITY_SETUP.md` |
