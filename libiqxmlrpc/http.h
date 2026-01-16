@@ -220,7 +220,7 @@ public:
   Packet_reader():
     header_cache(),
     content_cache(),
-    header(0),
+    header(nullptr),
     ver_level_(HTTP_CHECK_WEAK),
     constructed(false),
     pkt_max_sz(0),
@@ -288,7 +288,7 @@ public:
     Packet( new Response_header(code, phrase), "" ),
     Exception( "HTTP: " + phrase ) {}
 
-  ~Error_response() throw() override {};
+  ~Error_response() throw() override = default;
 
   const Response_header* response_header() const
   {

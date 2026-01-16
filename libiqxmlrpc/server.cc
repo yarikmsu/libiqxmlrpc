@@ -204,7 +204,7 @@ void Server::unregister_connection(Server_connection* conn)
 void Server::log_err_msg( const std::string& msg )
 {
   if( impl->log )
-    *impl->log << msg << std::endl;
+    *impl->log << msg << '\n';
 }
 
 namespace {
@@ -217,7 +217,7 @@ authenticate(const http::Packet& pkt, const Auth_Plugin_base* ap)
   if (!ap)
     return std::nullopt;
 
-  const Request_header& hdr =
+  const auto& hdr =
     dynamic_cast<const Request_header&>(*pkt.header());
 
   if (!hdr.has_authinfo())
@@ -269,7 +269,7 @@ void Server::schedule_execute( http::Packet* pkt, Server_connection* conn )
   {
     log_err_msg( e.what() );
     std::unique_ptr<Executor> executor_to_delete(executor);
-    http::Packet *err_pkt = new http::Packet(e);
+    auto *err_pkt = new http::Packet(e);
     conn->schedule_response( err_pkt );
   }
   catch( const iqxmlrpc::Exception& e )
@@ -298,7 +298,7 @@ void Server::schedule_response(
 {
   std::unique_ptr<Executor> executor_to_delete(exec);
   std::string resp_str = dump_response(resp);
-  http::Packet *packet = new http::Packet(new http::Response_header(), resp_str);
+  auto *packet = new http::Packet(new http::Response_header(), resp_str);
   conn->schedule_response( packet );
 }
 
@@ -345,9 +345,9 @@ void Server::work()
   // Lock to prevent race with set_firewall() accessing acceptor
   {
     std::lock_guard<std::mutex> lock(impl->acceptor_mutex);
-    if( !impl->acceptor.get() )
+    if( !impl->acceptor )
     {
-      impl->acceptor.reset(new iqnet::Acceptor( impl->bind_addr, get_conn_factory(), get_reactor()));
+      impl->acceptor = std::make_unique<iqnet::Acceptor>( impl->bind_addr, get_conn_factory(), get_reactor());
       impl->acceptor->set_firewall( impl->firewall );
     }
   }
@@ -368,7 +368,7 @@ void Server::work()
   // Lock to prevent race with set_firewall() accessing acceptor
   {
     std::lock_guard<std::mutex> lock(impl->acceptor_mutex);
-    impl->acceptor.reset(0);
+    impl->acceptor.reset();
   }
   impl->exit_flag = false;
 }

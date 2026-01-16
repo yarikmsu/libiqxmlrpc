@@ -74,7 +74,7 @@ protected:
 //! Abstract base for Executor's factories.
 class LIBIQXMLRPC_API Executor_factory_base {
 public:
-  virtual ~Executor_factory_base() {}
+  virtual ~Executor_factory_base() = default;
 
   virtual Executor* create(
     Method*,

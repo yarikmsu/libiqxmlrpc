@@ -25,14 +25,14 @@ public:
     ValueBuilderBase(parser),
     state_(parser, NONE),
     name_(),
-    value_(0),
+    value_(nullptr),
     proxy_(nullptr)
   {
     static const StateMachine::StateTransition trans[] = {
       { NONE, MEMBER, "member" },
       { MEMBER, NAME_READ, "name" },
       { NAME_READ, VALUE_READ, "value" },
-      { 0, 0, 0 }
+      { 0, 0, nullptr }
     };
     state_.set_transitions(trans);
     retval.reset(proxy_ = new Struct());
@@ -94,13 +94,13 @@ public:
   explicit ArrayBuilder(Parser& parser):
     ValueBuilderBase(parser),
     state_(parser, NONE),
-    proxy_(0)
+    proxy_(nullptr)
   {
     static const StateMachine::StateTransition trans[] = {
       { NONE, DATA, "data" },
       { DATA, VALUES, "value" },
       { VALUES, VALUES, "value" },
-      { 0, 0, 0 }
+      { 0, 0, nullptr }
     };
     state_.set_transitions(trans);
     retval.reset(proxy_ = new Array());
@@ -185,14 +185,14 @@ ValueBuilder::do_visit_element(const std::string& tagname)
     break;
   }
 
-  if (retval.get())
+  if (retval)
     want_exit();
 }
 
 void
 ValueBuilder::do_visit_element_end(const std::string&)
 {
-  if (retval.get())
+  if (retval)
     return;
 
   std::unique_ptr<Int> default_int(Value::get_default_int());
@@ -205,14 +205,14 @@ ValueBuilder::do_visit_element_end(const std::string&)
     break;
 
   case INT:
-    if (default_int.get()) {
+    if (default_int) {
       retval.reset(default_int.release());
       break;
     }
     throw XML_RPC_violation(parser_.context());
 
   case INT64:
-    if (default_int64.get()) {
+    if (default_int64) {
       retval.reset(default_int64.release());
       break;
     }

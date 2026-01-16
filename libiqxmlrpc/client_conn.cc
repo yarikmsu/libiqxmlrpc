@@ -15,9 +15,7 @@ Client_connection::Client_connection():
 {
 }
 
-Client_connection::~Client_connection()
-{
-}
+Client_connection::~Client_connection() = default;
 
 Response Client_connection::process_session( const Request& req, const XHeaders& xheaders )
 {
@@ -43,7 +41,7 @@ Response Client_connection::process_session( const Request& req, const XHeaders&
   // Received packet
   std::unique_ptr<Packet> res_p( do_process_session(req_p.dump()) );
 
-  const Response_header* res_h =
+  const auto* res_h =
     static_cast<const Response_header*>(res_p->header());
 
   if( res_h->code() != 200 )

@@ -187,9 +187,7 @@ Header::Header(Verification_level lev):
   register_validator(names::content_type, validator::content_type, HTTP_CHECK_STRICT);
 }
 
-Header::~Header()
-{
-}
+Header::~Header() = default;
 
 void Header::register_validator(
   const std::string& name,
@@ -285,7 +283,7 @@ void Header::parse(const std::string& s)
 template <class T>
 T Header::get_option(const std::string& name) const
 {
-  Options::const_iterator i = options_.find(name);
+  auto i = options_.find(name);
 
   if (i == options_.end()) {
       throw Malformed_packet("Missing mandatory header option '" + name + "'.");
@@ -612,9 +610,7 @@ Packet::Packet( Header* h, const std::string& co ):
   header_->set_content_length(content_.length());
 }
 
-Packet::~Packet()
-{
-}
+Packet::~Packet() = default;
 
 void Packet::set_keep_alive( bool keep_alive )
 {
@@ -624,7 +620,7 @@ void Packet::set_keep_alive( bool keep_alive )
 // ---------------------------------------------------------------------------
 void Packet_reader::clear()
 {
-  header = 0;
+  header = nullptr;
   content_cache.erase();
   header_cache.erase();
   constructed = false;
@@ -736,13 +732,13 @@ Packet* Packet_reader::read_packet( const std::string& s, bool hdr_only )
     if( ready )
     {
       content_cache.erase( header->content_length(), std::string::npos );
-      Packet* packet = new Packet( header, content_cache );
+      auto* packet = new Packet( header, content_cache );
       constructed = true;
       return packet;
     }
   }
 
-  return 0;
+  return nullptr;
 }
 
 bool Packet_reader::expect_continue() const

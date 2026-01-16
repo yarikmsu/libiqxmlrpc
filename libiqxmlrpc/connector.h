@@ -35,7 +35,7 @@ private:
   iqxmlrpc::Client_connection*
   create_connection(const Socket& s) override
   {
-    Conn_type* c = new Conn_type( s, true );
+    auto* c = new Conn_type( s, true );
     c->post_connect();
     return c;
   }
