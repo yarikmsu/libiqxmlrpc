@@ -25,13 +25,12 @@ on:
       threshold:
         description: 'Regression threshold percentage (must be positive number)'
         required: false
-        default: '20'
+        default: '50'
 
 env:
-  # TEMPORARY: 150% threshold for methodology transition (increased iteration counts).
-  # TODO: Lower back to 20% after this PR merges and baseline is established.
-  # See: https://github.com/yarikmsu/libiqxmlrpc/pull/110
-  REGRESSION_THRESHOLD: ${{ github.event.inputs.threshold || '150' }}
+  # 50% threshold accounts for CI runner variance, especially on multi-threaded
+  # latency benchmarks (queue P90/P95) which can vary 50-100% due to scheduling
+  REGRESSION_THRESHOLD: ${{ github.event.inputs.threshold || '50' }}
 
 jobs:
   benchmark:
