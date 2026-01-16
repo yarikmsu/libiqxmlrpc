@@ -178,6 +178,7 @@ public:
   }
 
   int64_t p50() { return percentile(0.50); }
+  int64_t p90() { return percentile(0.90); }
   int64_t p95() { return percentile(0.95); }
   int64_t p99() { return percentile(0.99); }
   int64_t min() { sort(); return samples_.empty() ? 0 : samples_.front(); }

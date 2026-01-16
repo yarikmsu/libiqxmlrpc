@@ -137,6 +137,9 @@ BOOST_AUTO_TEST_CASE(percentile_interpolation)
     // With 100 samples, p50 should be around 50
     BOOST_CHECK_EQUAL(stats.p50(), 50);
 
+    // p90 should be around 90
+    BOOST_CHECK_EQUAL(stats.p90(), 90);
+
     // p95 should be around 95
     BOOST_CHECK_EQUAL(stats.p95(), 95);
 
