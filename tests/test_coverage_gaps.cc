@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <sstream>
 #include <string>
 #include <thread>
 
@@ -49,11 +50,9 @@ BOOST_AUTO_TEST_CASE(malformed_content_length_non_numeric)
   bool got_exception = false;
   try {
     http::Request_header header(http::HTTP_CHECK_STRICT, raw_request);
-  } catch (const http::Malformed_packet& e) {
+  } catch (const http::Malformed_packet&) {
     got_exception = true;
-    BOOST_CHECK(std::string(e.what()).find("Content-Length") != std::string::npos ||
-                std::string(e.what()).find("malformed") != std::string::npos ||
-                true);  // Any malformed packet exception is correct
+    // Exception thrown is sufficient - message format may vary
   }
   BOOST_CHECK(got_exception);
 }
@@ -513,6 +512,310 @@ BOOST_FIXTURE_TEST_CASE(http_server_rapid_large_requests, IntegrationFixture)
   }
 
   BOOST_CHECK_GE(success_count.load(), 3);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+//=============================================================================
+// Server Authentication and Error Logging Coverage
+// Covers server.cc lines 207, 220 (modernization changes)
+//=============================================================================
+
+BOOST_AUTO_TEST_SUITE(server_modernization_coverage)
+
+// Test authentication with dynamic_cast (covers server.cc line 220)
+// The authenticate() function uses: const auto& hdr = dynamic_cast<...>
+BOOST_FIXTURE_TEST_CASE(server_authentication_path_coverage, IntegrationFixture)
+{
+  start_server(1, 580);
+
+  // Setup auth plugin that requires authentication
+  TestAuthPlugin auth_plugin(false);  // Don't allow anonymous
+  server().set_auth_plugin(auth_plugin);
+
+  auto client = create_client();
+
+  // First, try without auth - should fail with Unauthorized
+  try {
+    Response r = client->execute("echo", Value("no auth"));
+    BOOST_CHECK(r.is_fault());
+  } catch (...) {
+    // Connection error is also acceptable
+  }
+
+  // Now try with valid auth
+  auto auth_client = create_client();
+  auth_client->set_authinfo("testuser", "testpass");
+  Response r2 = auth_client->execute("echo", Value("with auth"));
+  BOOST_CHECK(!r2.is_fault());
+  BOOST_CHECK_EQUAL(r2.value().get_string(), "with auth");
+}
+
+// Test error logging path (covers server.cc line 207 with '\n')
+BOOST_FIXTURE_TEST_CASE(server_error_logging_coverage, IntegrationFixture)
+{
+  std::ostringstream log_stream;
+  start_server(1, 581);
+  server().log_errors(&log_stream);
+
+  auto client = create_client();
+
+  // Call a method that throws std::exception (not Fault)
+  // std_exception_method throws std::runtime_error which goes through
+  // the std::exception catch block that calls log_err_msg
+  Response r = client->execute("std_exception_method", Param_list());
+  BOOST_CHECK(r.is_fault());
+
+  // Verify error was logged (exercises log_err_msg with '\n')
+  std::string logged = log_stream.str();
+  BOOST_CHECK(!logged.empty());
+  BOOST_CHECK(logged.find("Server:") != std::string::npos);
+}
+
+// Test server start/stop cycle (covers server.cc lines 348, 350, 371)
+// These lines use make_unique for acceptor and reset() for cleanup
+BOOST_FIXTURE_TEST_CASE(server_start_stop_cycle_coverage, IntegrationFixture)
+{
+  // First start/stop cycle
+  start_server(1, 582);
+  auto client1 = create_client();
+  Response r1 = client1->execute("echo", Value("cycle 1"));
+  BOOST_CHECK(!r1.is_fault());
+  stop_server();
+
+  // Brief pause before restart
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+  // Second start/stop cycle - exercises acceptor recreation
+  // Use different port to avoid TIME_WAIT socket state issues
+  start_server(1, 583);
+  auto client2 = create_client();
+  Response r2 = client2->execute("echo", Value("cycle 2"));
+  BOOST_CHECK(!r2.is_fault());
+  // stop_server() called in fixture destructor
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+//=============================================================================
+// Reactor Fake Event Coverage
+// Covers reactor_impl.h line 179 (auto i = find_handler_state)
+//=============================================================================
+
+BOOST_AUTO_TEST_SUITE(reactor_fake_event_coverage)
+
+// Test reactor fake_event through server interrupt mechanism
+// The interrupt mechanism uses fake_event internally
+BOOST_FIXTURE_TEST_CASE(reactor_fake_event_via_interrupt, IntegrationFixture)
+{
+  start_server(1, 590);
+
+  // Start a client request
+  auto client = create_client();
+  Response r = client->execute("echo", Value("before interrupt"));
+  BOOST_CHECK(!r.is_fault());
+
+  // Interrupt the server (uses fake_event internally via Reactor_interrupter)
+  server().interrupt();
+
+  // Server should still handle requests after interrupt
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  auto client2 = create_client();
+  Response r2 = client2->execute("echo", Value("after interrupt"));
+  BOOST_CHECK(!r2.is_fault());
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+//=============================================================================
+// HTTP Header and Packet Reader Coverage
+// Covers http.cc lines 286, 623 (modernization changes)
+//=============================================================================
+
+BOOST_AUTO_TEST_SUITE(http_modernization_coverage)
+
+// Test get_option with auto iterator (covers http.cc line 286)
+BOOST_AUTO_TEST_CASE(header_get_option_auto_iterator)
+{
+  http::Response_header hdr(200, "OK");
+  hdr.set_content_length(100);
+
+  // This exercises the auto i = options_.find(name) path
+  unsigned len = hdr.content_length();
+  BOOST_CHECK_EQUAL(len, 100u);
+
+  // Test string option retrieval
+  hdr.set_option("x-custom", "value");
+  std::string dump = hdr.dump();
+  BOOST_CHECK(dump.find("x-custom: value") != std::string::npos);
+}
+
+// Test Packet_reader::clear() with nullptr (covers http.cc line 623)
+BOOST_AUTO_TEST_CASE(packet_reader_clear_nullptr)
+{
+  http::Packet_reader reader;
+
+  // Read a complete packet
+  std::string raw = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 4\r\n\r\ntest";
+  std::unique_ptr<http::Packet> pkt(reader.read_request(raw));
+  BOOST_REQUIRE(pkt != nullptr);
+
+  // Read another packet - this triggers clear() which sets header = nullptr
+  std::string raw2 = "POST /other HTTP/1.1\r\nhost: localhost\r\ncontent-length: 5\r\n\r\nhello";
+  std::unique_ptr<http::Packet> pkt2(reader.read_request(raw2));
+  BOOST_REQUIRE(pkt2 != nullptr);
+  BOOST_CHECK_EQUAL(pkt2->content(), "hello");
+}
+
+// Test Packet destructor (covers http.cc line 613)
+BOOST_AUTO_TEST_CASE(packet_destructor_coverage)
+{
+  // Create and destroy packet to exercise destructor
+  {
+    http::Packet pkt(new http::Response_header(200, "OK"), "test content");
+    BOOST_CHECK_EQUAL(pkt.content(), "test content");
+  }
+  // Packet destructor runs here
+
+  // Create another to verify no issues
+  http::Response_header* resp_hdr = new http::Response_header(404, "Not Found");
+  http::Packet pkt2(resp_hdr, "error");
+  BOOST_CHECK_EQUAL(resp_hdr->code(), 404);
+}
+
+// Test Header destructor (covers http.cc line 190)
+BOOST_AUTO_TEST_CASE(header_destructor_coverage)
+{
+  // Create and destroy headers to exercise destructor
+  {
+    http::Response_header hdr(200, "OK");
+    hdr.set_content_length(50);
+  }
+  // Response_header destructor runs (calls Header destructor)
+
+  {
+    http::Request_header hdr("/RPC2", "localhost", 8080);
+    hdr.set_content_length(100);
+  }
+  // Request_header destructor runs (calls Header destructor)
+
+  BOOST_CHECK(true);  // If we got here, destructors worked
+}
+
+// Test read_packet returning nullptr path (covers http.cc line 741)
+BOOST_AUTO_TEST_CASE(packet_reader_return_nullptr)
+{
+  http::Packet_reader reader;
+
+  // Incomplete packet - should return nullptr
+  std::unique_ptr<http::Packet> pkt(reader.read_response("HTTP/1.1 200 OK\r\n", false));
+  BOOST_CHECK(pkt == nullptr);
+
+  // Still incomplete
+  pkt.reset(reader.read_response("content-length: 100\r\n\r\n", false));
+  BOOST_CHECK(pkt == nullptr);
+
+  // Still waiting for content
+  pkt.reset(reader.read_response("partial", false));
+  BOOST_CHECK(pkt == nullptr);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+//=============================================================================
+// Server Accessor Coverage
+// Covers server.cc line 181-183 (get_idle_timeout)
+//=============================================================================
+
+BOOST_AUTO_TEST_SUITE(server_accessor_coverage)
+
+// Test get_idle_timeout accessor (covers server.cc lines 181-183)
+BOOST_FIXTURE_TEST_CASE(server_get_idle_timeout_coverage, IntegrationFixture)
+{
+  start_server(1, 700);
+
+  // Test default value (0 = no timeout)
+  auto timeout = server().get_idle_timeout();
+  BOOST_CHECK_EQUAL(timeout.count(), 0);
+
+  // Set a timeout and verify getter returns it
+  server().set_idle_timeout(std::chrono::milliseconds(5000));
+  timeout = server().get_idle_timeout();
+  BOOST_CHECK_EQUAL(timeout.count(), 5000);
+
+  // Change and verify again
+  server().set_idle_timeout(std::chrono::milliseconds(100));
+  timeout = server().get_idle_timeout();
+  BOOST_CHECK_EQUAL(timeout.count(), 100);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+//=============================================================================
+// Reactor Unregister Handler Coverage
+// Covers reactor_impl.h lines 140, 161 (auto i = ...)
+//=============================================================================
+
+BOOST_AUTO_TEST_SUITE(reactor_unregister_coverage)
+
+// Test that connection termination exercises unregister paths
+// The reactor unregister methods are called when connections close
+BOOST_FIXTURE_TEST_CASE(reactor_unregister_via_connection_close, IntegrationFixture)
+{
+  start_server(1, 710);
+
+  // Create multiple connections and let them close naturally
+  // This exercises the reactor's unregister_handler paths
+  for (int i = 0; i < 3; ++i) {
+    auto client = create_client();
+    client->set_keep_alive(false);  // Connection will close after response
+    Response r = client->execute("echo", Value(i));
+    BOOST_CHECK(!r.is_fault());
+  }
+  // Connections close when clients go out of scope, triggering unregister
+
+  // Brief pause to let server process disconnections
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+  // Server should still work after connection cleanup
+  auto client2 = create_client();
+  Response r2 = client2->execute("echo", Value("after cleanup"));
+  BOOST_CHECK(!r2.is_fault());
+}
+
+// Test rapid connection creation and destruction
+// This stresses the register/unregister paths in the reactor
+BOOST_FIXTURE_TEST_CASE(reactor_rapid_connect_disconnect, IntegrationFixture)
+{
+  start_server(4, 711);  // Pool executor for concurrent handling
+
+  std::atomic<int> success_count(0);
+  std::vector<std::thread> threads;
+
+  // Spawn threads that rapidly create and destroy connections
+  for (int t = 0; t < 4; ++t) {
+    threads.emplace_back([this, t, &success_count]() {
+      for (int i = 0; i < 5; ++i) {
+        try {
+          auto client = create_client();
+          client->set_keep_alive(false);
+          Response r = client->execute("echo", Value(t * 10 + i));
+          if (!r.is_fault()) {
+            ++success_count;
+          }
+        } catch (...) {
+          // Connection errors acceptable under stress
+        }
+      }
+    });
+  }
+
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  // Most connections should succeed
+  BOOST_CHECK_GE(success_count.load(), 15);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -37,7 +37,7 @@ public:
   Reactor& operator=(const Reactor&) = delete;
 
   Reactor();
-  ~Reactor() override {}
+  ~Reactor() override = default;
 
   void register_handler( Event_handler*, Event_mask ) override;
   void unregister_handler( Event_handler*, Event_mask ) override;
@@ -104,7 +104,7 @@ template <class Lock>
 iqnet::Event_handler* Reactor<Lock>::find_handler(Socket::Handler fd)
 {
   scoped_lock lk(lock);
-  h_iterator i = handlers.find(fd);
+  auto i = handlers.find(fd);
   return i == handlers.end() ? nullptr : i->second;
 }
 
@@ -127,7 +127,7 @@ void Reactor<Lock>::register_handler( Event_handler* eh, Event_mask mask )
   else
   {
     handlers_states.copy_for_write();  // COW: copy if readers hold references
-    typename Reactor<Lock>::hs_iterator i = find_handler_state(eh);
+    auto i = find_handler_state(eh);
     i->mask |= mask;
   }
 }
@@ -137,7 +137,7 @@ void Reactor<Lock>::unregister_handler( Event_handler* eh, Event_mask mask )
 {
   scoped_lock lk(lock);
   handlers_states.copy_for_write();  // COW: copy if readers hold references
-  hs_iterator i = find_handler_state( eh );
+  auto i = find_handler_state( eh );
 
   if( i != end() )
   {
@@ -158,7 +158,7 @@ template <class Lock>
 void Reactor<Lock>::unregister_handler( Event_handler* eh )
 {
   scoped_lock lk(lock);
-  h_iterator i = handlers.find(eh->get_handler());
+  auto i = handlers.find(eh->get_handler());
 
   if( i != handlers.end() )
   {
@@ -176,7 +176,7 @@ void Reactor<Lock>::fake_event( Event_handler* eh, Event_mask mask )
 {
   scoped_lock lk(lock);
   handlers_states.copy_for_write();  // COW: copy if readers hold references
-  hs_iterator i = find_handler_state( eh );
+  auto i = find_handler_state( eh );
 
   if( i != end() )
     i->revents |= mask;

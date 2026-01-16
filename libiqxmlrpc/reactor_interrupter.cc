@@ -46,7 +46,7 @@ public:
   Impl& operator=(const Impl&) = delete;
 
   explicit Impl(Reactor_base* reactor);
-  ~Impl() {}
+  ~Impl() = default;
 
   void make_interrupt();
 
@@ -70,7 +70,7 @@ Reactor_interrupter::Impl::Impl(Reactor_base* reactor):
   client_.connect( Inet_addr("127.0.0.1", srv_addr.get_port()) );
   Socket srv_conn(srv.accept());
 
-  server_.reset(new Interrupter_connection(reactor, srv_conn));
+  server_ = std::make_unique<Interrupter_connection>(reactor, srv_conn);
 }
 
 void Reactor_interrupter::Impl::make_interrupt()
@@ -81,14 +81,11 @@ void Reactor_interrupter::Impl::make_interrupt()
 
 
 Reactor_interrupter::Reactor_interrupter(Reactor_base* r):
-  impl_(new Impl(r))
+  impl_(std::make_unique<Impl>(r))
 {
 }
 
-Reactor_interrupter::~Reactor_interrupter()
-{
-  delete impl_;
-}
+Reactor_interrupter::~Reactor_interrupter() = default;
 
 void Reactor_interrupter::make_interrupt()
 {

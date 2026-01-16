@@ -25,9 +25,7 @@ Server_connection::Server_connection( const iqnet::Inet_addr& a ):
 }
 
 
-Server_connection::~Server_connection()
-{
-}
+Server_connection::~Server_connection() = default;
 
 
 http::Packet* Server_connection::read_request( const std::string& s )

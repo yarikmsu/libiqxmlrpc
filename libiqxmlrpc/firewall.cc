@@ -86,7 +86,7 @@ bool RateLimitingFirewall::grant(const Inet_addr& addr)
 
   // Check per-IP limit
   if (impl_->max_per_ip > 0) {
-    std::string ip = addr.get_host_name();
+    const std::string& ip = addr.get_host_name();
     auto it = impl_->ip_counts.find(ip);
     size_t current = (it != impl_->ip_counts.end()) ? it->second : 0;
 
@@ -103,7 +103,7 @@ bool RateLimitingFirewall::grant(const Inet_addr& addr)
 
 void RateLimitingFirewall::release(const Inet_addr& addr)
 {
-  std::string ip = addr.get_host_name();
+  const std::string& ip = addr.get_host_name();
 
   std::lock_guard<std::mutex> lock(impl_->map_mutex);
 
@@ -126,7 +126,7 @@ void RateLimitingFirewall::release(const Inet_addr& addr)
 
 size_t RateLimitingFirewall::connections_from(const Inet_addr& addr) const
 {
-  std::string ip = addr.get_host_name();
+  const std::string& ip = addr.get_host_name();
 
   std::lock_guard<std::mutex> lock(impl_->map_mutex);
   auto it = impl_->ip_counts.find(ip);
@@ -150,7 +150,7 @@ bool RateLimitingFirewall::check_request_allowed(const Inet_addr& addr)
     return true;  // No rate limit
   }
 
-  std::string ip = addr.get_host_name();
+  const std::string& ip = addr.get_host_name();
 
   std::lock_guard<std::mutex> lock(impl_->rate_mutex);
 
@@ -167,7 +167,7 @@ bool RateLimitingFirewall::check_request_allowed(const Inet_addr& addr)
 
 size_t RateLimitingFirewall::request_rate(const Inet_addr& addr) const
 {
-  std::string ip = addr.get_host_name();
+  const std::string& ip = addr.get_host_name();
 
   std::lock_guard<std::mutex> lock(impl_->rate_mutex);
 
