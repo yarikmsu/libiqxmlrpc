@@ -1,0 +1,226 @@
+# Benchmark CI - Performance Regression Detection
+#
+# Compares PR performance against master branch to detect regressions.
+# Both branches are benchmarked in the same CI run for accurate comparison.
+#
+# Benchmarks run on ubuntu-24.04 with fixed -march=x86-64-v3 for consistent results.
+# Uses minimum of 5 runs for stability (best achievable performance).
+
+name: Benchmark
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      # Run on changes to library code or benchmark infrastructure
+      - 'libiqxmlrpc/**'
+      - 'tests/test_performance.cc'
+      - 'tests/perf_utils.h'
+      - 'scripts/benchmark_utils.py'
+      - 'scripts/compare_benchmarks.py'
+      - 'scripts/select_minimum_results.py'
+      - '.github/workflows/benchmark.yml'
+  workflow_dispatch:
+    inputs:
+      threshold:
+        description: 'Regression threshold percentage (must be positive number)'
+        required: false
+        default: '20'
+
+env:
+  # TEMPORARY: 150% threshold for methodology transition (increased iteration counts).
+  # TODO: Lower back to 20% after this PR merges and baseline is established.
+  # See: https://github.com/yarikmsu/libiqxmlrpc/pull/110
+  REGRESSION_THRESHOLD: ${{ github.event.inputs.threshold || '150' }}
+
+jobs:
+  benchmark:
+    name: Performance Regression Check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+    - name: Validate threshold
+      if: github.event.inputs.threshold
+      run: |
+        set -euo pipefail
+        threshold="${{ github.event.inputs.threshold }}"
+        # Two-stage validation: shell checks format/range, Python checks threshold > 0
+        # This catches invalid input early before running expensive benchmark steps
+        # Regex rejects leading zeros (e.g., "007") except for "0.x" decimals
+        if ! [[ "$threshold" =~ ^(0|[1-9][0-9]*)(\.[0-9]+)?$ ]]; then
+          echo "::error::Threshold must be a number, got: $threshold"
+          exit 1
+        fi
+        if [ "$(echo "$threshold <= 0" | bc -l)" -eq 1 ]; then
+          echo "::error::Threshold must be positive, got: $threshold"
+          exit 1
+        fi
+
+    - name: Install dependencies
+      run: |
+        set -euo pipefail
+        sudo apt-get update
+        sudo apt-get install -y libboost-dev libboost-date-time-dev \
+          libboost-thread-dev libboost-test-dev libboost-program-options-dev \
+          libboost-chrono-dev libxml2-dev libssl-dev python3 bc
+
+    - name: Configure
+      run: |
+        set -euo pipefail
+        mkdir build && cd build
+        # Use -march=x86-64-v3 (AVX2) for consistent results across GitHub runners
+        # Avoids variance from -march=native on different CPU generations
+        cmake -DCMAKE_BUILD_TYPE=Release \
+          -Dbuild_tests=ON \
+          -DCMAKE_CXX_FLAGS="-DBOOST_TIMER_ENABLE_DEPRECATED -O3 -march=x86-64-v3" \
+          ..
+
+    - name: Build benchmarks
+      run: |
+        set -euo pipefail
+        cd build
+        make -j$(nproc) performance-test
+
+    - name: Benchmark PR branch
+      run: |
+        set -euo pipefail
+        cd build
+        # Run benchmarks 5 times for stability
+        for i in 1 2 3 4 5; do
+          echo "=== PR benchmark run $i/5 ==="
+          ./tests/performance-test
+          cp performance_baseline.txt pr_run_$i.txt
+        done
+        # Select minimum (best) result for each benchmark across all runs
+        python3 ../scripts/select_minimum_results.py \
+          pr_run_1.txt pr_run_2.txt pr_run_3.txt pr_run_4.txt pr_run_5.txt \
+          -o pr_results.txt \
+          --github-actions
+        echo "PR benchmark results saved to pr_results.txt"
+
+    - name: Benchmark master branch
+      run: |
+        set -euo pipefail
+        # Copy scripts before checkout (they may not exist on master)
+        # Use GITHUB_RUN_ID for unique directory to avoid conflicts on self-hosted runners
+        cp -r scripts /tmp/benchmark_scripts_${GITHUB_RUN_ID}
+
+        # Checkout master branch
+        git fetch origin master
+        git checkout origin/master
+
+        # Rebuild with master code
+        cd build
+        rm -rf CMakeCache.txt CMakeFiles
+        cmake -DCMAKE_BUILD_TYPE=Release \
+          -Dbuild_tests=ON \
+          -DCMAKE_CXX_FLAGS="-DBOOST_TIMER_ENABLE_DEPRECATED -O3 -march=x86-64-v3" \
+          ..
+        make -j$(nproc) performance-test
+
+        # Run benchmarks 5 times on master
+        for i in 1 2 3 4 5; do
+          echo "=== Master benchmark run $i/5 ==="
+          ./tests/performance-test
+          cp performance_baseline.txt master_run_$i.txt
+        done
+
+        # Select minimum across runs (use preserved scripts)
+        python3 /tmp/benchmark_scripts_${GITHUB_RUN_ID}/select_minimum_results.py \
+          master_run_1.txt master_run_2.txt master_run_3.txt master_run_4.txt master_run_5.txt \
+          -o master_results.txt \
+          --github-actions
+        echo "Master benchmark results saved to master_results.txt"
+
+    - name: Compare against master
+      id: compare
+      run: |
+        # Note: -e omitted intentionally to capture Python script exit code
+        set -uo pipefail
+        echo "Comparing PR results against master branch..."
+        echo "Threshold: ${REGRESSION_THRESHOLD}%"
+        # Run comparison and capture exit code
+        # Exit 0 = pass, Exit 1 = regression detected, Exit 2 = script error
+        exit_code=0
+        python3 /tmp/benchmark_scripts_${GITHUB_RUN_ID}/compare_benchmarks.py \
+          build/master_results.txt \
+          build/pr_results.txt \
+          --threshold="${REGRESSION_THRESHOLD}" \
+          --github-actions | tee benchmark_report.txt || exit_code=$?
+        if [ "$exit_code" -eq 1 ]; then
+          echo "has_regression=true" >> "$GITHUB_OUTPUT"
+        elif [ "$exit_code" -eq 2 ]; then
+          echo "script_error=true" >> "$GITHUB_OUTPUT"
+          echo "::error::Benchmark script failed with error"
+        fi
+
+    - name: Upload benchmark results
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+      with:
+        name: benchmark-results
+        path: |
+          build/pr_results.txt
+          build/master_results.txt
+          build/pr_run_*.txt
+          build/master_run_*.txt
+          benchmark_report.txt
+        retention-days: 30
+
+    - name: Comment on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
+      with:
+        script: |
+          const fs = require('fs');
+          const report = fs.readFileSync('benchmark_report.txt', 'utf8');
+
+          // Find existing benchmark comment
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+
+          // Use hidden marker for reliable comment identification
+          const MARKER = '<!-- benchmark-ci-comment -->';
+          const botComment = comments.find(c =>
+            c.user.type === 'Bot' && c.body.includes(MARKER)
+          );
+
+          const body = `${MARKER}\n## Benchmark Results\n\n\`\`\`\n${report}\n\`\`\``;
+
+          if (botComment) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body: body
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+          }
+
+    - name: Check for script errors
+      if: steps.compare.outputs.script_error == 'true'
+      run: |
+        echo "Benchmark comparison script failed - see errors above"
+        exit 2
+
+    - name: Check for regressions
+      if: steps.compare.outputs.has_regression == 'true'
+      run: |
+        echo "Performance regressions detected - see report above"
+        exit 1

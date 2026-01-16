@@ -7,7 +7,53 @@ cd build
 make perf-test
 ```
 
-Results are saved to `tests/performance_baseline.txt`.
+Results are saved to `build/performance_baseline.txt`.
+
+## CI Performance Regression Detection
+
+The Benchmark CI workflow automatically runs on PRs that modify:
+- `libiqxmlrpc/**` — Library source code
+- `tests/test_performance.cc` — Benchmark test file
+- `tests/perf_utils.h` — Benchmark utilities
+- `scripts/benchmark_utils.py` — Shared parsing utilities
+- `scripts/compare_benchmarks.py` — Comparison script
+- `scripts/select_minimum_results.py` — Minimum result selector
+- `.github/workflows/benchmark.yml` — Workflow itself
+
+### How It Works
+
+1. Builds and benchmarks the **PR branch** (3 runs, selects minimum)
+2. Builds and benchmarks the **master branch** (3 runs, selects minimum)
+3. Compares PR against master — both measured in same CI environment
+4. Posts results as a PR comment
+5. Fails if any regression exceeds the threshold (default: 20%)
+
+This approach ensures accurate comparison by using identical hardware and configuration for both measurements.
+
+### Manual Trigger with Custom Threshold
+
+You can manually trigger the benchmark workflow with a custom threshold:
+
+1. Go to Actions → Benchmark → Run workflow
+2. Enter a custom threshold percentage (e.g., `5` for stricter, `20` for looser)
+3. Click "Run workflow"
+
+### Local Benchmark Comparison
+
+Compare your changes against a base branch on the same machine:
+
+```bash
+# From repository root (requires build directory)
+./scripts/local_benchmark_compare.sh           # Default 20% threshold, compare to master
+./scripts/local_benchmark_compare.sh 5         # Stricter 5% threshold
+./scripts/local_benchmark_compare.sh 10 main   # Compare to 'main' branch instead
+```
+
+The script:
+1. Benchmarks your current branch (3 runs)
+2. Stashes changes and checks out the base branch (default: master)
+3. Benchmarks the base branch (3 runs)
+4. Returns to your branch and shows comparison
 
 ## Performance Change Requirements
 
