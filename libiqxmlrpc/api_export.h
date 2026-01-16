@@ -1,6 +1,6 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
-
+//
 #ifndef _libiqxmlrpc_api_export_
 #define _libiqxmlrpc_api_export_
 
