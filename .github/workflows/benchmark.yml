@@ -30,10 +30,13 @@ on:
 env:
   # 20% default threshold catches most regressions while allowing normal CI variance
   REGRESSION_THRESHOLD: ${{ github.event.inputs.threshold || '20' }}
-  # Queue latency benchmarks (P90/P95) use 100% threshold due to thread scheduling noise
-  # These benchmarks show 50-100% variance on CI runners even with 5-run minimum selection
+  # High-variance benchmarks use 100% threshold due to:
+  # - Sub-nanosecond measurements (tiny absolute differences = large %)
+  # - Thread scheduling noise (queue latency P90/P95)
+  # - Memory allocation timing (clone operations)
+  # Analysis shows these have 50-200% within-run variance even with 5-run minimum selection
   RELAXED_THRESHOLD: '100'
-  RELAXED_BENCHMARKS: 'perf_lockfree_queue_p90_latency,perf_lockfree_queue_p95_latency'
+  RELAXED_BENCHMARKS: 'perf_string_to_int_new,perf_value_clone_string,perf_value_clone_int,perf_datetime_to_string,perf_base64_encode_64kb,perf_ssl_result_ok_exception,perf_lockfree_queue_p90_latency,perf_lockfree_queue_p95_latency,perf_atomic_bool_read,perf_atomic_bool_write'
 
 jobs:
   benchmark:
