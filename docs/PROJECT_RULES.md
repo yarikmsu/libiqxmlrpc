@@ -26,7 +26,7 @@ make perf-test                                     # Run benchmarks
 
 PRs must pass: ubuntu-24.04, ubi8, macos | ASan/UBSan | TSan | Valgrind | Fuzz | coverage | cppcheck | clang-tidy | CodeQL
 
-Scheduled: Coverity Scan (weekly deep static analysis)
+Additional (non-blocking): Coverity Scan - weekly deep static analysis, results reviewed periodically
 
 ## Architecture
 
