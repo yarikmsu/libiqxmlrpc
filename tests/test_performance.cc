@@ -1272,17 +1272,17 @@ void benchmark_lockfree_queue() {
     "Lock-Free", lockfree_stats
   );
 
-  // Record p95 latencies as benchmark results for baseline tracking
-  // (p95 is more stable than p99 in CI environments with thread scheduling noise)
-  auto mutex_p95 = mutex_stats.p95();
-  auto lockfree_p95 = lockfree_stats.p95();
-  if (mutex_p95 > 0) {
+  // Record p90 latencies as benchmark results for baseline tracking
+  // (p90 is more stable than p95/p99 in CI environments with thread scheduling noise)
+  auto mutex_p90 = mutex_stats.p90();
+  auto lockfree_p90 = lockfree_stats.p90();
+  if (mutex_p90 > 0) {
     perf::ResultCollector::instance().add_result(
-      perf::BenchmarkResult("perf_mutex_queue_p95_latency", mutex_p95 / 1e6, 1));
+      perf::BenchmarkResult("perf_mutex_queue_p90_latency", mutex_p90 / 1e6, 1));
   }
-  if (lockfree_p95 > 0) {
+  if (lockfree_p90 > 0) {
     perf::ResultCollector::instance().add_result(
-      perf::BenchmarkResult("perf_lockfree_queue_p95_latency", lockfree_p95 / 1e6, 1));
+      perf::BenchmarkResult("perf_lockfree_queue_p90_latency", lockfree_p90 / 1e6, 1));
   }
 }
 
