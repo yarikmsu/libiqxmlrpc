@@ -97,9 +97,7 @@ Client_base::Client_base(
 {
 }
 
-Client_base::~Client_base()
-{
-}
+Client_base::~Client_base() = default;
 
 void Client_base::set_proxy( const iqnet::Inet_addr& addr )
 {
@@ -140,7 +138,7 @@ Response Client_base::execute(
 {
   Request req( method, pl );
 
-  Auto_conn conn( *impl_.get(), *this );
+  Auto_conn conn( *impl_, *this );
   conn->set_options(impl_->opts);
 
   return conn->process_session( req, xheaders );

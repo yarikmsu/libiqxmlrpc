@@ -12,7 +12,7 @@ namespace iqnet
 //! Abstract factory for accepted connections.
 class LIBIQXMLRPC_API Accepted_conn_factory {
 public:
-  virtual ~Accepted_conn_factory() {}
+  virtual ~Accepted_conn_factory() = default;
   virtual void create_accepted( const Socket& ) = 0;
 };
 
@@ -23,7 +23,7 @@ class Serial_conn_factory: public Accepted_conn_factory {
 public:
   void create_accepted( const Socket& sock ) override
   {
-    Conn_type* c = new Conn_type( sock );
+    auto* c = new Conn_type( sock );
     post_create( c );
     c->post_accept();
   }

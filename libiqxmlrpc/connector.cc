@@ -45,9 +45,7 @@ Connector_base::Connector_base( const iqnet::Inet_addr& peer ):
 {
 }
 
-Connector_base::~Connector_base()
-{
-}
+Connector_base::~Connector_base() = default;
 
 iqxmlrpc::Client_connection*
 Connector_base::connect(int timeout)

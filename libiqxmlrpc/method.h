@@ -34,7 +34,7 @@ class LIBIQXMLRPC_API Server_feedback {
 public:
   // Do not use objects constructed with default ctor!
   Server_feedback():
-    server_(0) {}
+    server_(nullptr) {}
 
   explicit Server_feedback(Server* s):
     server_(s) {}
@@ -61,7 +61,7 @@ private:
 
 public:
   Method() : data_(), authname_(), xheaders_() {}
-  virtual ~Method() {}
+  virtual ~Method() = default;
 
   //! Calls customized execute() and optionally wraps it with interceptors.
   //! Is is called by a server object.
@@ -106,7 +106,7 @@ public:
   Interceptor(const Interceptor&) = delete;
   Interceptor& operator=(const Interceptor&) = delete;
 
-  virtual ~Interceptor() {}
+  virtual ~Interceptor() = default;
 
   // cppcheck-suppress constParameterPointer
   void nest(Interceptor* ic)
@@ -163,7 +163,7 @@ private:
 */
 class LIBIQXMLRPC_API Method_factory_base {
 public:
-  virtual ~Method_factory_base() {}
+  virtual ~Method_factory_base() = default;
 
   virtual Method* create() = 0;
 };
@@ -194,7 +194,7 @@ private:
 //! Method dispatcher base class.
 class LIBIQXMLRPC_API Method_dispatcher_base {
 public:
-  virtual ~Method_dispatcher_base() {}
+  virtual ~Method_dispatcher_base() = default;
 
   Method* create_method(const Method::Data& data)
   {

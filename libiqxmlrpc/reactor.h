@@ -17,7 +17,7 @@ namespace iqnet
 //! Base class for event-driven communication classes.
 class LIBIQXMLRPC_API Event_handler {
 public:
-  virtual ~Event_handler() {}
+  virtual ~Event_handler() = default;
 
   //! If this handler used as Reactor stopper.
   virtual bool is_stopper() const { return false; }
@@ -112,7 +112,7 @@ public:
     std::shared_ptr<List> data_;
   };
 
-  virtual ~Reactor_base() {};
+  virtual ~Reactor_base() = default;
 
   virtual void register_handler( Event_handler*, Event_mask )   = 0;
   virtual void unregister_handler( Event_handler*, Event_mask ) = 0;

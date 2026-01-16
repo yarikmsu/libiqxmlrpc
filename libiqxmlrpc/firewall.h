@@ -18,7 +18,7 @@ namespace iqnet {
 */
 class LIBIQXMLRPC_API Firewall_base {
 public:
-  virtual ~Firewall_base() {}
+  virtual ~Firewall_base() = default;
 
   //! Must return bool to grant client to send request.
   virtual bool grant( const iqnet::Inet_addr& ) = 0;

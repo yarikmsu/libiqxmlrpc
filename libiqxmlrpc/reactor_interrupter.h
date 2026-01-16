@@ -6,6 +6,8 @@
 
 #include "reactor.h"
 
+#include <memory>
+
 namespace iqnet {
 
 #ifdef _MSC_VER
@@ -25,7 +27,7 @@ public:
 
 private:
   class Impl;
-  Impl* impl_;
+  std::unique_ptr<Impl> impl_;
 };
 
 #ifdef _MSC_VER

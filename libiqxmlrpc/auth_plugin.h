@@ -53,7 +53,7 @@ inline bool constant_time_compare(const std::string& a, const std::string& b)
 */
 class Auth_Plugin_base {
 public:
-  virtual ~Auth_Plugin_base() {}
+  virtual ~Auth_Plugin_base() = default;
 
   bool authenticate(
     const std::string& user,
