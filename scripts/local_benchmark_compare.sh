@@ -34,10 +34,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TMP_SCRIPTS="/tmp/benchmark_scripts_$$"
 
-# Tiered thresholds: high-variance benchmarks (sub-nanosecond, threading, memory)
-# These have 50-200% variance even with 5-run minimum selection
+# These 3 benchmarks have demonstrated CI failures due to inherent variance:
+# - perf_lockfree_queue_p90/p95_latency: Thread scheduling noise (50-95% variance)
+# - perf_string_to_int_new: Sub-nanosecond measurement (~1ns, 69% variance observed)
 RELAXED_THRESHOLD=100
-RELAXED_BENCHMARKS="perf_string_to_int_new,perf_value_clone_string,perf_value_clone_int,perf_datetime_to_string,perf_base64_encode_64kb,perf_ssl_result_ok_exception,perf_lockfree_queue_p90_latency,perf_lockfree_queue_p95_latency,perf_atomic_bool_read,perf_atomic_bool_write"
+RELAXED_BENCHMARKS="perf_lockfree_queue_p90_latency,perf_lockfree_queue_p95_latency,perf_string_to_int_new"
 
 # Cross-platform nproc
 get_nproc() {
