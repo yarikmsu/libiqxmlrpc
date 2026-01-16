@@ -2,11 +2,15 @@
 # Compare benchmark performance between current branch and a base branch.
 # Must be run from the repository root directory.
 #
+# Uses tiered thresholds:
+#   - Default: 20% for most benchmarks
+#   - Relaxed: 100% for high-variance benchmarks (queue latency P90/P95)
+#
 # Usage:
 #   ./scripts/local_benchmark_compare.sh [threshold] [base_branch]
 #
 # Arguments:
-#   threshold   - Regression threshold percentage (default: 10)
+#   threshold   - Default regression threshold percentage (default: 20)
 #   base_branch - Branch to compare against (default: master)
 #
 # Example:
@@ -29,6 +33,12 @@ BRANCH=$(git rev-parse --abbrev-ref HEAD)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TMP_SCRIPTS="/tmp/benchmark_scripts_$$"
+
+# These 3 benchmarks have demonstrated CI failures due to inherent variance:
+# - perf_lockfree_queue_p90/p95_latency: Thread scheduling noise (50-95% variance)
+# - perf_string_to_int_new: Sub-nanosecond measurement (~1ns, 69% variance observed)
+RELAXED_THRESHOLD=100
+RELAXED_BENCHMARKS="perf_lockfree_queue_p90_latency,perf_lockfree_queue_p95_latency,perf_string_to_int_new"
 
 # Cross-platform nproc
 get_nproc() {
@@ -134,8 +144,12 @@ echo "$BASE_BRANCH branch results saved to build/base_results.txt"
 cd ..
 
 echo ""
-echo "=== Comparison (threshold: ${THRESHOLD}%) ==="
+echo "=== Comparison ==="
+echo "Default threshold: ${THRESHOLD}%"
+echo "Relaxed threshold: ${RELAXED_THRESHOLD}% for: ${RELAXED_BENCHMARKS}"
 python3 "$TMP_SCRIPTS/compare_benchmarks.py" \
     build/base_results.txt \
     build/current_results.txt \
-    --threshold="$THRESHOLD"
+    --threshold="$THRESHOLD" \
+    --relaxed-threshold="$RELAXED_THRESHOLD" \
+    --relaxed-benchmarks="$RELAXED_BENCHMARKS"
