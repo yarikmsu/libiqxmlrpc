@@ -56,7 +56,15 @@ jobs:
           exit 1
         fi
         mkdir -p coverity_tool
-        tar xzf coverity_tool.tgz --strip-components=1 -C coverity_tool
+        tar xzf coverity_tool.tgz --strip-components=1 -C coverity_tool || {
+          echo "::error::Failed to extract Coverity tool"
+          exit 1
+        }
+        # Verify extraction succeeded
+        if [ ! -x coverity_tool/bin/cov-build ]; then
+          echo "::error::Coverity tool extraction incomplete - cov-build not found"
+          exit 1
+        fi
       env:
         COV_TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
 
@@ -72,18 +80,32 @@ jobs:
         export PATH="$(pwd)/coverity_tool/bin:$PATH"
         cd build
         cov-build --dir cov-int make -j$(nproc)
+        # Verify build capture succeeded
+        if [ ! -f cov-int/build-log.txt ]; then
+          echo "::error::Coverity build capture failed - no build log"
+          exit 1
+        fi
+        echo "Build capture complete. Files captured:"
+        wc -l cov-int/build-log.txt
 
     - name: Submit to Coverity Scan
       run: |
         cd build
         tar czvf libiqxmlrpc-cov.tgz cov-int
-        curl -fsSL \
+        response=$(curl -fsSL \
           --form "token=${COV_TOKEN}" \
           --form "email=${COV_EMAIL}" \
           --form file=@libiqxmlrpc-cov.tgz \
           --form version="$(git rev-parse --short HEAD)" \
           --form description="Automated Coverity Scan from GitHub Actions" \
-          https://scan.coverity.com/builds?project=yarikmsu%2Flibiqxmlrpc
+          https://scan.coverity.com/builds?project=yarikmsu%2Flibiqxmlrpc)
+        echo "Coverity response: $response"
+        # Check for error indicators in response
+        if echo "$response" | grep -qiE "error|failed|exceeded|denied"; then
+          echo "::error::Coverity submission issue detected"
+          exit 1
+        fi
+        echo "Submission successful"
       env:
         COV_TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
         COV_EMAIL: ${{ secrets.COVERITY_SCAN_EMAIL }}
