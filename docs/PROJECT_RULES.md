@@ -54,3 +54,26 @@ Additional (non-blocking): Coverity Scan - weekly deep static analysis, results 
 | SSL/HTTPS testing | `docs/SSL_TESTING.md` |
 | Debugging tips | `docs/DEBUGGING.md` |
 | Coverity Scan setup | `docs/COVERITY_SETUP.md` |
+| Security checklist | `docs/SECURITY_CHECKLIST.md` |
+| Code review checklist | `docs/CODE_REVIEW_CHECKLIST.md` |
+| Code simplification | `docs/CODE_SIMPLIFICATION.md` |
+| CI troubleshooting | `docs/CI_TROUBLESHOOTING.md` |
+
+## Development Workflow
+
+### Pre-Commit Checklist
+- [ ] `make check` passes
+- [ ] No compiler warnings
+- [ ] No untracked files forgotten (`git status`)
+- [ ] No debug code (`cout`, `printf`, `TODO`)
+
+### Quality Checklists
+- **Code Review**: `docs/CODE_REVIEW_CHECKLIST.md`
+- **Security**: `docs/SECURITY_CHECKLIST.md`
+- **Simplicity**: `docs/CODE_SIMPLIFICATION.md`
+- **Performance**: `docs/PERFORMANCE_GUIDE.md` (for hot path changes)
+
+### Done When
+- [ ] All local tests pass
+- [ ] CI checks pass
+- [ ] Quality checklists reviewed
