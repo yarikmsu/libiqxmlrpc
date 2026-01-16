@@ -11,12 +11,14 @@
 #include "num_conv.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <cstring>
 #include <ctime>
 #include <deque>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <sstream>
 
 namespace iqxmlrpc {
@@ -102,6 +104,39 @@ namespace names {
   const char expect_continue[]= "expect";
 } // namespace names
 
+// SECURITY: Thread-safe static configuration for server version disclosure
+// Note: Strings protected by mutex; bools/ints are atomic for lock-free reads
+static std::mutex s_config_mutex;
+static std::string s_custom_server_header;
+static std::atomic<bool> s_hide_server_version{false};
+
+void Header::set_server_header(const std::string& header)
+{
+  std::lock_guard<std::mutex> lock(s_config_mutex);
+  s_custom_server_header = header;
+}
+
+void Header::hide_server_version(bool hide)
+{
+  s_hide_server_version.store(hide, std::memory_order_relaxed);
+}
+
+// SECURITY: Thread-safe static configuration for HSTS and CSP headers
+static std::atomic<bool> s_hsts_enabled{false};
+static std::atomic<int> s_hsts_max_age{31536000};  // 1 year
+static std::string s_csp_policy;
+
+void Header::enable_hsts(bool enable, int max_age)
+{
+  s_hsts_enabled.store(enable, std::memory_order_relaxed);
+  s_hsts_max_age.store(max_age, std::memory_order_relaxed);
+}
+
+void Header::set_content_security_policy(const std::string& policy)
+{
+  std::lock_guard<std::mutex> lock(s_config_mutex);
+  s_csp_policy = policy;
+}
 
 namespace validator {
 
@@ -504,7 +539,41 @@ Response_header::Response_header( int c, const std::string& p ):
   phrase_(p)
 {
   set_option(names::date, current_date());
-  set_option(names::server, PACKAGE " " VERSION);
+
+  // SECURITY: Allow hiding or customizing server version disclosure
+  // Use atomic load for bool, mutex-protected copy for string
+  if (!s_hide_server_version.load(std::memory_order_relaxed)) {
+    std::string server_header;
+    {
+      std::lock_guard<std::mutex> lock(s_config_mutex);
+      server_header = s_custom_server_header;
+    }
+    if (server_header.empty()) {
+      set_option(names::server, PACKAGE " " VERSION);
+    } else {
+      set_option(names::server, server_header);
+    }
+  }
+
+  // SECURITY: Add standard security headers for defense-in-depth
+  // These protect against content type sniffing and framing attacks
+  set_option("x-content-type-options", "nosniff");
+  set_option("x-frame-options", "DENY");
+  set_option("cache-control", "no-store");
+
+  // SECURITY: Optional HSTS header (only enable for HTTPS servers)
+  if (s_hsts_enabled.load(std::memory_order_relaxed)) {
+    set_option("strict-transport-security",
+               "max-age=" + std::to_string(s_hsts_max_age.load(std::memory_order_relaxed)));
+  }
+
+  // SECURITY: Optional Content-Security-Policy header
+  {
+    std::lock_guard<std::mutex> lock(s_config_mutex);
+    if (!s_csp_policy.empty()) {
+      set_option("content-security-policy", s_csp_policy);
+    }
+  }
 }
 
 std::string Response_header::current_date()
@@ -606,6 +675,22 @@ bool Packet_reader::read_header( const std::string& s )
   if (sep_pos == std::string::npos) {
     sep_pos = header_cache.find("\n\n");
     sep_len = 2;
+  }
+
+  // SECURITY: Check header size limit to prevent header-based DoS attacks
+  if (header_max_sz) {
+    if (sep_pos == std::string::npos) {
+      // No separator found yet - if accumulated data exceeds limit, reject
+      // (headers alone shouldn't be this big)
+      if (header_cache.length() > header_max_sz) {
+        throw Request_too_large();
+      }
+    } else {
+      // Separator found - check actual header size
+      if (sep_pos > header_max_sz) {
+        throw Request_too_large();
+      }
+    }
   }
 
   if (sep_pos == std::string::npos)

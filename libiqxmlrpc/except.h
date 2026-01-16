@@ -76,7 +76,30 @@ public:
 class LIBIQXMLRPC_API Unknown_method: public Exception {
 public:
   explicit Unknown_method( const std::string& name ):
-    Exception((std::string("Server error. Method '") += name) += "' not found.", -32601) {}
+    Exception(std::string("Server error. Method '") + sanitize_method_name(name) + "' not found.", -32601) {}
+
+private:
+  //! SECURITY: Sanitize method name to prevent log injection and info disclosure.
+  static std::string sanitize_method_name(const std::string& name) {
+    // Limit length to prevent memory exhaustion and log flooding
+    constexpr size_t MAX_METHOD_NAME_LEN = 128;
+    std::string result;
+    result.reserve(std::min(name.length(), MAX_METHOD_NAME_LEN));
+
+    for (size_t i = 0; i < name.length() && result.length() < MAX_METHOD_NAME_LEN; ++i) {
+      char c = name[i];
+      // Allow alphanumeric, dots, underscores, colons (for namespaces)
+      if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+          (c >= '0' && c <= '9') || c == '.' || c == '_' || c == ':') {
+        result += c;
+      }
+    }
+
+    if (name.length() > MAX_METHOD_NAME_LEN) {
+      result += "...";
+    }
+    return result;
+  }
 };
 
 //! Invalid method parameters exception.

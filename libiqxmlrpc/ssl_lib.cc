@@ -8,6 +8,7 @@
 #include <openssl/rsa.h>
 #include <openssl/crypto.h>
 #include <openssl/x509.h>
+#include <openssl/x509v3.h>
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -245,15 +246,20 @@ ConnectionVerifier::cert_finger_sha256(X509_STORE_CTX* ctx)
 //
 
 struct Ctx::Impl {
-  SSL_CTX* ctx = nullptr;
+  SSL_CTX* ctx;
   ConnectionVerifier* server_verifier;
   ConnectionVerifier* client_verifier;
   bool require_client_cert;
+  bool hostname_verification;  // SECURITY: Verify hostname against certificate
+  std::string expected_hostname;
 
   Impl():
-    server_verifier(0),
-    client_verifier(0),
-    require_client_cert(false)
+    ctx(nullptr),
+    server_verifier(nullptr),
+    client_verifier(nullptr),
+    require_client_cert(false),
+    hostname_verification(true),  // SECURITY: Default to verifying hostname
+    expected_hostname()
   {
   }
 
@@ -341,6 +347,87 @@ Ctx::prepare_verify(SSL* ssl, bool server)
   } else {
     SSL_set_verify(ssl, mode, 0);
   }
+}
+
+void
+Ctx::set_session_cache(bool enable, int cache_size, int timeout_sec)
+{
+  if (enable) {
+    SSL_CTX_set_session_cache_mode(impl_->ctx, SSL_SESS_CACHE_SERVER);
+    SSL_CTX_sess_set_cache_size(impl_->ctx, cache_size);
+    SSL_CTX_set_timeout(impl_->ctx, timeout_sec);
+  } else {
+    SSL_CTX_set_session_cache_mode(impl_->ctx, SSL_SESS_CACHE_OFF);
+  }
+}
+
+bool
+Ctx::load_verify_locations(const std::string& ca_file, const std::string& ca_dir)
+{
+  const char* file = ca_file.empty() ? nullptr : ca_file.c_str();
+  const char* dir = ca_dir.empty() ? nullptr : ca_dir.c_str();
+
+  if (!file && !dir) {
+    return false;  // At least one must be provided
+  }
+
+  return SSL_CTX_load_verify_locations(impl_->ctx, file, dir) == 1;
+}
+
+bool
+Ctx::use_default_verify_paths()
+{
+  return SSL_CTX_set_default_verify_paths(impl_->ctx) == 1;
+}
+
+void
+Ctx::set_hostname_verification(bool enable)
+{
+  impl_->hostname_verification = enable;
+}
+
+void
+Ctx::set_expected_hostname(const std::string& hostname)
+{
+  impl_->expected_hostname = hostname;
+}
+
+void
+Ctx::prepare_hostname_verify(SSL* ssl)
+{
+  if (!impl_->hostname_verification || impl_->expected_hostname.empty()) {
+    return;
+  }
+
+#if OPENSSL_VERSION_NUMBER >= 0x10002000L
+  // OpenSSL 1.0.2+: Use X509_VERIFY_PARAM for hostname verification
+  X509_VERIFY_PARAM* param = SSL_get0_param(ssl);
+  if (!param) {
+    return;  // Cannot configure hostname verification without param
+  }
+  X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
+  X509_VERIFY_PARAM_set1_host(param, impl_->expected_hostname.c_str(),
+                              impl_->expected_hostname.length());
+#else
+  // OpenSSL < 1.0.2: Hostname verification not available
+  // SECURITY WARNING: Connection proceeds without hostname verification
+  // Note: This is a compile-time limitation; users should upgrade OpenSSL
+  (void)ssl;  // Suppress unused parameter warning
+#endif
+}
+
+void
+Ctx::prepare_sni(SSL* ssl)
+{
+  if (impl_->expected_hostname.empty()) {
+    return;
+  }
+
+  // Set Server Name Indication (SNI) extension
+  // This tells the server which hostname we're connecting to, enabling:
+  // - Virtual hosting (multiple sites on one IP)
+  // - Correct certificate selection on the server side
+  SSL_set_tlsext_host_name(ssl, impl_->expected_hostname.c_str());
 }
 
 // ----------------------------------------------------------------------------

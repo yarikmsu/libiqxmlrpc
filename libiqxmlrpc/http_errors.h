@@ -54,7 +54,25 @@ public:
 class LIBIQXMLRPC_API Unsupported_content_type: public Error_response {
 public:
   explicit Unsupported_content_type(const std::string& wrong):
-    Error_response( "Unsupported media type '" + wrong + "'", 415 ) {}
+    Error_response( "Unsupported media type '" + sanitize_content_type(wrong) + "'", 415 ) {}
+
+private:
+  // SECURITY: Sanitize user input to prevent injection/leakage
+  static std::string sanitize_content_type(const std::string& s) {
+    // Truncate to reasonable length and remove control characters
+    std::string result;
+    result.reserve(std::min(s.length(), size_t(64)));
+    for (size_t i = 0; i < s.length() && result.length() < 64; ++i) {
+      char c = s[i];
+      if (c >= 32 && c < 127) {  // Printable ASCII only
+        result += c;
+      }
+    }
+    if (s.length() > 64) {
+      result += "...";
+    }
+    return result;
+  }
 };
 
 //! HTTP/1.1 417 Unsupported expectation
