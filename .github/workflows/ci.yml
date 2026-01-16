@@ -33,7 +33,7 @@ jobs:
       run: ${{ matrix.install }}
 
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Configure
       run: |
@@ -60,7 +60,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Install dependencies
       run: sudo apt-get update && sudo apt-get install -y clang libboost-dev libboost-date-time-dev libboost-thread-dev libboost-test-dev libboost-program-options-dev libboost-chrono-dev libxml2-dev libssl-dev
@@ -98,7 +98,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Install dependencies
       run: sudo apt-get update && sudo apt-get install -y libboost-dev libboost-date-time-dev libboost-thread-dev libboost-test-dev libboost-program-options-dev libboost-chrono-dev libxml2-dev libssl-dev lcov
@@ -158,7 +158,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Install dependencies
       run: sudo apt-get update && sudo apt-get install -y clang libboost-dev libboost-date-time-dev libboost-thread-dev libboost-test-dev libboost-program-options-dev libboost-chrono-dev libxml2-dev libssl-dev
@@ -198,7 +198,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Install dependencies
       run: sudo apt-get update && sudo apt-get install -y clang libboost-dev libboost-date-time-dev libboost-thread-dev libxml2-dev libssl-dev
@@ -278,7 +278,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Install cppcheck
       run: sudo apt-get update && sudo apt-get install -y cppcheck
@@ -296,7 +296,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Install dependencies
       run: |
@@ -342,7 +342,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Install dependencies
       run: |
