@@ -25,7 +25,7 @@ Requires Python 3.6+
 import argparse
 import sys
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from benchmark_utils import parse_benchmark_file, format_ns
 
@@ -41,8 +41,8 @@ def error_exit(msg: str, github_actions: bool = False) -> None:
 def compare_benchmarks(baseline: Dict[str, float],
                        current: Dict[str, float],
                        threshold: float,
-                       relaxed_threshold: float = None,
-                       relaxed_benchmarks: Set[str] = None) -> Tuple[List, List, List, List, List]:
+                       relaxed_threshold: Optional[float] = None,
+                       relaxed_benchmarks: Optional[Set[str]] = None) -> Tuple[List, List, List, List, List]:
     """
     Compare current results against baseline.
 
@@ -105,8 +105,8 @@ def compare_benchmarks(baseline: Dict[str, float],
 
 def print_report(regressions: List, improvements: List, unchanged: List,
                  new_benchmarks: List, missing_benchmarks: List,
-                 threshold: float, relaxed_threshold: float = None,
-                 relaxed_benchmarks: Set[str] = None, github_actions: bool = False):
+                 threshold: float, relaxed_threshold: Optional[float] = None,
+                 relaxed_benchmarks: Optional[Set[str]] = None, github_actions: bool = False):
     """Print a formatted comparison report."""
 
     # Summary
@@ -222,6 +222,14 @@ Examples:
     relaxed_benchmarks = None
     if args.relaxed_benchmarks:
         relaxed_benchmarks = set(b.strip() for b in args.relaxed_benchmarks.split(',') if b.strip())
+
+    # Warn about misconfigured tiered thresholds
+    if relaxed_benchmarks and args.relaxed_threshold is None:
+        print("Warning: --relaxed-benchmarks specified without --relaxed-threshold; "
+              "relaxed benchmarks will use default threshold", file=sys.stderr)
+    if args.relaxed_threshold is not None and not relaxed_benchmarks:
+        print("Warning: --relaxed-threshold specified without --relaxed-benchmarks; "
+              "relaxed threshold will not be applied to any benchmarks", file=sys.stderr)
 
     # Parse both files using shared utility
     baseline = parse_benchmark_file(args.baseline, github_actions=args.github_actions)
