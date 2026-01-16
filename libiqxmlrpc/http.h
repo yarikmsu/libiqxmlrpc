@@ -36,6 +36,33 @@ enum Verification_level { HTTP_CHECK_WEAK, HTTP_CHECK_STRICT };
 //! creating generic HTTP headers.
 class LIBIQXMLRPC_API Header {
 public:
+  //! Set a custom server header (e.g., "MyServer/1.0").
+  /*! Call before creating any Response_header instances.
+      \param header Custom server identifier (empty to use default)
+  */
+  static void set_server_header(const std::string& header);
+
+  //! Hide the server version from HTTP responses.
+  /*! When enabled, the "Server:" header will be omitted entirely.
+      Call before creating any Response_header instances.
+      \param hide Whether to hide the server version
+  */
+  static void hide_server_version(bool hide);
+
+  //! Enable HSTS (HTTP Strict Transport Security) header.
+  /*! SECURITY: Only enable for HTTPS servers. Tells browsers to only
+      connect via HTTPS for the specified duration.
+      \param enable Whether to add HSTS header
+      \param max_age Duration in seconds (default: 31536000 = 1 year)
+  */
+  static void enable_hsts(bool enable, int max_age = 31536000);
+
+  //! Set a custom Content-Security-Policy header.
+  /*! SECURITY: Helps prevent XSS attacks by restricting resource loading.
+      \param policy CSP policy string (empty to disable, e.g., "default-src 'self'")
+  */
+  static void set_content_security_policy(const std::string& policy);
+
   Header(Verification_level = HTTP_CHECK_WEAK);
   virtual ~Header();
 
@@ -182,6 +209,7 @@ class Packet_reader {
   Verification_level ver_level_;
   bool constructed;
   size_t pkt_max_sz;
+  size_t header_max_sz;  // SECURITY: Limit header size independently
   size_t total_sz;
   bool continue_sent_;
 
@@ -196,6 +224,7 @@ public:
     ver_level_(HTTP_CHECK_WEAK),
     constructed(false),
     pkt_max_sz(0),
+    header_max_sz(16384),  // SECURITY: Default 16KB header limit
     total_sz(0),
     continue_sent_(false)
   {
@@ -215,6 +244,15 @@ public:
   void set_max_size( size_t m )
   {
     pkt_max_sz = m;
+  }
+
+  //! Set maximum header size to prevent header-based DoS attacks.
+  /*! Default: 16384 (16KB). Set to 0 to disable limit.
+      \param m Maximum header size in bytes
+  */
+  void set_max_header_size( size_t m )
+  {
+    header_max_sz = m;
   }
 
   bool expect_continue() const;

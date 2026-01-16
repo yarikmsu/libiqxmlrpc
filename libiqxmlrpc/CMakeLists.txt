@@ -85,6 +85,7 @@ add_library(iqxmlrpc
   connector.cc
   dispatcher_manager.cc
   executor.cc
+  firewall.cc
   http.cc
   http_client.cc
   https_client.cc

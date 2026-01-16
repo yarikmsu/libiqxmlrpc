@@ -600,7 +600,8 @@ BOOST_AUTO_TEST_CASE(header_set_content_length_zero)
     std::string dump = hdr.dump();
     BOOST_CHECK(dump.find("content-length: 0") != std::string::npos);
     // Should NOT set content-type for zero length
-    BOOST_CHECK(dump.find("content-type") == std::string::npos);
+    // Note: Check for "\ncontent-type:" to avoid matching "x-content-type-options" security header
+    BOOST_CHECK(dump.find("\ncontent-type:") == std::string::npos);
 }
 
 BOOST_AUTO_TEST_CASE(header_set_content_length_nonzero)

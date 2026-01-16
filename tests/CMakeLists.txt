@@ -46,6 +46,7 @@ iqxmlrpc_test(exceptions-test test_exceptions.cc)
 iqxmlrpc_test(socket-test test_socket.cc)
 iqxmlrpc_test(safe-math-test test_safe_math.cc)
 iqxmlrpc_test(perf-utils-test test_perf_utils.cc)
+iqxmlrpc_test(security-test test_security.cc)
 
 # Thread safety tests
 # NOTE: These tests stress-test Boost.Lockfree which produces TSan false positives.
@@ -68,6 +69,7 @@ set(INTEGRATION_TEST_SOURCES
     test_integration_errors.cc
     test_integration_reactor.cc
     test_integration_advanced.cc
+    test_coverage_gaps.cc
     methods.cc
 )
 iqxmlrpc_test(integration-test ${INTEGRATION_TEST_SOURCES})

@@ -104,6 +104,7 @@ public:
 
 private:
   void switch_state( bool& terminate );
+  void handle_io_result( SslIoResult result );
   void try_send();
   size_t try_recv();
 

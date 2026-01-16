@@ -55,6 +55,8 @@ void ssl::Connection::ssl_accept()
 void ssl::Connection::ssl_connect()
 {
   ssl_ctx->prepare_verify(ssl, false);
+  ssl_ctx->prepare_sni(ssl);              // SECURITY: Set SNI for virtual hosting
+  ssl_ctx->prepare_hostname_verify(ssl);  // SECURITY: Enable hostname verification
   int ret = SSL_connect( ssl );
 
   if( ret != 1 )
@@ -158,11 +160,7 @@ ssl::SslIoResult ssl::Connection::try_ssl_write( const char* buf, size_t len, si
 
   if( ret > 0 ) {
     bytes_written = static_cast<size_t>(ret);
-    if( bytes_written == len ) {
-      return SslIoResult::OK;
-    }
-    // Partial write - still OK but caller may need to continue
-    return SslIoResult::OK;
+    return SslIoResult::OK;  // Caller checks bytes_written for partial writes
   }
 
   bool clean_close = false;
@@ -187,6 +185,8 @@ ssl::SslIoResult ssl::Connection::try_ssl_accept_nonblock()
 ssl::SslIoResult ssl::Connection::try_ssl_connect_nonblock()
 {
   ssl_ctx->prepare_verify(ssl, false);
+  ssl_ctx->prepare_sni(ssl);              // SECURITY: Set SNI for virtual hosting
+  ssl_ctx->prepare_hostname_verify(ssl);  // SECURITY: Enable hostname verification
   int ret = SSL_connect( ssl );
 
   if( ret == 1 ) {
@@ -259,6 +259,30 @@ void ssl::Reaction_connection::ssl_connect()
 
 // P3 Optimization: Use return codes instead of exceptions for hot path
 // This eliminates ~3000ns exception overhead per WANT_READ/WANT_WRITE
+void ssl::Reaction_connection::handle_io_result( SslIoResult result )
+{
+  switch( result )
+  {
+    case SslIoResult::OK:
+      break;
+
+    case SslIoResult::WANT_READ:
+      reactor->register_handler( this, Reactor_base::INPUT );
+      break;
+
+    case SslIoResult::WANT_WRITE:
+      reactor->register_handler( this, Reactor_base::OUTPUT );
+      break;
+
+    case SslIoResult::CONNECTION_CLOSE:
+      reg_shutdown();
+      break;
+
+    case SslIoResult::ERROR:
+      throw ssl::exception("SSL I/O error");
+  }
+}
+
 void ssl::Reaction_connection::switch_state( bool& terminate )
 {
   SslIoResult result = SslIoResult::OK;
@@ -316,32 +340,7 @@ void ssl::Reaction_connection::switch_state( bool& terminate )
       return;
   }
 
-  // Handle result codes (replaces try/catch block for the hot path cases)
-  switch( result )
-  {
-    case SslIoResult::OK:
-      // Already handled above
-      break;
-
-    case SslIoResult::WANT_READ:
-      reactor->register_handler( this, Reactor_base::INPUT );
-      break;
-
-    case SslIoResult::WANT_WRITE:
-      reactor->register_handler( this, Reactor_base::OUTPUT );
-      break;
-
-    case SslIoResult::CONNECTION_CLOSE:
-      reg_shutdown();
-      break;
-
-    case SslIoResult::ERROR:
-      // For actual errors (SSL_ERROR_SSL, SSL_ERROR_SYSCALL, etc.),
-      // we need to throw to match original behavior - these errors
-      // should propagate up and cause connection cleanup by the reactor.
-      // This is rare and doesn't affect hot path performance.
-      throw ssl::exception("SSL I/O error");
-  }
+  handle_io_result( result );
 }
 
 
