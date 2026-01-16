@@ -25,6 +25,9 @@ on:
       # Only run on changes to library source code
       - 'libiqxmlrpc/**'
 
+env:
+  COVERITY_PROJECT: yarikmsu%2Flibiqxmlrpc
+
 jobs:
   coverity:
     name: Coverity Scan
@@ -40,6 +43,7 @@ jobs:
 
     - name: Install dependencies
       run: |
+        set -euo pipefail
         sudo apt-get update
         sudo apt-get install -y libboost-dev libboost-date-time-dev \
           libboost-thread-dev libboost-test-dev libboost-program-options-dev \
@@ -47,11 +51,13 @@ jobs:
 
     - name: Download Coverity Build Tool
       run: |
-        curl -fsSL https://scan.coverity.com/download/linux64 \
-          --data "token=${COV_TOKEN}&project=yarikmsu%2Flibiqxmlrpc" \
+        set -euo pipefail
+        curl --max-time 300 --connect-timeout 30 -fsSL \
+          https://scan.coverity.com/download/linux64 \
+          --data "token=${COV_TOKEN}&project=${COVERITY_PROJECT}" \
           -o coverity_tool.tgz
         # Verify download succeeded
-        if [ ! -s coverity_tool.tgz ]; then
+        if [[ ! -s coverity_tool.tgz ]]; then
           echo "::error::Failed to download Coverity tool"
           exit 1
         fi
@@ -61,7 +67,7 @@ jobs:
           exit 1
         }
         # Verify extraction succeeded
-        if [ ! -x coverity_tool/bin/cov-build ]; then
+        if [[ ! -x coverity_tool/bin/cov-build ]]; then
           echo "::error::Coverity tool extraction incomplete - cov-build not found"
           exit 1
         fi
@@ -70,6 +76,7 @@ jobs:
 
     - name: Configure
       run: |
+        set -euo pipefail
         mkdir build && cd build
         cmake -Dbuild_tests=ON \
           -DCMAKE_CXX_FLAGS="-DBOOST_TIMER_ENABLE_DEPRECATED -Wall -Wextra" \
@@ -77,11 +84,12 @@ jobs:
 
     - name: Build with Coverity
       run: |
+        set -euo pipefail
         export PATH="$(pwd)/coverity_tool/bin:$PATH"
         cd build
         cov-build --dir cov-int make -j$(nproc)
         # Verify build capture succeeded
-        if [ ! -f cov-int/build-log.txt ]; then
+        if [[ ! -f cov-int/build-log.txt ]]; then
           echo "::error::Coverity build capture failed - no build log"
           exit 1
         fi
@@ -90,22 +98,38 @@ jobs:
 
     - name: Submit to Coverity Scan
       run: |
+        set -euo pipefail
         cd build
         tar czvf libiqxmlrpc-cov.tgz cov-int
-        response=$(curl -fsSL \
+        # Submit with timeout and capture HTTP status
+        http_code=$(curl --max-time 600 --connect-timeout 30 -sSL \
           --form "token=${COV_TOKEN}" \
           --form "email=${COV_EMAIL}" \
           --form file=@libiqxmlrpc-cov.tgz \
           --form version="$(git rev-parse --short HEAD)" \
           --form description="Automated Coverity Scan from GitHub Actions" \
-          https://scan.coverity.com/builds?project=yarikmsu%2Flibiqxmlrpc)
-        echo "Coverity response: $response"
-        # Check for error indicators in response
-        if echo "$response" | grep -qiE "error|failed|exceeded|denied"; then
-          echo "::error::Coverity submission issue detected"
+          -w "%{http_code}" \
+          -o response.txt \
+          "https://scan.coverity.com/builds?project=${COVERITY_PROJECT}")
+        # Check HTTP status code
+        if [[ "$http_code" -lt 200 || "$http_code" -ge 300 ]]; then
+          echo "::error::Coverity submission failed with HTTP $http_code"
           exit 1
         fi
-        echo "Submission successful"
+        # Check response for error indicators (sanitized output - no raw response)
+        if grep -qiE "error|failed|exceeded|denied|quota" response.txt; then
+          echo "::error::Coverity submission issue detected in response"
+          # Show only safe portions of response (filter out potential secrets)
+          grep -viE "token|key|secret|password|credential" response.txt || true
+          exit 1
+        fi
+        echo "Submission successful (HTTP $http_code)"
       env:
         COV_TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
         COV_EMAIL: ${{ secrets.COVERITY_SCAN_EMAIL }}
+
+    - name: Cleanup
+      if: always()
+      run: |
+        rm -rf coverity_tool coverity_tool.tgz response.txt
+        rm -rf build/cov-int build/libiqxmlrpc-cov.tgz
