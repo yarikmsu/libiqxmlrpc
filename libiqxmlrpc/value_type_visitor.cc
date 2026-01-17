@@ -53,11 +53,10 @@ void Print_value_visitor::do_visit_struct(const Struct& s)
 {
   out_ << "{";
 
-  typedef Struct::const_iterator CI;
-  for(CI i = s.begin(); i != s.end(); ++i )
+  for (const auto& [key, value] : s)
   {
-    out_ << " '" << i->first << "' => ";
-    i->second->apply_visitor(*this);
+    out_ << " '" << key << "' => ";
+    value->apply_visitor(*this);
     out_ << ",";
   }
 
