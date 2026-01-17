@@ -79,7 +79,7 @@ public:
   explicit LockedBool(bool default_):
     val(default_) {}
 
-  ~LockedBool() {}
+  ~LockedBool() = default;
 
   operator bool()
   {

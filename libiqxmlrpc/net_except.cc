@@ -5,7 +5,7 @@
 #include <windows.h>
 #endif
 
-#include <string.h>
+#include <cstring>
 #include "net_except.h"
 
 namespace {

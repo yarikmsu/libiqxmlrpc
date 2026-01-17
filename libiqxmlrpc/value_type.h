@@ -53,7 +53,7 @@ enum class ValueTypeTag : unsigned char {
 //! Base type for XML-RPC types.
 class LIBIQXMLRPC_API Value_type {
 public:
-  virtual ~Value_type() {}
+  virtual ~Value_type() = default;
 
   virtual Value_type*  clone()  const = 0;
   virtual const std::string& type_name() const = 0;
@@ -225,7 +225,7 @@ public:
   // cppcheck-suppress noExplicitConstructor
   const_iterator( Array::Val_vector::const_iterator i_ ):  // NOLINT(google-explicit-constructor)
     i(i_) {}
-  ~const_iterator() {}
+  ~const_iterator() = default;
 
   const Value& operator *() const { return *(*i); }
   const Value* operator ->() const { return *i; }
