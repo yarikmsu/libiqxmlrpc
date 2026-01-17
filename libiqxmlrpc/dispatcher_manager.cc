@@ -149,10 +149,9 @@ Method* Method_dispatcher_manager::create_method(const Method::Data& mdata)
     throw Unknown_method(mdata.method_name);  // Sanitized in exception
   }
 
-  typedef Impl::DispatchersSet::iterator I;
-  for (I i = impl_->dispatchers.begin(); i != impl_->dispatchers.end(); ++i)
+  for (const auto& dispatcher : impl_->dispatchers)
   {
-    Method* tmp = (*i)->create_method(mdata);
+    Method* tmp = dispatcher->create_method(mdata);
     if (tmp)
       return tmp;
   }
