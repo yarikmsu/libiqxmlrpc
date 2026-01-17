@@ -52,7 +52,7 @@ XmlBuilder::XmlBuilder():
   writer(nullptr)
 {
   throwBuildError(writer = xmlNewTextWriterMemory(buf, 0), static_cast<xmlTextWriter*>(nullptr));
-  throwBuildError(xmlTextWriterStartDocument(writer, NULL, "UTF-8", NULL), -1);
+  throwBuildError(xmlTextWriterStartDocument(writer, nullptr, "UTF-8", nullptr), -1);
 }
 
 XmlBuilder::~XmlBuilder()
