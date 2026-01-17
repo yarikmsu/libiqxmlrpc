@@ -31,7 +31,7 @@ ResponseBuilder::ResponseBuilder(Parser& parser):
     { OK_PARAM, OK_PARAM_VALUE, "value" },
     { RESPONSE, FAULT_RESPONSE, "fault" },
     { FAULT_RESPONSE, FAULT_RESPONSE_VALUE, "value" },
-    { 0, 0, 0 }
+    { 0, 0, nullptr }
   };
   state_.set_transitions(trans);
 }

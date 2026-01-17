@@ -61,7 +61,7 @@ public:
   Ptr release()
   {
     Ptr p(p_);
-    p_ = 0;
+    p_ = nullptr;
     return p;
   }
 };
