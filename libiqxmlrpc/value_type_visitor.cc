@@ -67,11 +67,10 @@ void Print_value_visitor::do_visit_array(const Array& a)
 {
   out_ << "[";
 
-  typedef Array::const_iterator CI;
-  for(CI i = a.begin(); i != a.end(); ++i )
+  for (const auto& elem : a)
   {
     out_ << " ";
-    i->apply_visitor(*this);
+    elem.apply_visitor(*this);
     out_ << ",";
   }
 
