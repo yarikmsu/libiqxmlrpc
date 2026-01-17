@@ -1,6 +1,7 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
+#include <memory>
 #include <stdexcept>
 #include "except.h"
 #include "num_conv.h"
@@ -177,7 +178,7 @@ ValueBuilder::do_visit_element(const std::string& tagname)
     break;
 
   case NIL:
-    retval.reset(new Nil());
+    retval = std::make_unique<Nil>();
     break;
 
   default:
@@ -201,7 +202,7 @@ ValueBuilder::do_visit_element_end(const std::string&)
   switch (state_.get_state()) {
   case VALUE:
   case STRING:
-    retval.reset(new String(""));
+    retval = std::make_unique<String>("");
     break;
 
   case INT:
@@ -235,23 +236,23 @@ ValueBuilder::do_visit_text(const std::string& text)
     want_exit();
     [[fallthrough]];
   case STRING:
-    retval.reset(new String(text));
+    retval = std::make_unique<String>(text);
     break;
 
   case INT:
-    retval.reset(new Int(num_conv::from_string<int>(text)));
+    retval = std::make_unique<Int>(num_conv::from_string<int>(text));
     break;
 
   case INT64:
-    retval.reset(new Int64(num_conv::from_string<int64_t>(text)));
+    retval = std::make_unique<Int64>(num_conv::from_string<int64_t>(text));
     break;
 
   case BOOL:
-    retval.reset(new Bool(num_conv::from_string<int>(text) != 0));
+    retval = std::make_unique<Bool>(num_conv::from_string<int>(text) != 0);
     break;
 
   case DOUBLE:
-    retval.reset(new Double(num_conv::string_to_double(text)));
+    retval = std::make_unique<Double>(num_conv::string_to_double(text));
     break;
 
   case BINARY:
@@ -259,7 +260,7 @@ ValueBuilder::do_visit_text(const std::string& text)
     break;
 
   case TIME:
-    retval.reset(new Date_time(text));
+    retval = std::make_unique<Date_time>(text);
     break;
 
   default:
