@@ -196,8 +196,8 @@ set_server_cipher_options(SSL_CTX* ctx)
 int
 iqxmlrpc_SSL_verify(int prev_ok, X509_STORE_CTX* ctx)
 {
-  SSL* ssl = reinterpret_cast<SSL*>(X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
-  const ConnectionVerifier* v = reinterpret_cast<const ConnectionVerifier*>(SSL_get_ex_data(ssl, iqxmlrpc_ssl_data_idx));
+  auto ssl = reinterpret_cast<SSL*>(X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
+  auto v = reinterpret_cast<const ConnectionVerifier*>(SSL_get_ex_data(ssl, iqxmlrpc_ssl_data_idx));
   return v->verify(prev_ok, ctx);
 }
 

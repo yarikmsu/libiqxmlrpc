@@ -128,7 +128,7 @@ void Socket::send_shutdown( const char* data, size_t len )
 
 void Socket::bind( const Inet_addr& addr )
 {
-  const sockaddr* saddr = reinterpret_cast<const sockaddr*>(addr.get_sockaddr());
+  auto saddr = reinterpret_cast<const sockaddr*>(addr.get_sockaddr());
 
   if( ::bind( sock, saddr, sizeof(sockaddr_in) ) == -1 )
     throw network_error( "Socket::bind" );
@@ -156,7 +156,7 @@ Socket Socket::accept()
 
 bool Socket::connect( const iqnet::Inet_addr& peer_addr )
 {
-  const sockaddr* saddr = reinterpret_cast<const sockaddr*>(peer_addr.get_sockaddr());
+  auto saddr = reinterpret_cast<const sockaddr*>(peer_addr.get_sockaddr());
 
   int code = ::connect(sock, saddr, sizeof(sockaddr_in));
   bool wouldblock = false;
