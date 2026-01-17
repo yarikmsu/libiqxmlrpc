@@ -455,7 +455,7 @@ void Binary_data::encode() const
 // Optimized decode using lookup table - no exceptions, direct buffer write
 void Binary_data::decode()
 {
-  const unsigned char* src = reinterpret_cast<const unsigned char*>(base64.data());
+  auto src = reinterpret_cast<const unsigned char*>(base64.data());
   const size_t src_len = base64.length();
 
   // Reserve space (decoded is at most 3/4 of base64 size)
