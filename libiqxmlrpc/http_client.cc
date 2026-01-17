@@ -17,7 +17,7 @@ Http_client_connection::Http_client_connection( const iqnet::Socket& s, bool nb 
   Connection( s ),
   reactor( new Reactor<Null_lock> ),
   out_str(),
-  resp_packet(0)
+  resp_packet(nullptr)
 {
   sock.set_non_blocking( nb );
 }
@@ -26,7 +26,7 @@ Http_client_connection::Http_client_connection( const iqnet::Socket& s, bool nb 
 http::Packet* Http_client_connection::do_process_session( const std::string& s )
 {
   out_str = s;
-  resp_packet = 0;
+  resp_packet = nullptr;
   reactor->register_handler( this, Reactor_base::OUTPUT );
 
   do {

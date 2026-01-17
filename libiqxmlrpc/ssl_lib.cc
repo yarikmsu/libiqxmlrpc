@@ -75,12 +75,12 @@ openssl_id_function()
 LockContainer::~LockContainer()
 {
   if (CRYPTO_get_locking_callback() == &openssl_lock_callback) {
-    CRYPTO_set_locking_callback(0);
+    CRYPTO_set_locking_callback(nullptr);
   }
 
 #ifndef _WIN32
   if (CRYPTO_get_id_callback() == &openssl_id_function) {
-    CRYPTO_set_id_callback(0);
+    CRYPTO_set_id_callback(nullptr);
   }
 #endif
 
@@ -112,10 +112,10 @@ init_library()
 #endif
 #else
   // OpenSSL 1.1.0+ initializes automatically
-  OPENSSL_init_ssl(0, NULL);
+  OPENSSL_init_ssl(0, nullptr);
 #endif
 
-  iqxmlrpc_ssl_data_idx = SSL_get_ex_new_index(0, const_cast<void*>(static_cast<const void*>("iqxmlrpc verifier")), NULL, NULL, NULL);
+  iqxmlrpc_ssl_data_idx = SSL_get_ex_new_index(0, const_cast<void*>(static_cast<const void*>("iqxmlrpc verifier")), nullptr, nullptr, nullptr);
 }
 
 //
@@ -345,7 +345,7 @@ Ctx::prepare_verify(SSL* ssl, bool server)
     SSL_set_verify(ssl, mode, iqxmlrpc_SSL_verify);
     SSL_set_ex_data(ssl, iqxmlrpc_ssl_data_idx, const_cast<void*>(static_cast<const void*>(v)));
   } else {
-    SSL_set_verify(ssl, mode, 0);
+    SSL_set_verify(ssl, mode, nullptr);
   }
 }
 

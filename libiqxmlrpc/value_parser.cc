@@ -159,7 +159,7 @@ ValueBuilder::ValueBuilder(Parser& parser):
     { VALUE,  STRUCT, "struct" },
     { VALUE,  ARRAY,  "array" },
     { VALUE,  NIL,    "nil" },
-    { 0, 0, 0 }
+    { 0, 0, nullptr }
   };
   state_.set_transitions(trans);
 }
