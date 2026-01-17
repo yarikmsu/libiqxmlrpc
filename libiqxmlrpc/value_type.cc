@@ -602,11 +602,11 @@ Date_time::Date_time( const std::string& s ):
   tm_.tm_min  = parse_field(12, 2);         // mm
   tm_.tm_sec  = parse_field(15, 2);         // ss
 
-  if( (tm_.tm_year < 0) || !(tm_.tm_mon >= 0 && tm_.tm_mon <= 11) ||
-      !(tm_.tm_mday >= 1 && tm_.tm_mday <= 31) ||
-      !(tm_.tm_hour >= 0 && tm_.tm_hour <= 23) ||
-      !(tm_.tm_min >= 0 && tm_.tm_min <= 59) ||
-      !(tm_.tm_sec >= 0 && tm_.tm_sec <= 61)
+  if( (tm_.tm_year < 0) || (tm_.tm_mon < 0 || tm_.tm_mon > 11) ||
+      (tm_.tm_mday < 1 || tm_.tm_mday > 31) ||
+      (tm_.tm_hour < 0 || tm_.tm_hour > 23) ||
+      (tm_.tm_min < 0 || tm_.tm_min > 59) ||
+      (tm_.tm_sec < 0 || tm_.tm_sec > 61)
     )
     throw Malformed_iso8601();
 }
