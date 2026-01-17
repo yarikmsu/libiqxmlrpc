@@ -431,7 +431,7 @@ Ctx::prepare_sni(SSL* ssl)
 }
 
 // ----------------------------------------------------------------------------
-exception::exception() throw():
+exception::exception() noexcept:
   ssl_err( ERR_get_error() ),
   msg( ERR_reason_error_string(ssl_err) )
 {
@@ -439,7 +439,7 @@ exception::exception() throw():
 }
 
 
-exception::exception( unsigned long err ) throw():
+exception::exception( unsigned long err ) noexcept:
   ssl_err(err),
   msg()
 {
@@ -449,7 +449,7 @@ exception::exception( unsigned long err ) throw():
 }
 
 
-exception::exception( const std::string& msg_ ) throw():
+exception::exception( const std::string& msg_ ) noexcept:
   ssl_err(0),
   msg( msg_ )
 {
