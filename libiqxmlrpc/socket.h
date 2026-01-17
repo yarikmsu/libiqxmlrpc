@@ -28,7 +28,7 @@ public:
   //! Create object from existing socket handler.
   Socket( Handler, const Inet_addr& );
   //! Destructor. Does not close actual socket.
-  virtual ~Socket() {}
+  virtual ~Socket() = default;
 
   Handler get_handler() const { return sock; }
 

@@ -12,7 +12,7 @@
 #include <charconv>
 #include <chrono>
 #include <ctime>
-#include <string.h>
+#include <cstring>
 
 namespace iqxmlrpc {
 namespace type_names {
@@ -225,10 +225,7 @@ Struct& Struct::operator =( const Struct& other )
 }
 
 
-Struct::~Struct()
-{
-  // unique_ptr elements are automatically destroyed by map destructor
-}
+Struct::~Struct() = default;
 
 
 void Struct::swap( Struct& other ) noexcept
@@ -269,7 +266,7 @@ bool Struct::has_field( const std::string& f ) const
 
 const Value& Struct::operator []( const std::string& f ) const
 {
-  const_iterator i = values.find(f);
+  auto i = values.find(f);
 
   if( i == values.end() )
     throw No_field( f );
@@ -280,7 +277,7 @@ const Value& Struct::operator []( const std::string& f ) const
 
 Value& Struct::operator []( const std::string& f )
 {
-  const_iterator i = values.find(f);
+  auto i = values.find(f);
 
   if( i == values.end() )
     throw No_field( f );

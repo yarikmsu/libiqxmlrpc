@@ -161,9 +161,9 @@ Method* Method_dispatcher_manager::create_method(const Method::Data& mdata)
 
 void Method_dispatcher_manager::get_methods_list(Array& retval) const
 {
-  typedef Impl::DispatchersSet::const_iterator CI;
-  for (CI i = impl_->dispatchers.begin(); i != impl_->dispatchers.end(); ++i)
-    (*i)->get_methods_list(retval);
+  // cppcheck-suppress constVariableReference
+  for (const auto& dispatcher : impl_->dispatchers)
+    dispatcher->get_methods_list(retval);
 }
 
 void Method_dispatcher_manager::enable_introspection()
