@@ -78,11 +78,10 @@ void Value_type_to_xml::do_visit_array(const Array& a)
   XmlNode arr(builder_, "array");
   XmlNode data(builder_, "data");
 
-  typedef Array::const_iterator CI;
   Value_type_to_xml vis(builder_, server_mode_);
 
-  for(CI i = a.begin(); i != a.end(); ++i ) {
-    i->apply_visitor(vis);
+  for (const auto& elem : a) {
+    elem.apply_visitor(vis);
   }
 }
 

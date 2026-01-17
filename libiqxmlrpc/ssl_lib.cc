@@ -207,9 +207,7 @@ iqxmlrpc_SSL_verify(int prev_ok, X509_STORE_CTX* ctx)
 // ConnectionVerifier
 //
 
-ConnectionVerifier::~ConnectionVerifier()
-{
-}
+ConnectionVerifier::~ConnectionVerifier() = default;
 
 int
 ConnectionVerifier::verify(bool prev_ok, X509_STORE_CTX* ctx) const
@@ -309,9 +307,7 @@ Ctx::Ctx():
 }
 
 
-Ctx::~Ctx()
-{
-}
+Ctx::~Ctx() = default;
 
 SSL_CTX*
 Ctx::context()
