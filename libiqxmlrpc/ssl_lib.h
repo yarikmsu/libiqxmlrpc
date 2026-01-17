@@ -149,13 +149,13 @@ class LIBIQXMLRPC_API exception: public std::exception {
   std::string msg;
 
 public:
-  exception() throw();
-  explicit exception( unsigned long ssl_err ) throw();
-  explicit exception( const std::string& msg ) throw();
-  virtual ~exception() throw() {}
+  exception() noexcept;
+  explicit exception( unsigned long ssl_err ) noexcept;
+  explicit exception( const std::string& msg ) noexcept;
+  ~exception() noexcept override = default;
 
-  const char*   what() const throw() { return msg.c_str(); }
-  unsigned long code() const throw() { return ssl_err; }
+  const char*   what() const noexcept override { return msg.c_str(); }
+  unsigned long code() const noexcept { return ssl_err; }
 };
 
 class LIBIQXMLRPC_API not_initialized: public ssl::exception {

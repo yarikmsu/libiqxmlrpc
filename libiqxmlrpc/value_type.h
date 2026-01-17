@@ -164,7 +164,7 @@ public:
   Array& operator =( const Array& );
   Array& operator =( Array&& other ) noexcept { swap(other); return *this; }
 
-  void swap(Array&) throw();
+  void swap(Array&) noexcept;
   Array* clone() const override;
   const std::string& type_name() const override;
   void apply_visitor(Value_type_visitor&) const override;
@@ -286,7 +286,7 @@ public:
   Struct& operator =( const Struct& );
   Struct& operator =( Struct&& other ) noexcept { swap(other); return *this; }
 
-  void swap(Struct&) throw();
+  void swap(Struct&) noexcept;
   Struct* clone() const override;
   const std::string& type_name() const override;
   void apply_visitor(Value_type_visitor&) const override;
