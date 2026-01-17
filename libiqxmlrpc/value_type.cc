@@ -150,7 +150,7 @@ Array& Array::operator =( const Array& other )
 }
 
 
-void Array::swap( Array& other) throw()
+void Array::swap( Array& other) noexcept
 {
   values.swap(other.values);
 }
@@ -231,7 +231,7 @@ Struct::~Struct()
 }
 
 
-void Struct::swap( Struct& other ) throw()
+void Struct::swap( Struct& other ) noexcept
 {
   values.swap(other.values);
 }
