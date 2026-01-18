@@ -1,6 +1,7 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
+#include <cstdint>
 #include <stdexcept>
 #include "except.h"
 #include "request_parser.h"
@@ -8,7 +9,7 @@
 
 namespace iqxmlrpc {
 
-enum RequestBuilderState {
+enum RequestBuilderState : std::uint8_t {
   NONE,
   METHOD_CALL,
   METHOD_NAME,

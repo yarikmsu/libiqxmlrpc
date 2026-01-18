@@ -6,6 +6,7 @@
 
 #include "api_export.h"
 
+#include <cstdint>
 #include <memory>
 #include <openssl/ssl.h>
 #include <stdexcept>
@@ -31,7 +32,7 @@ void LIBIQXMLRPC_API throw_io_exception( SSL*, int ret );
     These states occur frequently in non-blocking SSL I/O and using
     exceptions for normal control flow is expensive.
 */
-enum class SslIoResult {
+enum class SslIoResult : std::uint8_t {
   OK,               //!< Operation completed successfully
   WANT_READ,        //!< Need to wait for socket readable, then retry
   WANT_WRITE,       //!< Need to wait for socket writable, then retry
