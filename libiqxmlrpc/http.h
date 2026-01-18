@@ -8,6 +8,7 @@
 #include "inet_addr.h"
 #include "xheaders.h"
 
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>
@@ -25,7 +26,7 @@ class Auth_Plugin_base;
 namespace http {
 
 //! The level of HTTP sanity checks.
-enum Verification_level { HTTP_CHECK_WEAK, HTTP_CHECK_STRICT };
+enum Verification_level : std::uint8_t { HTTP_CHECK_WEAK, HTTP_CHECK_STRICT };
 
 #ifdef _MSC_VER
 #pragma warning(push)

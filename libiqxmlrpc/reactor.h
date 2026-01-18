@@ -8,6 +8,7 @@
 #include "net_except.h"
 #include "socket.h"
 
+#include <cstdint>
 #include <list>
 #include <memory>
 
@@ -50,7 +51,7 @@ public:
       network_error( "iqnet::Reactor: no handlers given.", false ) {}
   };
 
-  enum Event_mask { INPUT=1, OUTPUT=2 };
+  enum Event_mask : std::uint8_t { INPUT=1, OUTPUT=2 };
 
   struct HandlerState {
     Socket::Handler fd;
