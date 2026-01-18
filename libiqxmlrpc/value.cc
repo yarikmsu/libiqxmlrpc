@@ -78,7 +78,7 @@ Value::Value( Value&& v ) noexcept :
   v.value = nullptr;
 }
 
-Value::Value( Nil n ):
+Value::Value( const Nil& n ):
   value( n.clone() )
 {
 }

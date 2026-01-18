@@ -213,7 +213,7 @@ void Header::register_validator(
   Header::Option_validator_fn fn,
   Verification_level level)
 {
-  Option_validator v = { level, fn };
+  Option_validator v = { level, std::move(fn) };
   validators_.insert(std::make_pair(name, v));
 }
 
