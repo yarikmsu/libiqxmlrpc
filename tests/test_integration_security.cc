@@ -91,4 +91,49 @@ BOOST_FIXTURE_TEST_CASE(firewall_allows_connection, IntegrationFixture)
   BOOST_CHECK_EQUAL(r.value().get_string(), "allowed");
 }
 
+BOOST_FIXTURE_TEST_CASE(firewall_blocks_connection_no_leak, IntegrationFixture)
+{
+  // Test that firewall rejection properly closes the socket (no FD leak).
+  // This test verifies the fix for Coverity CID 641369.
+  start_server(1, 81);
+  // Heap-allocate: set_firewall() takes ownership and deletes old firewall
+  server().set_firewall(new BlockAllFirewall());
+
+  // Make multiple connection attempts that will be rejected.
+  // If sockets leak, the server would eventually run out of FDs.
+  for (int i = 0; i < 10; ++i) {
+    auto client = create_client();
+    BOOST_CHECK_THROW(client->execute("echo", Value("blocked")), std::exception);
+  }
+
+  // Remove firewall and verify server still works (not exhausted of FDs)
+  server().set_firewall(nullptr);
+  auto client = create_client();
+  Response r = client->execute("echo", Value("after_firewall"));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), "after_firewall");
+}
+
+BOOST_FIXTURE_TEST_CASE(firewall_blocks_with_message_no_leak, IntegrationFixture)
+{
+  // Test that firewall rejection with custom message properly closes socket.
+  // Covers the send_shutdown() path in Acceptor::accept().
+  start_server(1, 82);
+  // Heap-allocate: set_firewall() takes ownership and deletes old firewall
+  server().set_firewall(new CustomMessageFirewall());
+
+  // Make multiple connection attempts that will be rejected with message.
+  for (int i = 0; i < 10; ++i) {
+    auto client = create_client();
+    BOOST_CHECK_THROW(client->execute("echo", Value("blocked")), std::exception);
+  }
+
+  // Verify server still works after many rejections
+  server().set_firewall(nullptr);
+  auto client = create_client();
+  Response r = client->execute("echo", Value("recovered"));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), "recovered");
+}
+
 BOOST_AUTO_TEST_SUITE_END()
