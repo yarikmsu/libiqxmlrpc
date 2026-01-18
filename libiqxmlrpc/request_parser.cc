@@ -46,6 +46,9 @@ RequestBuilder::do_visit_element(const std::string& tagname)
   case VALUE:
     params_.emplace_back(sub_build<Value_type*, ValueBuilder>(true));
     break;
+
+  default:
+    break;
   }
 }
 
