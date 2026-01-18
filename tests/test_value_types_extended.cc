@@ -1,14 +1,19 @@
 #define BOOST_TEST_MODULE value_types_extended_test
 #include <memory>
 #include <ctime>
+#include <limits>
 #include <sstream>
 #include <boost/test/test_tools.hpp>
 #include <boost/test/unit_test.hpp>
 #include "libiqxmlrpc/value.h"
 #include "libiqxmlrpc/value_type_visitor.h"
+#include "test_utils.h"
 
 using namespace boost::unit_test;
 using namespace iqxmlrpc;
+using iqxmlrpc::test::OmitStringTagGuard;
+using iqxmlrpc::test::DefaultIntGuard;
+using iqxmlrpc::test::DefaultInt64Guard;
 
 BOOST_AUTO_TEST_SUITE(binary_data_tests)
 
@@ -302,31 +307,30 @@ BOOST_AUTO_TEST_CASE(value_empty_string)
 
 BOOST_AUTO_TEST_CASE(value_max_int)
 {
-    Value v = 2147483647;
+    Value v = std::numeric_limits<int>::max();
     BOOST_CHECK(v.is_int());
-    BOOST_CHECK_EQUAL(v.get_int(), 2147483647);
+    BOOST_CHECK_EQUAL(v.get_int(), std::numeric_limits<int>::max());
 }
 
 BOOST_AUTO_TEST_CASE(value_min_int)
 {
-    Value v = static_cast<int>(-2147483647 - 1);
+    Value v = std::numeric_limits<int>::min();
     BOOST_CHECK(v.is_int());
-    BOOST_CHECK_EQUAL(v.get_int(), -2147483647 - 1);
+    BOOST_CHECK_EQUAL(v.get_int(), std::numeric_limits<int>::min());
 }
 
 BOOST_AUTO_TEST_CASE(value_max_int64)
 {
-    Value v = static_cast<int64_t>(9223372036854775807LL);
+    Value v = std::numeric_limits<int64_t>::max();
     BOOST_CHECK(v.is_int64());
-    BOOST_CHECK_EQUAL(v.get_int64(), 9223372036854775807LL);
+    BOOST_CHECK_EQUAL(v.get_int64(), std::numeric_limits<int64_t>::max());
 }
 
 BOOST_AUTO_TEST_CASE(value_min_int64)
 {
-    int64_t min_val = -9223372036854775807LL - 1;
-    Value v = min_val;
+    Value v = std::numeric_limits<int64_t>::min();
     BOOST_CHECK(v.is_int64());
-    BOOST_CHECK_EQUAL(v.get_int64(), min_val);
+    BOOST_CHECK_EQUAL(v.get_int64(), std::numeric_limits<int64_t>::min());
 }
 
 BOOST_AUTO_TEST_CASE(value_double_zero)
@@ -376,13 +380,13 @@ BOOST_AUTO_TEST_CASE(value_assignment)
 BOOST_AUTO_TEST_CASE(value_bad_cast_int_to_string)
 {
     Value v = 42;
-    BOOST_CHECK_THROW(v.get_string(), Value::Value::Bad_cast);
+    BOOST_CHECK_THROW(v.get_string(), Value::Bad_cast);
 }
 
 BOOST_AUTO_TEST_CASE(value_bad_cast_string_to_int)
 {
     Value v = "not a number";
-    BOOST_CHECK_THROW(v.get_int(), Value::Value::Bad_cast);
+    BOOST_CHECK_THROW(v.get_int(), Value::Bad_cast);
 }
 
 BOOST_AUTO_TEST_CASE(array_out_of_range)
@@ -618,30 +622,27 @@ BOOST_AUTO_TEST_CASE(omit_string_tag_default_false)
 
 BOOST_AUTO_TEST_CASE(omit_string_tag_set_and_get)
 {
-    // Save original value
-    bool original = Value::omit_string_tag_in_responses();
+    OmitStringTagGuard guard;  // RAII ensures restoration even on failure
 
     Value::omit_string_tag_in_responses(true);
     BOOST_CHECK(Value::omit_string_tag_in_responses());
 
     Value::omit_string_tag_in_responses(false);
     BOOST_CHECK(!Value::omit_string_tag_in_responses());
-
-    // Restore original value
-    Value::omit_string_tag_in_responses(original);
 }
 
 BOOST_AUTO_TEST_CASE(default_int_set_get_drop)
 {
+    DefaultIntGuard guard;  // RAII ensures cleanup even on failure
+
     // Initially should return null
     BOOST_CHECK(Value::get_default_int() == nullptr);
 
     // Set default
     Value::set_default_int(42);
-    Int* def = Value::get_default_int();
+    std::unique_ptr<Int> def(Value::get_default_int());
     BOOST_REQUIRE(def != nullptr);
     BOOST_CHECK_EQUAL(def->value(), 42);
-    delete def;
 
     // Drop default
     Value::drop_default_int();
@@ -650,15 +651,16 @@ BOOST_AUTO_TEST_CASE(default_int_set_get_drop)
 
 BOOST_AUTO_TEST_CASE(default_int64_set_get_drop)
 {
+    DefaultInt64Guard guard;  // RAII ensures cleanup even on failure
+
     // Initially should return null
     BOOST_CHECK(Value::get_default_int64() == nullptr);
 
     // Set default
     Value::set_default_int64(5000000000LL);
-    Int64* def = Value::get_default_int64();
+    std::unique_ptr<Int64> def(Value::get_default_int64());
     BOOST_REQUIRE(def != nullptr);
     BOOST_CHECK_EQUAL(def->value(), 5000000000LL);
-    delete def;
 
     // Drop default
     Value::drop_default_int64();
@@ -1129,11 +1131,13 @@ BOOST_AUTO_TEST_CASE(binary_empty_data_extended)
 
 BOOST_AUTO_TEST_CASE(binary_roundtrip_extended)
 {
-    std::string original = "Test binary \x00\x01\x02 data";
+    // Use explicit length to include null byte in the middle
+    std::string original("Test binary \x00\x01\x02 data", 20);
     std::unique_ptr<Binary_data> bin1(Binary_data::from_data(original));
     std::string base64 = bin1->get_base64();
     std::unique_ptr<Binary_data> bin2(Binary_data::from_base64(base64));
     BOOST_CHECK_EQUAL(bin2->get_data(), original);
+    BOOST_CHECK_EQUAL(bin2->get_data().size(), 20u);  // Verify full length preserved
 }
 
 // Tests for bytes >= 128 (covers signed char UB fix in encode())
@@ -1890,6 +1894,165 @@ BOOST_AUTO_TEST_CASE(datetime_boundary_values)
     // Leap second (61 seconds is valid in tm)
     Date_time dt3(std::string("20230630T23:59:60"));
     BOOST_CHECK_EQUAL(dt3.to_string(), "20230630T23:59:60");
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+//=============================================================================
+// Additional tests for clang-tidy PR coverage
+// Covers specific code paths modified in the modernization effort
+//=============================================================================
+
+BOOST_AUTO_TEST_SUITE(clang_tidy_coverage_tests)
+
+// Test Struct::operator[] const version returning valid value
+// Covers value_type.cc lines 270-277 (const operator[])
+BOOST_AUTO_TEST_CASE(struct_const_subscript_success)
+{
+    Struct s;
+    s.insert("key1", Value(42));
+    s.insert("key2", Value("hello"));
+    s.insert("key3", Value(3.14));
+
+    // Use const reference to ensure const operator[] is called
+    const Struct& cs = s;
+
+    BOOST_CHECK_EQUAL(cs["key1"].get_int(), 42);
+    BOOST_CHECK_EQUAL(cs["key2"].get_string(), "hello");
+    BOOST_CHECK_CLOSE(cs["key3"].get_double(), 3.14, 0.001);
+}
+
+// Test Struct::operator[] non-const version returning valid value
+// Covers value_type.cc lines 281-288 (non-const operator[])
+BOOST_AUTO_TEST_CASE(struct_nonconst_subscript_success)
+{
+    Struct s;
+    s.insert("key", Value(100));
+
+    // Non-const access and modification
+    Value& ref = s["key"];
+    BOOST_CHECK_EQUAL(ref.get_int(), 100);
+
+    // Modify through reference
+    ref = Value(200);
+    BOOST_CHECK_EQUAL(s["key"].get_int(), 200);
+}
+
+// Test Struct iteration via range-based for (uses begin()/end())
+// Covers value_type_xml.cc line 68 (for loop over struct)
+BOOST_AUTO_TEST_CASE(struct_range_iteration)
+{
+    Struct s;
+    s.insert("a", Value(1));
+    s.insert("b", Value(2));
+    s.insert("c", Value(3));
+
+    int sum = 0;
+    int count = 0;
+    for (const auto& entry : s) {
+        sum += entry.second->get_int();
+        count++;
+    }
+
+    BOOST_CHECK_EQUAL(count, 3);
+    BOOST_CHECK_EQUAL(sum, 6);
+}
+
+// Test Array iteration via range-based for
+// Covers value_type_xml.cc line 83 (for loop over array)
+BOOST_AUTO_TEST_CASE(array_range_iteration)
+{
+    Array a;
+    a.push_back(Value(10));
+    a.push_back(Value(20));
+    a.push_back(Value(30));
+
+    int sum = 0;
+    for (const auto& elem : a) {
+        sum += elem.get_int();
+    }
+
+    BOOST_CHECK_EQUAL(sum, 60);
+}
+
+// Test Date_time validation with boundary values for DeMorgan fix
+// Covers value_type.cc lines 605-610 (validation with simplified boolean expression)
+BOOST_AUTO_TEST_CASE(datetime_demorgan_validation_boundaries)
+{
+    // Test all boundary conditions that exercise the DeMorgan-simplified condition
+    // tm_year < 0
+    BOOST_CHECK_THROW(Date_time(std::string("-0010108T12:30:45")), Date_time::Malformed_iso8601);
+
+    // tm_mon < 0 (month 00)
+    BOOST_CHECK_THROW(Date_time(std::string("20260008T12:30:45")), Date_time::Malformed_iso8601);
+
+    // tm_mon > 11 (month 13)
+    BOOST_CHECK_THROW(Date_time(std::string("20261308T12:30:45")), Date_time::Malformed_iso8601);
+
+    // tm_mday < 1 (day 00)
+    BOOST_CHECK_THROW(Date_time(std::string("20260100T12:30:45")), Date_time::Malformed_iso8601);
+
+    // tm_mday > 31 (day 32)
+    BOOST_CHECK_THROW(Date_time(std::string("20260132T12:30:45")), Date_time::Malformed_iso8601);
+
+    // tm_hour < 0 is not possible with string parsing
+    // tm_hour > 23 (hour 24)
+    BOOST_CHECK_THROW(Date_time(std::string("20260108T24:30:45")), Date_time::Malformed_iso8601);
+
+    // tm_min > 59 (minute 60)
+    BOOST_CHECK_THROW(Date_time(std::string("20260108T12:60:45")), Date_time::Malformed_iso8601);
+
+    // tm_sec > 61 (second 62)
+    BOOST_CHECK_THROW(Date_time(std::string("20260108T12:30:62")), Date_time::Malformed_iso8601);
+
+    // Valid boundary cases should pass
+    Date_time dt_valid1(std::string("20260101T00:00:00")); // min valid
+    BOOST_CHECK_EQUAL(dt_valid1.to_string(), "20260101T00:00:00");
+
+    Date_time dt_valid2(std::string("20261231T23:59:59")); // max valid (non-leap)
+    BOOST_CHECK_EQUAL(dt_valid2.to_string(), "20261231T23:59:59");
+}
+
+// Test Date_time to_string with strftime check
+// Covers value_type.cc line 638 (strftime return check)
+BOOST_AUTO_TEST_CASE(datetime_strftime_coverage)
+{
+    // Create datetime and verify to_string produces expected output
+    Date_time dt(std::string("20260515T14:30:00"));
+    const std::string& result = dt.to_string();
+
+    BOOST_CHECK_EQUAL(result.length(), 17u);
+    BOOST_CHECK_EQUAL(result, "20260515T14:30:00");
+
+    // Verify caching by checking pointer identity
+    const std::string& cached = dt.to_string();
+    BOOST_CHECK_EQUAL(&result, &cached);
+}
+
+// Test Value construction with complex nested types
+// This verifies that nested Struct/Array values work correctly,
+// which is a prerequisite for request parsing tests in test_request_response.cc
+BOOST_AUTO_TEST_CASE(value_nested_construction)
+{
+    // Complex nested structures that would be used in request parameters
+    Struct nested;
+    nested.insert("inner_key", Value("inner_value"));
+
+    Array arr;
+    arr.push_back(Value(1));
+    arr.push_back(Value(2));
+
+    Struct outer;
+    outer.insert("nested", Value(nested));
+    outer.insert("array", Value(arr));
+
+    // Verify nested structure is correctly constructed
+    Value v(outer);
+    BOOST_CHECK(v.is_struct());
+    BOOST_CHECK(v["nested"].is_struct());
+    BOOST_CHECK_EQUAL(v["nested"]["inner_key"].get_string(), "inner_value");
+    BOOST_CHECK(v["array"].is_array());
+    BOOST_CHECK_EQUAL(v["array"].size(), 2u);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
