@@ -33,7 +33,6 @@ XHeaders& XHeaders::operator=(const std::map<std::string, std::string>& v) {
   return *this;
 }
 
-XHeaders::~XHeaders() {}
 
 std::string& XHeaders::operator[] (const std::string& v) {
   if (!validate(v)) {
@@ -61,6 +60,9 @@ XHeaders::const_iterator XHeaders::begin() const {
 XHeaders::const_iterator XHeaders::end() const {
   return xheaders_.end();
 }
+
+// NOLINTNEXTLINE(modernize-use-equals-default)
+XHeaders::~XHeaders() {}
 
 bool XHeaders::validate(const std::string& val) {
   return starts_with(val, "X-") || starts_with(val, "x-");
