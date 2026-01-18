@@ -136,10 +136,9 @@ BOOST_AUTO_TEST_CASE(method_throws_fault)
     Value result = Nil();
     Param_list params;
 
-    BOOST_CHECK_THROW(method.process_execution(nullptr, params, result), Fault);
-
     try {
         method.process_execution(nullptr, params, result);
+        BOOST_FAIL("Expected Fault to be thrown");
     } catch (const Fault& f) {
         BOOST_CHECK_EQUAL(f.code(), 100);
         BOOST_CHECK_EQUAL(f.what(), std::string("Test fault"));
@@ -491,10 +490,7 @@ BOOST_AUTO_TEST_CASE(server_feedback_null_set_exit_flag)
     // Create Server_feedback with default constructor (null server)
     Server_feedback feedback;
 
-    // Calling set_exit_flag should throw Exception
-    BOOST_CHECK_THROW(feedback.set_exit_flag(), Exception);
-
-    // Verify the exception message
+    // Calling set_exit_flag should throw Exception with "null pointer" message
     try {
         feedback.set_exit_flag();
         BOOST_FAIL("Expected Exception to be thrown");
@@ -510,10 +506,7 @@ BOOST_AUTO_TEST_CASE(server_feedback_null_log_message)
     // Create Server_feedback with default constructor (null server)
     Server_feedback feedback;
 
-    // Calling log_message should throw Exception
-    BOOST_CHECK_THROW(feedback.log_message("test message"), Exception);
-
-    // Verify the exception message
+    // Calling log_message should throw Exception with "null pointer" message
     try {
         feedback.log_message("test message");
         BOOST_FAIL("Expected Exception to be thrown");

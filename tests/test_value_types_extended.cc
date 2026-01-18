@@ -380,13 +380,13 @@ BOOST_AUTO_TEST_CASE(value_assignment)
 BOOST_AUTO_TEST_CASE(value_bad_cast_int_to_string)
 {
     Value v = 42;
-    BOOST_CHECK_THROW(v.get_string(), Value::Value::Bad_cast);
+    BOOST_CHECK_THROW(v.get_string(), Value::Bad_cast);
 }
 
 BOOST_AUTO_TEST_CASE(value_bad_cast_string_to_int)
 {
     Value v = "not a number";
-    BOOST_CHECK_THROW(v.get_int(), Value::Value::Bad_cast);
+    BOOST_CHECK_THROW(v.get_int(), Value::Bad_cast);
 }
 
 BOOST_AUTO_TEST_CASE(array_out_of_range)
@@ -1131,11 +1131,13 @@ BOOST_AUTO_TEST_CASE(binary_empty_data_extended)
 
 BOOST_AUTO_TEST_CASE(binary_roundtrip_extended)
 {
-    std::string original = "Test binary \x00\x01\x02 data";
+    // Use explicit length to include null byte in the middle
+    std::string original("Test binary \x00\x01\x02 data", 20);
     std::unique_ptr<Binary_data> bin1(Binary_data::from_data(original));
     std::string base64 = bin1->get_base64();
     std::unique_ptr<Binary_data> bin2(Binary_data::from_base64(base64));
     BOOST_CHECK_EQUAL(bin2->get_data(), original);
+    BOOST_CHECK_EQUAL(bin2->get_data().size(), 20u);  // Verify full length preserved
 }
 
 // Tests for bytes >= 128 (covers signed char UB fix in encode())
