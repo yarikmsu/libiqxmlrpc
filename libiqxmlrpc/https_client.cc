@@ -105,7 +105,8 @@ void Https_proxy_client_connection::handle_input( bool& )
 {
   for( size_t sz = read_buf_sz(); (sz == read_buf_sz()) && !resp_packet ; )
   {
-    if( !(sz = recv( read_buf(), read_buf_sz() )) )
+    sz = recv( read_buf(), read_buf_sz() );
+    if( sz == 0 )
       throw iqnet::network_error( "Connection closed by peer.", false );
 
     resp_packet.reset( read_response(std::string(read_buf(), sz), true) );

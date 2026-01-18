@@ -17,7 +17,10 @@ Socket::Socket():
   sock(-1),
   peer()
 {
-  if( (sock = socket( PF_INET, SOCK_STREAM, IPPROTO_TCP )) == -1 )
+  // cppcheck-suppress useInitializationList
+  // Cannot use initializer list: need to check socket() return value for errors
+  sock = socket( PF_INET, SOCK_STREAM, IPPROTO_TCP );
+  if( sock == -1 )
     throw network_error( "Socket::Socket" );
 
 #ifndef WIN32
