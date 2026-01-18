@@ -149,6 +149,9 @@ Inet_addr::get_sockaddr() const
     }
   });
 
+  if (!impl_->sa.has_value()) {
+    throw network_error("Socket address initialization failed", false);
+  }
   return &(*impl_->sa);
 }
 
