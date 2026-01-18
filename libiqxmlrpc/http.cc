@@ -89,6 +89,17 @@ void split_by_chars(Container& result, const std::string& s, const char* delims)
   }
 }
 
+// SECURITY: Validate header name/value against CRLF injection
+// Throws Http_header_error if \r or \n found (prevents HTTP header injection)
+inline void validate_header_crlf(const std::string& name, const std::string& value) {
+  if (name.find_first_of("\r\n") != std::string::npos) {
+    throw Http_header_error("Header name contains invalid CRLF characters");
+  }
+  if (value.find_first_of("\r\n") != std::string::npos) {
+    throw Http_header_error("Header value contains invalid CRLF characters");
+  }
+}
+
 } // anonymous namespace
 
 namespace names {
@@ -112,6 +123,10 @@ static std::atomic<bool> s_hide_server_version{false};
 
 void Header::set_server_header(const std::string& header)
 {
+  // SECURITY: Validate early for fail-fast behavior
+  if (header.find_first_of("\r\n") != std::string::npos) {
+    throw Http_header_error("Server header contains invalid CRLF characters");
+  }
   std::lock_guard<std::mutex> lock(s_config_mutex);
   s_custom_server_header = header;
 }
@@ -134,6 +149,10 @@ void Header::enable_hsts(bool enable, int max_age)
 
 void Header::set_content_security_policy(const std::string& policy)
 {
+  // SECURITY: Validate early for fail-fast behavior
+  if (policy.find_first_of("\r\n") != std::string::npos) {
+    throw Http_header_error("CSP policy contains invalid CRLF characters");
+  }
   std::lock_guard<std::mutex> lock(s_config_mutex);
   s_csp_policy = policy;
 }
@@ -327,6 +346,7 @@ void Header::set_option_checked(const std::string& name, const std::string& valu
 
 void Header::set_option(const std::string& name, const std::string& value)
 {
+  validate_header_crlf(name, value);
   options_[name] = value;
 }
 
@@ -342,6 +362,7 @@ bool Header::option_exists(const std::string& name) const
 
 void Header::set_option_default(const std::string& name, const std::string& value)
 {
+  validate_header_crlf(name, value);
   // insert() is a no-op if key exists, avoiding double lookup
   options_.insert({name, value});
 }

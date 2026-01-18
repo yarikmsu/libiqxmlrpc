@@ -1,11 +1,11 @@
 /**
- * CRLF Injection Exploit Test
+ * CRLF Injection Prevention Test
  *
- * This test demonstrates the HTTP header injection vulnerability
+ * This test verifies the fix for the HTTP header injection vulnerability
  * documented in GitHub Issue #137.
  *
- * Vulnerability: Header values are not sanitized for CRLF characters,
- * allowing attackers to inject arbitrary HTTP headers.
+ * Fix: Header values are validated against CRLF characters,
+ * rejecting any attempt to inject arbitrary HTTP headers.
  *
  * OWASP Category: A03:2021 – Injection
  */
@@ -13,216 +13,224 @@
 #define BOOST_TEST_MODULE crlf_injection_test
 #include <boost/test/unit_test.hpp>
 #include "libiqxmlrpc/http.h"
+#include "libiqxmlrpc/http_errors.h"
 #include "libiqxmlrpc/xheaders.h"
 
 using namespace iqxmlrpc;
 using namespace iqxmlrpc::http;
 
-BOOST_AUTO_TEST_SUITE(crlf_injection_exploit)
+BOOST_AUTO_TEST_SUITE(crlf_injection_prevention)
 
 /**
- * EXPLOIT TEST: Prove that CRLF injection allows header injection
+ * TEST: Verify CRLF injection via XHeaders is rejected
  *
  * Attack vector: An attacker who can control header values
- * can inject arbitrary HTTP headers by embedding \r\n sequences.
+ * tries to inject arbitrary HTTP headers by embedding \r\n sequences.
+ * Expected: Http_header_error exception is thrown.
  */
-BOOST_AUTO_TEST_CASE(exploit_header_injection_via_xheaders)
+BOOST_AUTO_TEST_CASE(header_injection_via_xheaders_rejected)
 {
-    // Setup: Create response header with XHeaders
     Response_header hdr(200, "OK");
     XHeaders xheaders;
 
-    // ATTACK: Inject a malicious header via CRLF in value
-    // The value contains \r\n followed by an injected header
+    // ATTACK ATTEMPT: Inject a malicious header via CRLF in value
     xheaders["X-Legitimate"] = "normal-value\r\nX-Injected: malicious-payload";
 
-    hdr.set_xheaders(xheaders);
-
-    // Serialize the header
-    std::string dump = hdr.dump();
-
-    // PROOF OF EXPLOIT: The injected header appears in the output
-    // This should NOT happen in a secure implementation
-    bool injection_successful = (dump.find("X-Injected: malicious-payload") != std::string::npos);
-
-    BOOST_TEST_MESSAGE("=== CRLF INJECTION EXPLOIT TEST ===");
-    BOOST_TEST_MESSAGE("Serialized header output:");
-    BOOST_TEST_MESSAGE(dump);
-    BOOST_TEST_MESSAGE("===================================");
-
-    // This test PASSES if the injection works (proving the vulnerability)
-    // A FIXED implementation would make this test FAIL
-    BOOST_CHECK_MESSAGE(injection_successful,
-        "VULNERABILITY CONFIRMED: CRLF injection allowed header injection. "
-        "The injected header 'X-Injected: malicious-payload' appears in output.");
+    // VERIFY: Exception is thrown when setting xheaders
+    BOOST_CHECK_THROW(hdr.set_xheaders(xheaders), Http_header_error);
 }
 
 /**
- * EXPLOIT TEST: Session fixation via Set-Cookie injection
+ * TEST: Verify session fixation via Set-Cookie injection is rejected
  *
  * Impact: Attacker could inject Set-Cookie headers to hijack sessions
  */
-BOOST_AUTO_TEST_CASE(exploit_session_fixation_via_cookie_injection)
+BOOST_AUTO_TEST_CASE(session_fixation_via_cookie_injection_rejected)
 {
     Response_header hdr(200, "OK");
     XHeaders xheaders;
 
-    // ATTACK: Inject a Set-Cookie header to fix session
+    // ATTACK ATTEMPT: Inject a Set-Cookie header to fix session
     xheaders["X-Tracking"] = "id123\r\nSet-Cookie: session=attacker-controlled; Path=/";
 
-    hdr.set_xheaders(xheaders);
-    std::string dump = hdr.dump();
-
-    bool cookie_injected = (dump.find("Set-Cookie: session=attacker-controlled") != std::string::npos);
-
-    BOOST_TEST_MESSAGE("=== SESSION FIXATION EXPLOIT TEST ===");
-    BOOST_TEST_MESSAGE(dump);
-    BOOST_TEST_MESSAGE("=====================================");
-
-    BOOST_CHECK_MESSAGE(cookie_injected,
-        "VULNERABILITY CONFIRMED: Set-Cookie header injection possible. "
-        "This could enable session fixation attacks.");
+    BOOST_CHECK_THROW(hdr.set_xheaders(xheaders), Http_header_error);
 }
 
 /**
- * EXPLOIT TEST: Cache poisoning via injected headers
+ * TEST: Verify cache poisoning via injected headers is rejected
  *
  * Impact: Attacker could inject cache-control headers to poison caches
  */
-BOOST_AUTO_TEST_CASE(exploit_cache_poisoning)
+BOOST_AUTO_TEST_CASE(cache_poisoning_rejected)
 {
     Response_header hdr(200, "OK");
     XHeaders xheaders;
 
-    // ATTACK: Inject cache-control to poison intermediate caches
+    // ATTACK ATTEMPT: Inject cache-control to poison intermediate caches
     xheaders["X-Request-Id"] = "abc\r\nCache-Control: public, max-age=31536000\r\nX-Poison: true";
 
-    hdr.set_xheaders(xheaders);
-    std::string dump = hdr.dump();
-
-    bool cache_header_injected = (dump.find("Cache-Control: public") != std::string::npos);
-    bool multiple_headers_injected = (dump.find("X-Poison: true") != std::string::npos);
-
-    BOOST_TEST_MESSAGE("=== CACHE POISONING EXPLOIT TEST ===");
-    BOOST_TEST_MESSAGE(dump);
-    BOOST_TEST_MESSAGE("=====================================");
-
-    BOOST_CHECK_MESSAGE(cache_header_injected && multiple_headers_injected,
-        "VULNERABILITY CONFIRMED: Multiple header injection possible. "
-        "Cache poisoning attack vector confirmed.");
+    BOOST_CHECK_THROW(hdr.set_xheaders(xheaders), Http_header_error);
 }
 
 /**
- * EXPLOIT TEST: HTTP Response Splitting
+ * TEST: Verify HTTP Response Splitting is rejected
  *
  * Impact: Inject a complete HTTP response body after headers
  */
-BOOST_AUTO_TEST_CASE(exploit_response_splitting)
+BOOST_AUTO_TEST_CASE(response_splitting_rejected)
 {
     Response_header hdr(200, "OK");
     XHeaders xheaders;
 
-    // ATTACK: Terminate headers and inject response body
+    // ATTACK ATTEMPT: Terminate headers and inject response body
     // Double CRLF ends headers, then inject fake content
     xheaders["X-Debug"] = "value\r\n\r\n<html><script>alert('XSS')</script></html>";
 
-    hdr.set_xheaders(xheaders);
-    std::string dump = hdr.dump();
-
-    bool body_injected = (dump.find("<script>alert('XSS')</script>") != std::string::npos);
-
-    BOOST_TEST_MESSAGE("=== RESPONSE SPLITTING EXPLOIT TEST ===");
-    BOOST_TEST_MESSAGE(dump);
-    BOOST_TEST_MESSAGE("========================================");
-
-    BOOST_CHECK_MESSAGE(body_injected,
-        "VULNERABILITY CONFIRMED: Response splitting allows XSS injection. "
-        "Attacker can inject arbitrary HTML/JavaScript.");
+    BOOST_CHECK_THROW(hdr.set_xheaders(xheaders), Http_header_error);
 }
 
 /**
- * EXPLOIT TEST: Carriage Return only injection (\r)
+ * TEST: Verify Carriage Return only injection (\r) is rejected
  *
  * Some parsers treat lone \r as line terminator
  */
-BOOST_AUTO_TEST_CASE(exploit_cr_only_injection)
+BOOST_AUTO_TEST_CASE(cr_only_injection_rejected)
 {
     Response_header hdr(200, "OK");
     XHeaders xheaders;
 
-    // ATTACK: Use only \r (some servers/proxies may treat this as newline)
+    // ATTACK ATTEMPT: Use only \r (some servers/proxies may treat this as newline)
     xheaders["X-Test"] = "value\rX-Injected-CR: via-carriage-return";
 
-    hdr.set_xheaders(xheaders);
-    std::string dump = hdr.dump();
-
-    // Check if the \r is present (not sanitized)
-    bool cr_present = (dump.find("value\rX-Injected-CR") != std::string::npos);
-
-    BOOST_TEST_MESSAGE("=== CR-ONLY INJECTION TEST ===");
-    BOOST_TEST_MESSAGE("Raw bytes present: CR character embedded");
-    BOOST_TEST_MESSAGE("==============================");
-
-    BOOST_CHECK_MESSAGE(cr_present,
-        "VULNERABILITY CONFIRMED: Lone CR (\\r) not sanitized. "
-        "May enable injection on some HTTP parsers.");
+    BOOST_CHECK_THROW(hdr.set_xheaders(xheaders), Http_header_error);
 }
 
 /**
- * EXPLOIT TEST: Line Feed only injection (\n)
+ * TEST: Verify Line Feed only injection (\n) is rejected
  *
  * Some parsers treat lone \n as line terminator
  */
-BOOST_AUTO_TEST_CASE(exploit_lf_only_injection)
+BOOST_AUTO_TEST_CASE(lf_only_injection_rejected)
 {
     Response_header hdr(200, "OK");
     XHeaders xheaders;
 
-    // ATTACK: Use only \n (HTTP/1.1 allows LF-only line endings)
+    // ATTACK ATTEMPT: Use only \n (HTTP/1.1 allows LF-only line endings)
     xheaders["X-Test"] = "value\nX-Injected-LF: via-line-feed";
 
-    hdr.set_xheaders(xheaders);
-    std::string dump = hdr.dump();
-
-    bool lf_present = (dump.find("value\nX-Injected-LF") != std::string::npos);
-
-    BOOST_TEST_MESSAGE("=== LF-ONLY INJECTION TEST ===");
-    BOOST_TEST_MESSAGE("Raw bytes present: LF character embedded");
-    BOOST_TEST_MESSAGE("==============================");
-
-    BOOST_CHECK_MESSAGE(lf_present,
-        "VULNERABILITY CONFIRMED: Lone LF (\\n) not sanitized. "
-        "HTTP/1.1 allows LF-only line endings, enabling injection.");
+    BOOST_CHECK_THROW(hdr.set_xheaders(xheaders), Http_header_error);
 }
 
 /**
- * EXPLOIT TEST: Direct set_option() bypass
+ * TEST: Verify direct set_option() also rejects CRLF injection
  *
- * The vulnerability also exists in Header::set_option()
+ * The fix must protect all entry points
  */
-BOOST_AUTO_TEST_CASE(exploit_direct_set_option)
+BOOST_AUTO_TEST_CASE(direct_set_option_rejected)
 {
     Response_header hdr(200, "OK");
 
-    // ATTACK: Directly use set_option with malicious value
-    hdr.set_option("x-custom", "safe\r\nX-Direct-Inject: via-set-option");
+    // ATTACK ATTEMPT: Directly use set_option with malicious value
+    BOOST_CHECK_THROW(
+        hdr.set_option("x-custom", "safe\r\nX-Direct-Inject: via-set-option"),
+        Http_header_error
+    );
+}
+
+/**
+ * TEST: Verify CRLF in header NAME is also rejected
+ *
+ * Both name and value must be validated
+ */
+BOOST_AUTO_TEST_CASE(crlf_in_header_name_rejected)
+{
+    Response_header hdr(200, "OK");
+
+    // ATTACK ATTEMPT: CRLF in header name
+    BOOST_CHECK_THROW(
+        hdr.set_option("x-header\r\nX-Injected", "value"),
+        Http_header_error
+    );
+}
+
+/**
+ * TEST: Verify legitimate headers still work
+ *
+ * The fix should not break normal usage
+ * Note: XHeaders converts header names to lowercase internally
+ */
+BOOST_AUTO_TEST_CASE(legitimate_headers_work)
+{
+    Response_header hdr(200, "OK");
+    XHeaders xheaders;
+
+    // Normal header values without CRLF
+    xheaders["X-Request-Id"] = "abc123-def456-ghi789";
+    xheaders["X-Custom-Header"] = "some normal value with spaces";
+    xheaders["X-Numeric"] = "12345";
+
+    // Should NOT throw
+    BOOST_CHECK_NO_THROW(hdr.set_xheaders(xheaders));
+
+    // Verify headers are actually set by checking dump
+    // Note: XHeaders converts names to lowercase (x-request-id not X-Request-Id)
+    std::string dump = hdr.dump();
+    BOOST_CHECK(dump.find("x-request-id: abc123-def456-ghi789") != std::string::npos);
+    BOOST_CHECK(dump.find("x-custom-header: some normal value with spaces") != std::string::npos);
+}
+
+/**
+ * TEST: Verify direct set_option() works for legitimate values
+ */
+BOOST_AUTO_TEST_CASE(legitimate_direct_set_option_works)
+{
+    Response_header hdr(200, "OK");
+
+    // Normal values without CRLF
+    BOOST_CHECK_NO_THROW(hdr.set_option("x-test", "normal-value"));
 
     std::string dump = hdr.dump();
+    BOOST_CHECK(dump.find("x-test: normal-value") != std::string::npos);
+}
 
-    bool injection_via_set_option = (dump.find("X-Direct-Inject: via-set-option") != std::string::npos);
+/**
+ * TEST: Static config set_server_header rejects CRLF
+ *
+ * Defense-in-depth: Early validation for fail-fast behavior
+ */
+BOOST_AUTO_TEST_CASE(set_server_header_rejects_crlf)
+{
+    BOOST_CHECK_THROW(
+        Header::set_server_header("MyServer/1.0\r\nX-Injected: evil"),
+        Http_header_error
+    );
+}
 
-    BOOST_TEST_MESSAGE("=== DIRECT set_option() EXPLOIT TEST ===");
-    BOOST_TEST_MESSAGE(dump);
-    BOOST_TEST_MESSAGE("=========================================");
+/**
+ * TEST: Static config set_content_security_policy rejects CRLF
+ *
+ * Defense-in-depth: Early validation for fail-fast behavior
+ */
+BOOST_AUTO_TEST_CASE(set_content_security_policy_rejects_crlf)
+{
+    BOOST_CHECK_THROW(
+        Header::set_content_security_policy("default-src 'self'\r\nX-Injected: evil"),
+        Http_header_error
+    );
+}
 
-    BOOST_CHECK_MESSAGE(injection_via_set_option,
-        "VULNERABILITY CONFIRMED: set_option() also vulnerable. "
-        "CRLF injection works through multiple entry points.");
+/**
+ * TEST: Legitimate static configs still work
+ */
+BOOST_AUTO_TEST_CASE(legitimate_static_config_works)
+{
+    BOOST_CHECK_NO_THROW(Header::set_server_header("MyServer/1.0"));
+    BOOST_CHECK_NO_THROW(Header::set_content_security_policy("default-src 'self'"));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
 
-// Summary of attack vectors demonstrated:
+// Summary of attack vectors that are now REJECTED:
 // 1. Arbitrary header injection via XHeaders
 // 2. Session fixation via Set-Cookie injection
 // 3. Cache poisoning via Cache-Control injection
@@ -230,5 +238,10 @@ BOOST_AUTO_TEST_SUITE_END()
 // 5. CR-only injection (for susceptible parsers)
 // 6. LF-only injection (HTTP/1.1 compliant parsers)
 // 7. Direct set_option() injection
+// 8. CRLF in header names
+// 9. Static config: set_server_header() with CRLF
+// 10. Static config: set_content_security_policy() with CRLF
+//
+// Plus verification that legitimate headers and configs still work.
 
 // vim:ts=4:sw=4:et
