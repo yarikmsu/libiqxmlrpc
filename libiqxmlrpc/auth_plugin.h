@@ -1,8 +1,8 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
-#ifndef _iqxmlrpc_http_auth_plugin_
-#define _iqxmlrpc_http_auth_plugin_
+#ifndef IQXMLRPC_HTTP_AUTH_PLUGIN_H
+#define IQXMLRPC_HTTP_AUTH_PLUGIN_H
 
 #include "sysinc.h"
 

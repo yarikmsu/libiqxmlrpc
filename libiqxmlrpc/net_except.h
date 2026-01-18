@@ -1,8 +1,8 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
-#ifndef _libiqnet_net_except_h_
-#define _libiqnet_net_except_h_
+#ifndef LIBIQNET_NET_EXCEPT_H
+#define LIBIQNET_NET_EXCEPT_H
 
 #include "api_export.h"
 

@@ -1,8 +1,8 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
-#ifndef _libiqxmlrpc_num_conv_h_
-#define _libiqxmlrpc_num_conv_h_
+#ifndef LIBIQXMLRPC_NUM_CONV_H
+#define LIBIQXMLRPC_NUM_CONV_H
 
 #include <cerrno>
 #include <charconv>
@@ -81,4 +81,4 @@ inline double string_to_double(const std::string& str) {
 } // namespace num_conv
 } // namespace iqxmlrpc
 
-#endif // _libiqxmlrpc_num_conv_h_
+#endif // LIBIQXMLRPC_NUM_CONV_H
