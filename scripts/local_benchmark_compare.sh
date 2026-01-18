@@ -2,21 +2,21 @@
 # Compare benchmark performance between current branch and a base branch.
 # Must be run from the repository root directory.
 #
-# Uses tiered thresholds:
-#   - Default: 15% for most benchmarks
-#   - Relaxed: 75% for high-variance benchmarks (queue latency, sub-ns measurements)
+# Thresholds:
+#   - Default: 10% for most benchmarks
+#   - Tier 1:  40% for perf_lockfree_queue_p90_latency (thread scheduling variance)
 #
 # Usage:
 #   ./scripts/local_benchmark_compare.sh [threshold] [base_branch]
 #
 # Arguments:
-#   threshold   - Default regression threshold percentage (default: 20)
+#   threshold   - Default regression threshold percentage (default: 10)
 #   base_branch - Branch to compare against (default: master)
 #
 # Example:
-#   ./scripts/local_benchmark_compare.sh           # 20% threshold, compare to master
+#   ./scripts/local_benchmark_compare.sh           # 10% threshold, compare to master
 #   ./scripts/local_benchmark_compare.sh 5         # 5% threshold (stricter)
-#   ./scripts/local_benchmark_compare.sh 10 main   # Compare to 'main' branch
+#   ./scripts/local_benchmark_compare.sh 15 main   # Compare to 'main' branch
 
 set -euo pipefail
 
@@ -27,19 +27,16 @@ if ! command -v bc &>/dev/null; then
     exit 2
 fi
 
-THRESHOLD=${1:-15}
+THRESHOLD=${1:-10}
 BASE_BRANCH=${2:-master}
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TMP_SCRIPTS="/tmp/benchmark_scripts_$$"
 
-# These 3 benchmarks have demonstrated CI failures due to inherent variance:
-# - perf_lockfree_queue_p90/p95_latency: Thread scheduling noise (50-95% variance)
-# - perf_string_to_int_new: Sub-nanosecond measurement (~1ns, 69% variance observed)
-# 75% threshold catches real regressions while tolerating normal CI variance (~11%)
-RELAXED_THRESHOLD=75
-RELAXED_BENCHMARKS="perf_lockfree_queue_p90_latency,perf_lockfree_queue_p95_latency,perf_string_to_int_new"
+# Tier 1: High-variance benchmarks due to thread scheduling
+RELAXED_THRESHOLD=40
+RELAXED_BENCHMARKS="perf_lockfree_queue_p90_latency"
 
 # Cross-platform nproc
 get_nproc() {
@@ -147,10 +144,18 @@ cd ..
 echo ""
 echo "=== Comparison ==="
 echo "Default threshold: ${THRESHOLD}%"
-echo "Relaxed threshold: ${RELAXED_THRESHOLD}% for: ${RELAXED_BENCHMARKS}"
-python3 "$TMP_SCRIPTS/compare_benchmarks.py" \
-    build/base_results.txt \
-    build/current_results.txt \
-    --threshold="$THRESHOLD" \
-    --relaxed-threshold="$RELAXED_THRESHOLD" \
-    --relaxed-benchmarks="$RELAXED_BENCHMARKS"
+if [ -n "$RELAXED_BENCHMARKS" ]; then
+    echo "Relaxed threshold: ${RELAXED_THRESHOLD}% for: ${RELAXED_BENCHMARKS}"
+    python3 "$TMP_SCRIPTS/compare_benchmarks.py" \
+        build/base_results.txt \
+        build/current_results.txt \
+        --threshold="$THRESHOLD" \
+        --relaxed-threshold="$RELAXED_THRESHOLD" \
+        --relaxed-benchmarks="$RELAXED_BENCHMARKS"
+else
+    echo "Relaxed threshold: (none - all benchmarks use default)"
+    python3 "$TMP_SCRIPTS/compare_benchmarks.py" \
+        build/base_results.txt \
+        build/current_results.txt \
+        --threshold="$THRESHOLD"
+fi
