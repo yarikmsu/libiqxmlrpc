@@ -43,7 +43,8 @@ public:
 
   void set_timeout( int seconds )
   {
-    if( (timeout_ = seconds) > 0 )
+    timeout_ = seconds;
+    if (timeout_ > 0)
       non_blocking_flag_ = true;
   }
 
