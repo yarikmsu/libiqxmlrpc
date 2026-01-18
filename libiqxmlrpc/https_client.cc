@@ -82,7 +82,7 @@ void Https_proxy_client_connection::setup_tunnel()
   }
   while( !resp_packet );
 
-  const http::Response_header* res_h =
+  const auto* res_h =
     static_cast<const http::Response_header*>(resp_packet->header());
 
   if( res_h->code() != 200 )
