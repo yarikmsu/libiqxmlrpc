@@ -8,12 +8,12 @@ void register_user_methods(iqxmlrpc::Server& server);
 
 class serverctl_stop: public iqxmlrpc::Method {
 public:
-  void execute( const iqxmlrpc::Param_list&, iqxmlrpc::Value& ) override;
+  void execute( const iqxmlrpc::Param_list&, iqxmlrpc::Value& );
 };
 
 class serverctl_log: public iqxmlrpc::Method {
 public:
-  void execute( const iqxmlrpc::Param_list&, iqxmlrpc::Value& ) override;
+  void execute( const iqxmlrpc::Param_list&, iqxmlrpc::Value& );
 };
 
 void echo_method(iqxmlrpc::Method*, const iqxmlrpc::Param_list&, iqxmlrpc::Value&);
@@ -26,7 +26,7 @@ void sleep_method(iqxmlrpc::Method*, const iqxmlrpc::Param_list&, iqxmlrpc::Valu
 
 class Get_file: public iqxmlrpc::Method {
 public:
-  void execute( const iqxmlrpc::Param_list&, iqxmlrpc::Value& ) override;
+  void execute( const iqxmlrpc::Param_list&, iqxmlrpc::Value& );
 };
 
 #endif
