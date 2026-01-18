@@ -16,6 +16,13 @@ public:
     Error_response( "Bad request", 400 ) {}
 };
 
+//! HTTP/1.1 400 Bad request - Invalid header (e.g., CRLF injection attempt)
+class LIBIQXMLRPC_API Http_header_error: public Error_response {
+public:
+  explicit Http_header_error(const std::string& reason):
+    Error_response( "Bad request: " + reason, 400 ) {}
+};
+
 //! HTTP/1.1 401 Unauthorized
 class LIBIQXMLRPC_API Unauthorized: public Error_response {
 public:
