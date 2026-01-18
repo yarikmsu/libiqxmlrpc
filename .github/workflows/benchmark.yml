@@ -28,14 +28,17 @@ on:
         default: '15'
 
 env:
-  # 15% default threshold for tighter regression detection
+  # 15% threshold for tight regression detection
+  # Local testing showed max ~8.5% variance on identical code
   REGRESSION_THRESHOLD: ${{ github.event.inputs.threshold || '15' }}
-  # These benchmarks have demonstrated CI failures due to inherent variance:
-  # - perf_*_queue_p90/p95_latency: Thread scheduling noise (20-95% variance)
-  # - perf_string_to_int_new: Sub-nanosecond measurement (~1ns, 69% variance observed)
-  # 75% threshold catches real regressions while tolerating normal CI variance
-  RELAXED_THRESHOLD: '75'
-  RELAXED_BENCHMARKS: 'perf_lockfree_queue_p90_latency,perf_lockfree_queue_p95_latency,perf_mutex_queue_p90_latency,perf_string_to_int_new'
+  # Relaxed threshold for high-variance benchmarks (tier 1)
+  # perf_lockfree_queue_p90_latency: ~37% CI variance observed (scheduler jitter)
+  RELAXED_THRESHOLD: '25'
+  RELAXED_BENCHMARKS: 'perf_lockfree_queue_p90_latency'
+  # Very high variance benchmarks (tier 2)
+  # perf_string_to_int_new: extreme variance on CI (~70%)
+  RELAXED_THRESHOLD_2: '70'
+  RELAXED_BENCHMARKS_2: 'perf_string_to_int_new'
 
 jobs:
   benchmark:
@@ -151,6 +154,7 @@ jobs:
         echo "Comparing PR results against master branch..."
         echo "Default threshold: ${REGRESSION_THRESHOLD}%"
         echo "Relaxed threshold: ${RELAXED_THRESHOLD}% for: ${RELAXED_BENCHMARKS}"
+        echo "Relaxed threshold 2: ${RELAXED_THRESHOLD_2}% for: ${RELAXED_BENCHMARKS_2}"
         # Run comparison and capture exit code
         # Exit 0 = pass, Exit 1 = regression detected, Exit 2 = script error
         exit_code=0
@@ -160,6 +164,8 @@ jobs:
           --threshold="${REGRESSION_THRESHOLD}" \
           --relaxed-threshold="${RELAXED_THRESHOLD}" \
           --relaxed-benchmarks="${RELAXED_BENCHMARKS}" \
+          --relaxed-threshold-2="${RELAXED_THRESHOLD_2}" \
+          --relaxed-benchmarks-2="${RELAXED_BENCHMARKS_2}" \
           --github-actions | tee benchmark_report.txt || exit_code=$?
         if [ "$exit_code" -eq 1 ]; then
           echo "has_regression=true" >> "$GITHUB_OUTPUT"
