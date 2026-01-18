@@ -47,6 +47,9 @@ ResponseBuilder::do_visit_element(const std::string& tagname)
   case FAULT_RESPONSE_VALUE:
     parse_fault();
     break;
+
+  default:
+    break;
   }
 }
 
