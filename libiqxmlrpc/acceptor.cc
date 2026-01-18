@@ -68,6 +68,7 @@ void Acceptor::accept()
       new_sock.shutdown();
     }
 
+    new_sock.close();  // Close socket to prevent file descriptor leak
     return;
   }
 
