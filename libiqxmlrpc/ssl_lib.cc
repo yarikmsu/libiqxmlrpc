@@ -75,12 +75,12 @@ openssl_id_function()
 LockContainer::~LockContainer()
 {
   if (CRYPTO_get_locking_callback() == &openssl_lock_callback) {
-    CRYPTO_set_locking_callback(nullptr);
+    CRYPTO_set_locking_callback(0);
   }
 
 #ifndef _WIN32
   if (CRYPTO_get_id_callback() == &openssl_id_function) {
-    CRYPTO_set_id_callback(nullptr);
+    CRYPTO_set_id_callback(0);
   }
 #endif
 
@@ -112,10 +112,10 @@ init_library()
 #endif
 #else
   // OpenSSL 1.1.0+ initializes automatically
-  OPENSSL_init_ssl(0, nullptr);
+  OPENSSL_init_ssl(0, NULL);
 #endif
 
-  iqxmlrpc_ssl_data_idx = SSL_get_ex_new_index(0, const_cast<void*>(static_cast<const void*>("iqxmlrpc verifier")), nullptr, nullptr, nullptr);
+  iqxmlrpc_ssl_data_idx = SSL_get_ex_new_index(0, const_cast<void*>(static_cast<const void*>("iqxmlrpc verifier")), NULL, NULL, NULL);
 }
 
 //
@@ -196,8 +196,8 @@ set_server_cipher_options(SSL_CTX* ctx)
 int
 iqxmlrpc_SSL_verify(int prev_ok, X509_STORE_CTX* ctx)
 {
-  auto ssl = reinterpret_cast<SSL*>(X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
-  auto v = reinterpret_cast<const ConnectionVerifier*>(SSL_get_ex_data(ssl, iqxmlrpc_ssl_data_idx));
+  SSL* ssl = reinterpret_cast<SSL*>(X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
+  const ConnectionVerifier* v = reinterpret_cast<const ConnectionVerifier*>(SSL_get_ex_data(ssl, iqxmlrpc_ssl_data_idx));
   return v->verify(prev_ok, ctx);
 }
 
@@ -207,7 +207,9 @@ iqxmlrpc_SSL_verify(int prev_ok, X509_STORE_CTX* ctx)
 // ConnectionVerifier
 //
 
-ConnectionVerifier::~ConnectionVerifier() = default;
+ConnectionVerifier::~ConnectionVerifier()
+{
+}
 
 int
 ConnectionVerifier::verify(bool prev_ok, X509_STORE_CTX* ctx) const
@@ -307,7 +309,9 @@ Ctx::Ctx():
 }
 
 
-Ctx::~Ctx() = default;
+Ctx::~Ctx()
+{
+}
 
 SSL_CTX*
 Ctx::context()
@@ -341,7 +345,7 @@ Ctx::prepare_verify(SSL* ssl, bool server)
     SSL_set_verify(ssl, mode, iqxmlrpc_SSL_verify);
     SSL_set_ex_data(ssl, iqxmlrpc_ssl_data_idx, const_cast<void*>(static_cast<const void*>(v)));
   } else {
-    SSL_set_verify(ssl, mode, nullptr);
+    SSL_set_verify(ssl, mode, 0);
   }
 }
 
@@ -427,7 +431,7 @@ Ctx::prepare_sni(SSL* ssl)
 }
 
 // ----------------------------------------------------------------------------
-exception::exception() noexcept:
+exception::exception() throw():
   ssl_err( ERR_get_error() ),
   msg( ERR_reason_error_string(ssl_err) )
 {
@@ -435,7 +439,7 @@ exception::exception() noexcept:
 }
 
 
-exception::exception( unsigned long err ) noexcept:
+exception::exception( unsigned long err ) throw():
   ssl_err(err),
   msg()
 {
@@ -445,7 +449,7 @@ exception::exception( unsigned long err ) noexcept:
 }
 
 
-exception::exception( const std::string& msg_ ) noexcept:
+exception::exception( const std::string& msg_ ) throw():
   ssl_err(0),
   msg( msg_ )
 {

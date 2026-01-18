@@ -62,14 +62,15 @@ void Value_type_to_xml::do_visit_struct(const Struct& s)
 {
   XmlNode st(builder_, "struct");
 
+  typedef Struct::const_iterator CI;
   // Reuse single visitor instance like do_visit_array() does
   Value_type_to_xml vis(builder_, server_mode_);
 
-  for (const auto& [key, value] : s)
+  for(CI i = s.begin(); i != s.end(); ++i )
   {
     XmlNode member(builder_, "member");
-    add_textnode("name", key);
-    value->apply_visitor(vis);
+    add_textnode("name", i->first);
+    i->second->apply_visitor(vis);
   }
 }
 
@@ -78,10 +79,11 @@ void Value_type_to_xml::do_visit_array(const Array& a)
   XmlNode arr(builder_, "array");
   XmlNode data(builder_, "data");
 
+  typedef Array::const_iterator CI;
   Value_type_to_xml vis(builder_, server_mode_);
 
-  for (const auto& elem : a) {
-    elem.apply_visitor(vis);
+  for(CI i = a.begin(); i != a.end(); ++i ) {
+    i->apply_visitor(vis);
   }
 }
 

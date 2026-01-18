@@ -29,7 +29,7 @@ void Value::set_default_int(int dint)
 
 Int* Value::get_default_int()
 {
-  return ValueOptions::default_int ? new Int(*ValueOptions::default_int) : nullptr;
+  return ValueOptions::default_int ? new Int(*ValueOptions::default_int) : 0;
 }
 
 void Value::drop_default_int()
@@ -44,7 +44,7 @@ void Value::set_default_int64(int64_t dint)
 
 Int64* Value::get_default_int64()
 {
-  return ValueOptions::default_int64 ? new Int64(*ValueOptions::default_int64) : nullptr;
+  return ValueOptions::default_int64 ? new Int64(*ValueOptions::default_int64) : 0;
 }
 
 void Value::drop_default_int64()

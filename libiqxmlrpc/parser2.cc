@@ -114,7 +114,7 @@ public:
 #if (LIBXML_VERSION < 20703)
 #define XML_PARSE_HUGE 0
 #endif
-    reader = xmlReaderForMemory(buf2, sz, nullptr, nullptr, XML_PARSE_NONET | XML_PARSE_HUGE);
+    reader = xmlReaderForMemory(buf2, sz, 0, 0, XML_PARSE_NONET | XML_PARSE_HUGE);
     xmlTextReaderSetParserProp(reader, XML_PARSER_SUBST_ENTITIES, 0); // No XXE
   }
 
@@ -306,7 +306,7 @@ StateMachine::change(const std::string& tag)
 {
   bool found = false;
   size_t i = 0;
-  for (; trans_[i].tag != nullptr; ++i) {
+  for (; trans_[i].tag != 0; ++i) {
     if (trans_[i].tag == tag && trans_[i].prev_state == curr_) {
       found = true;
       break;

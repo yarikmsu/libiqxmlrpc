@@ -30,7 +30,7 @@ RequestBuilder::RequestBuilder(Parser& parser):
     { PARAMS, PARAM, "param" },
     { PARAM, VALUE, "value" },
     { VALUE, PARAM, "param" },
-    { 0, 0, nullptr }
+    { 0, 0, 0 }
   };
   state_.set_transitions(trans);
 }

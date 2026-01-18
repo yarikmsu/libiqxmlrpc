@@ -39,7 +39,7 @@ public:
   Inet_addr( const std::string& host, int port = 0 );
   explicit Inet_addr( int port );
 
-  virtual ~Inet_addr() = default;
+  virtual ~Inet_addr() {}
 
   const struct sockaddr_in* get_sockaddr() const;
   const std::string& get_host_name() const;

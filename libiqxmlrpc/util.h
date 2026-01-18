@@ -61,7 +61,7 @@ public:
   Ptr release()
   {
     Ptr p(p_);
-    p_ = nullptr;
+    p_ = 0;
     return p;
   }
 };
@@ -79,7 +79,7 @@ public:
   explicit LockedBool(bool default_):
     val(default_) {}
 
-  ~LockedBool() = default;
+  ~LockedBool() {}
 
   operator bool()
   {

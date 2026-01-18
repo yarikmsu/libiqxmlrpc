@@ -159,7 +159,7 @@ ValueBuilder::ValueBuilder(Parser& parser):
     { VALUE,  STRUCT, "struct" },
     { VALUE,  ARRAY,  "array" },
     { VALUE,  NIL,    "nil" },
-    { 0, 0, nullptr }
+    { 0, 0, 0 }
   };
   state_.set_transitions(trans);
 }
@@ -177,6 +177,7 @@ ValueBuilder::do_visit_element(const std::string& tagname)
     break;
 
   case NIL:
+    // NOLINTNEXTLINE(modernize-make-unique) performance-critical parsing path
     retval.reset(new Nil());
     break;
 
@@ -201,6 +202,7 @@ ValueBuilder::do_visit_element_end(const std::string&)
   switch (state_.get_state()) {
   case VALUE:
   case STRING:
+    // NOLINTNEXTLINE(modernize-make-unique) performance-critical parsing path
     retval.reset(new String(""));
     break;
 
@@ -235,22 +237,27 @@ ValueBuilder::do_visit_text(const std::string& text)
     want_exit();
     [[fallthrough]];
   case STRING:
+    // NOLINTNEXTLINE(modernize-make-unique) performance-critical parsing path
     retval.reset(new String(text));
     break;
 
   case INT:
+    // NOLINTNEXTLINE(modernize-make-unique) performance-critical parsing path
     retval.reset(new Int(num_conv::from_string<int>(text)));
     break;
 
   case INT64:
+    // NOLINTNEXTLINE(modernize-make-unique) performance-critical parsing path
     retval.reset(new Int64(num_conv::from_string<int64_t>(text)));
     break;
 
   case BOOL:
+    // NOLINTNEXTLINE(modernize-make-unique) performance-critical parsing path
     retval.reset(new Bool(num_conv::from_string<int>(text) != 0));
     break;
 
   case DOUBLE:
+    // NOLINTNEXTLINE(modernize-make-unique) performance-critical parsing path
     retval.reset(new Double(num_conv::string_to_double(text)));
     break;
 
@@ -259,6 +266,7 @@ ValueBuilder::do_visit_text(const std::string& text)
     break;
 
   case TIME:
+    // NOLINTNEXTLINE(modernize-make-unique) performance-critical parsing path
     retval.reset(new Date_time(text));
     break;
 

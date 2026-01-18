@@ -142,7 +142,7 @@ inline void Https_client_connection::reg_send_request()
 http::Packet* Https_client_connection::do_process_session( const std::string& s )
 {
   out_str = s;
-  resp_packet = nullptr;
+  resp_packet = 0;
 
   if( established )
     reg_send_request();

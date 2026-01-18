@@ -149,9 +149,10 @@ Method* Method_dispatcher_manager::create_method(const Method::Data& mdata)
     throw Unknown_method(mdata.method_name);  // Sanitized in exception
   }
 
-  for (const auto& dispatcher : impl_->dispatchers)
+  typedef Impl::DispatchersSet::iterator I;
+  for (I i = impl_->dispatchers.begin(); i != impl_->dispatchers.end(); ++i)
   {
-    Method* tmp = dispatcher->create_method(mdata);
+    Method* tmp = (*i)->create_method(mdata);
     if (tmp)
       return tmp;
   }
@@ -161,9 +162,9 @@ Method* Method_dispatcher_manager::create_method(const Method::Data& mdata)
 
 void Method_dispatcher_manager::get_methods_list(Array& retval) const
 {
-  // cppcheck-suppress constVariableReference
-  for (const auto& dispatcher : impl_->dispatchers)
-    dispatcher->get_methods_list(retval);
+  typedef Impl::DispatchersSet::const_iterator CI;
+  for (CI i = impl_->dispatchers.begin(); i != impl_->dispatchers.end(); ++i)
+    (*i)->get_methods_list(retval);
 }
 
 void Method_dispatcher_manager::enable_introspection()

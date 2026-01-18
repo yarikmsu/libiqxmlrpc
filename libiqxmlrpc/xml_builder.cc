@@ -28,7 +28,7 @@ throwBuildError(T res, T err_res)
 XmlBuilder::Node::Node(XmlBuilder& w, const char* name):
   ctx(w)
 {
-  auto xname = reinterpret_cast<const xmlChar*>(name);
+  const xmlChar* xname = reinterpret_cast<const xmlChar*>(name);
   throwBuildError(xmlTextWriterStartElement(ctx.writer, xname), -1);
 }
 
@@ -52,7 +52,7 @@ XmlBuilder::XmlBuilder():
   writer(nullptr)
 {
   throwBuildError(writer = xmlNewTextWriterMemory(buf, 0), static_cast<xmlTextWriter*>(nullptr));
-  throwBuildError(xmlTextWriterStartDocument(writer, nullptr, "UTF-8", nullptr), -1);
+  throwBuildError(xmlTextWriterStartDocument(writer, NULL, "UTF-8", NULL), -1);
 }
 
 XmlBuilder::~XmlBuilder()
@@ -64,7 +64,7 @@ XmlBuilder::~XmlBuilder()
 void
 XmlBuilder::add_textdata(const std::string& data)
 {
-  auto xdata = reinterpret_cast<const xmlChar*>(data.c_str());
+  const xmlChar* xdata = reinterpret_cast<const xmlChar*>(data.c_str());
   throwBuildError(xmlTextWriterWriteString(writer, xdata), -1);
 }
 
@@ -78,7 +78,7 @@ std::string
 XmlBuilder::content() const
 {
   xmlTextWriterFlush(writer);
-  auto cdata = reinterpret_cast<const char*>(xmlBufferContent(buf));
+  const char* cdata = reinterpret_cast<const char*>(xmlBufferContent(buf));
   return std::string(cdata, buf->use);
 }
 

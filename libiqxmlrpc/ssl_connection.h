@@ -86,7 +86,7 @@ class LIBIQXMLRPC_API Reaction_connection: public ssl::Connection {
   size_t buf_len = 0;
 
 public:
-  Reaction_connection( const Socket&, Reactor_base* = nullptr );
+  Reaction_connection( const Socket&, Reactor_base* = 0 );
 
   Reaction_connection(const Reaction_connection&) = delete;
   Reaction_connection& operator=(const Reaction_connection&) = delete;

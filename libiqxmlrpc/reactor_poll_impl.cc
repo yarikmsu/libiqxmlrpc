@@ -63,15 +63,15 @@ bool Reactor_poll_impl::poll(HandlerStateList& out, Reactor_base::Timeout to_ms)
     break;  // Success - exit loop to process results
   } while (true);
 
-  for (const auto& pfd_entry : impl->pfd)
+  for( unsigned i = 0; i < impl->pfd.size(); i++ )
   {
-    if( pfd_entry.revents )
+    if( impl->pfd[i].revents )
     {
-      Reactor_base::HandlerState hs(pfd_entry.fd);
-      hs.revents |= (pfd_entry.revents & POLLIN)  ? Reactor_base::INPUT : 0;
-      hs.revents |= (pfd_entry.revents & POLLOUT) ? Reactor_base::OUTPUT : 0;
-      hs.revents |= (pfd_entry.revents & POLLERR) ? Reactor_base::OUTPUT : 0;
-      hs.revents |= (pfd_entry.revents & POLLHUP) ? Reactor_base::OUTPUT : 0;
+      Reactor_base::HandlerState hs(impl->pfd[i].fd);
+      hs.revents |= (impl->pfd[i].revents & POLLIN)  ? Reactor_base::INPUT : 0;
+      hs.revents |= (impl->pfd[i].revents & POLLOUT) ? Reactor_base::OUTPUT : 0;
+      hs.revents |= (impl->pfd[i].revents & POLLERR) ? Reactor_base::OUTPUT : 0;
+      hs.revents |= (impl->pfd[i].revents & POLLHUP) ? Reactor_base::OUTPUT : 0;
       out.push_back( hs );
     }
   }

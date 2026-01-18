@@ -288,7 +288,7 @@ public:
     Packet( new Response_header(code, phrase), "" ),
     Exception( "HTTP: " + phrase ) {}
 
-  ~Error_response() noexcept override = default;
+  ~Error_response() throw() override = default;
 
   const Response_header* response_header() const
   {

@@ -16,7 +16,7 @@ namespace iqxmlrpc {
  */
 class LIBIQXMLRPC_API Value_type_visitor {
 public:
-  virtual ~Value_type_visitor() = default;
+  virtual ~Value_type_visitor() {}
 
   void visit_value(const Value_type& v)
   {

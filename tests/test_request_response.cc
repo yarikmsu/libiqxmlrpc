@@ -4,9 +4,13 @@
 #include <boost/test/unit_test.hpp>
 #include "libiqxmlrpc/request.h"
 #include "libiqxmlrpc/response.h"
+#include "test_utils.h"
 
 using namespace boost::unit_test;
 using namespace iqxmlrpc;
+using iqxmlrpc::test::OmitStringTagGuard;
+using iqxmlrpc::test::DefaultIntGuard;
+using iqxmlrpc::test::DefaultInt64Guard;
 
 BOOST_AUTO_TEST_SUITE(request_tests)
 
@@ -705,8 +709,7 @@ BOOST_AUTO_TEST_SUITE(server_mode_serialization)
 
 BOOST_AUTO_TEST_CASE(response_string_without_omit_tag)
 {
-    // Default: omit_string_tag_in_responses is false
-    bool original = Value::omit_string_tag_in_responses();
+    OmitStringTagGuard guard;  // RAII ensures restoration even on failure
     Value::omit_string_tag_in_responses(false);
 
     Response resp(new Value("test string"));
@@ -715,14 +718,11 @@ BOOST_AUTO_TEST_CASE(response_string_without_omit_tag)
     // Should have <string> tag
     BOOST_CHECK(xml.find("<string>") != std::string::npos);
     BOOST_CHECK(xml.find("</string>") != std::string::npos);
-
-    Value::omit_string_tag_in_responses(original);
 }
 
 BOOST_AUTO_TEST_CASE(response_string_with_omit_tag)
 {
-    // When omit_string_tag_in_responses is true, server responses omit <string> tag
-    bool original = Value::omit_string_tag_in_responses();
+    OmitStringTagGuard guard;  // RAII ensures restoration even on failure
     Value::omit_string_tag_in_responses(true);
 
     Response resp(new Value("test string"));
@@ -733,14 +733,11 @@ BOOST_AUTO_TEST_CASE(response_string_with_omit_tag)
     BOOST_CHECK(xml.find("</string>") == std::string::npos);
     // But should still have the string content within <value>
     BOOST_CHECK(xml.find("test string") != std::string::npos);
-
-    Value::omit_string_tag_in_responses(original);
 }
 
 BOOST_AUTO_TEST_CASE(response_string_with_omit_tag_roundtrip)
 {
-    // Verify that strings without <string> tag can be parsed
-    bool original = Value::omit_string_tag_in_responses();
+    OmitStringTagGuard guard;  // RAII ensures restoration even on failure
     Value::omit_string_tag_in_responses(true);
 
     Response resp(new Value("roundtrip test"));
@@ -750,14 +747,11 @@ BOOST_AUTO_TEST_CASE(response_string_with_omit_tag_roundtrip)
     BOOST_CHECK(!parsed.is_fault());
     BOOST_CHECK(parsed.value().is_string());
     BOOST_CHECK_EQUAL(parsed.value().get_string(), "roundtrip test");
-
-    Value::omit_string_tag_in_responses(original);
 }
 
 BOOST_AUTO_TEST_CASE(response_struct_with_string_omit_tag)
 {
-    // Struct members should also respect omit_string_tag in server mode
-    bool original = Value::omit_string_tag_in_responses();
+    OmitStringTagGuard guard;  // RAII ensures restoration even on failure
     Value::omit_string_tag_in_responses(true);
 
     Struct s;
@@ -768,14 +762,11 @@ BOOST_AUTO_TEST_CASE(response_struct_with_string_omit_tag)
     // String values in struct should not have <string> tag
     BOOST_CHECK(xml.find("<string>") == std::string::npos);
     BOOST_CHECK(xml.find("value") != std::string::npos);
-
-    Value::omit_string_tag_in_responses(original);
 }
 
 BOOST_AUTO_TEST_CASE(response_array_with_string_omit_tag)
 {
-    // Array elements should also respect omit_string_tag in server mode
-    bool original = Value::omit_string_tag_in_responses();
+    OmitStringTagGuard guard;  // RAII ensures restoration even on failure
     Value::omit_string_tag_in_responses(true);
 
     Array arr;
@@ -788,14 +779,11 @@ BOOST_AUTO_TEST_CASE(response_array_with_string_omit_tag)
     BOOST_CHECK(xml.find("<string>") == std::string::npos);
     BOOST_CHECK(xml.find("first") != std::string::npos);
     BOOST_CHECK(xml.find("second") != std::string::npos);
-
-    Value::omit_string_tag_in_responses(original);
 }
 
 BOOST_AUTO_TEST_CASE(response_fault_with_string_omit_tag)
 {
-    // Fault strings should also respect omit_string_tag
-    bool original = Value::omit_string_tag_in_responses();
+    OmitStringTagGuard guard;  // RAII ensures restoration even on failure
     Value::omit_string_tag_in_responses(true);
 
     Response resp(500, "Server error message");
@@ -804,8 +792,6 @@ BOOST_AUTO_TEST_CASE(response_fault_with_string_omit_tag)
     // Fault string should not have <string> tag
     BOOST_CHECK(xml.find("<string>") == std::string::npos);
     BOOST_CHECK(xml.find("Server error message") != std::string::npos);
-
-    Value::omit_string_tag_in_responses(original);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
@@ -814,6 +800,7 @@ BOOST_AUTO_TEST_SUITE(parser_state_machine_tests)
 
 BOOST_AUTO_TEST_CASE(parse_empty_int_with_default)
 {
+    DefaultIntGuard guard;  // RAII ensures cleanup even on failure
     Value::set_default_int(42);
     std::string xml =
         "<?xml version=\"1.0\"?>"
@@ -821,11 +808,11 @@ BOOST_AUTO_TEST_CASE(parse_empty_int_with_default)
     Response resp = parse_response(xml);
     BOOST_CHECK(resp.value().is_int());
     BOOST_CHECK_EQUAL(resp.value().get_int(), 42);
-    Value::drop_default_int();
 }
 
 BOOST_AUTO_TEST_CASE(parse_empty_int64_with_default)
 {
+    DefaultInt64Guard guard;  // RAII ensures cleanup even on failure
     Value::set_default_int64(9876543210LL);
     std::string xml =
         "<?xml version=\"1.0\"?>"
@@ -833,12 +820,11 @@ BOOST_AUTO_TEST_CASE(parse_empty_int64_with_default)
     Response resp = parse_response(xml);
     BOOST_CHECK(resp.value().is_int64());
     BOOST_CHECK_EQUAL(resp.value().get_int64(), 9876543210LL);
-    Value::drop_default_int64();
 }
 
 BOOST_AUTO_TEST_CASE(parse_empty_int_without_default_throws)
 {
-    Value::drop_default_int();
+    DefaultIntGuard guard;  // RAII ensures cleanup even on failure
     std::string xml =
         "<?xml version=\"1.0\"?>"
         "<methodResponse><params><param><value><i4></i4></value></param></params></methodResponse>";
@@ -847,7 +833,7 @@ BOOST_AUTO_TEST_CASE(parse_empty_int_without_default_throws)
 
 BOOST_AUTO_TEST_CASE(parse_empty_int64_without_default_throws)
 {
-    Value::drop_default_int64();
+    DefaultInt64Guard guard;  // RAII ensures cleanup even on failure
     std::string xml =
         "<?xml version=\"1.0\"?>"
         "<methodResponse><params><param><value><i8></i8></value></param></params></methodResponse>";
@@ -1052,6 +1038,232 @@ BOOST_AUTO_TEST_CASE(parse_invalid_root_element_throws)
 
     BOOST_CHECK_THROW(parse_request(xml), XML_RPC_violation);
     BOOST_CHECK_THROW(parse_response(xml), XML_RPC_violation);
+}
+
+// Test parsing fault with wrong field names
+// Covers response_parser.cc line 74 (fault struct field validation)
+BOOST_AUTO_TEST_CASE(parse_fault_wrong_field_name_throws)
+{
+    // Fault with wrong field name instead of faultCode
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse>"
+        "<fault><value><struct>"
+        "<member><name>errorCode</name><value><int>500</int></value></member>"
+        "<member><name>faultString</name><value><string>Error</string></value></member>"
+        "</struct></value></fault>"
+        "</methodResponse>";
+
+    BOOST_CHECK_THROW(parse_response(xml), XML_RPC_violation);
+}
+
+// Test parsing fault with missing faultString field
+BOOST_AUTO_TEST_CASE(parse_fault_missing_field_throws)
+{
+    // Fault with only faultCode, missing faultString
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse>"
+        "<fault><value><struct>"
+        "<member><name>faultCode</name><value><int>500</int></value></member>"
+        "</struct></value></fault>"
+        "</methodResponse>";
+
+    BOOST_CHECK_THROW(parse_response(xml), XML_RPC_violation);
+}
+
+// Test parsing fault with extra fields is rejected (strict validation)
+// Covers response_parser.cc line 73 (s.size() != 2 check)
+BOOST_AUTO_TEST_CASE(parse_fault_extra_fields_rejected)
+{
+    // Fault with extra field - libiqxmlrpc uses strict validation
+    // requiring exactly 2 fields (faultCode and faultString)
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodResponse>"
+        "<fault><value><struct>"
+        "<member><name>faultCode</name><value><int>500</int></value></member>"
+        "<member><name>faultString</name><value><string>Error</string></value></member>"
+        "<member><name>extra</name><value><string>Ignored</string></value></member>"
+        "</struct></value></fault>"
+        "</methodResponse>";
+
+    // Strict validation rejects extra fields (s.size() != 2)
+    BOOST_CHECK_THROW(parse_response(xml), XML_RPC_violation);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+//=============================================================================
+// Additional coverage tests for request_parser.cc
+// These tests exercise the emplace_back path with complex parameter types
+//=============================================================================
+
+BOOST_AUTO_TEST_SUITE(request_parser_coverage_tests)
+
+// Test request parsing with struct parameter
+// Covers request_parser.cc line 47 (emplace_back with struct)
+BOOST_AUTO_TEST_CASE(parse_request_with_struct_param)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodCall>"
+        "<methodName>test.struct</methodName>"
+        "<params>"
+        "<param><value><struct>"
+        "<member><name>key1</name><value><i4>42</i4></value></member>"
+        "<member><name>key2</name><value><string>hello</string></value></member>"
+        "</struct></value></param>"
+        "</params>"
+        "</methodCall>";
+
+    std::unique_ptr<Request> req(parse_request(xml));
+    BOOST_REQUIRE(req != nullptr);
+    BOOST_CHECK_EQUAL(req->get_name(), "test.struct");
+    BOOST_CHECK_EQUAL(req->get_params().size(), 1u);
+    BOOST_CHECK(req->get_params()[0].is_struct());
+    BOOST_CHECK_EQUAL(req->get_params()[0]["key1"].get_int(), 42);
+    BOOST_CHECK_EQUAL(req->get_params()[0]["key2"].get_string(), "hello");
+}
+
+// Test request parsing with array parameter
+// Covers request_parser.cc line 47 (emplace_back with array)
+BOOST_AUTO_TEST_CASE(parse_request_with_array_param)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodCall>"
+        "<methodName>test.array</methodName>"
+        "<params>"
+        "<param><value><array><data>"
+        "<value><i4>1</i4></value>"
+        "<value><i4>2</i4></value>"
+        "<value><i4>3</i4></value>"
+        "</data></array></value></param>"
+        "</params>"
+        "</methodCall>";
+
+    std::unique_ptr<Request> req(parse_request(xml));
+    BOOST_REQUIRE(req != nullptr);
+    BOOST_CHECK_EQUAL(req->get_name(), "test.array");
+    BOOST_CHECK_EQUAL(req->get_params().size(), 1u);
+    BOOST_CHECK(req->get_params()[0].is_array());
+    BOOST_CHECK_EQUAL(req->get_params()[0].size(), 3u);
+    BOOST_CHECK_EQUAL(req->get_params()[0][0].get_int(), 1);
+    BOOST_CHECK_EQUAL(req->get_params()[0][2].get_int(), 3);
+}
+
+// Test request parsing with nested struct in array
+// Covers multiple emplace_back invocations with complex nested types
+BOOST_AUTO_TEST_CASE(parse_request_nested_complex)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodCall>"
+        "<methodName>test.nested</methodName>"
+        "<params>"
+        "<param><value><array><data>"
+        "<value><struct>"
+        "<member><name>id</name><value><i4>1</i4></value></member>"
+        "</struct></value>"
+        "<value><struct>"
+        "<member><name>id</name><value><i4>2</i4></value></member>"
+        "</struct></value>"
+        "</data></array></value></param>"
+        "</params>"
+        "</methodCall>";
+
+    std::unique_ptr<Request> req(parse_request(xml));
+    BOOST_REQUIRE(req != nullptr);
+    BOOST_CHECK_EQUAL(req->get_params().size(), 1u);
+    BOOST_CHECK(req->get_params()[0].is_array());
+    BOOST_CHECK_EQUAL(req->get_params()[0].size(), 2u);
+    BOOST_CHECK(req->get_params()[0][0].is_struct());
+    BOOST_CHECK_EQUAL(req->get_params()[0][0]["id"].get_int(), 1);
+    BOOST_CHECK_EQUAL(req->get_params()[0][1]["id"].get_int(), 2);
+}
+
+// Test request parsing with many parameters
+// Exercises multiple emplace_back calls in sequence
+BOOST_AUTO_TEST_CASE(parse_request_many_params)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodCall>"
+        "<methodName>test.many</methodName>"
+        "<params>"
+        "<param><value><i4>1</i4></value></param>"
+        "<param><value><string>two</string></value></param>"
+        "<param><value><boolean>1</boolean></value></param>"
+        "<param><value><double>4.0</double></value></param>"
+        "<param><value><i4>5</i4></value></param>"
+        "</params>"
+        "</methodCall>";
+
+    std::unique_ptr<Request> req(parse_request(xml));
+    BOOST_REQUIRE(req != nullptr);
+    BOOST_CHECK_EQUAL(req->get_params().size(), 5u);
+    BOOST_CHECK_EQUAL(req->get_params()[0].get_int(), 1);
+    BOOST_CHECK_EQUAL(req->get_params()[1].get_string(), "two");
+    BOOST_CHECK_EQUAL(req->get_params()[2].get_bool(), true);
+    BOOST_CHECK_CLOSE(req->get_params()[3].get_double(), 4.0, 0.001);
+    BOOST_CHECK_EQUAL(req->get_params()[4].get_int(), 5);
+}
+
+// Test request parsing with datetime and binary parameters
+BOOST_AUTO_TEST_CASE(parse_request_datetime_binary)
+{
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodCall>"
+        "<methodName>test.datetime</methodName>"
+        "<params>"
+        "<param><value><dateTime.iso8601>20260108T12:30:45</dateTime.iso8601></value></param>"
+        "<param><value><base64>SGVsbG8=</base64></value></param>"
+        "</params>"
+        "</methodCall>";
+
+    std::unique_ptr<Request> req(parse_request(xml));
+    BOOST_REQUIRE(req != nullptr);
+    BOOST_CHECK_EQUAL(req->get_params().size(), 2u);
+    BOOST_CHECK(req->get_params()[0].is_datetime());
+    BOOST_CHECK(req->get_params()[1].is_binary());
+    BOOST_CHECK_EQUAL(req->get_params()[1].get_binary().get_data(), "Hello");
+}
+
+// Test roundtrip with complex request containing all types
+BOOST_AUTO_TEST_CASE(request_complex_roundtrip)
+{
+    // Build a complex request
+    Param_list params;
+    params.push_back(Value(42));
+    params.push_back(Value("string"));
+    params.push_back(Value(true));
+    params.push_back(Value(3.14));
+
+    Struct s;
+    s.insert("nested_key", Value("nested_value"));
+    params.push_back(Value(s));
+
+    Array arr;
+    arr.push_back(Value(1));
+    arr.push_back(Value(2));
+    params.push_back(Value(arr));
+
+    Request orig("test.complex", params);
+
+    // Serialize and parse back
+    std::string xml = dump_request(orig);
+    std::unique_ptr<Request> parsed(parse_request(xml));
+
+    BOOST_REQUIRE(parsed != nullptr);
+    BOOST_CHECK_EQUAL(parsed->get_name(), "test.complex");
+    BOOST_CHECK_EQUAL(parsed->get_params().size(), 6u);
+    BOOST_CHECK_EQUAL(parsed->get_params()[0].get_int(), 42);
+    BOOST_CHECK_EQUAL(parsed->get_params()[1].get_string(), "string");
+    BOOST_CHECK_EQUAL(parsed->get_params()[2].get_bool(), true);
+    BOOST_CHECK(parsed->get_params()[4].is_struct());
+    BOOST_CHECK(parsed->get_params()[5].is_array());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

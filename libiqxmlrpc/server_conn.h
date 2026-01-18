@@ -121,7 +121,7 @@ public:
     reactor = r;
   }
 
-  void post_create( Transport* c ) override
+  void post_create( Transport* c )
   {
     c->set_server( server );
     c->set_reactor( reactor );

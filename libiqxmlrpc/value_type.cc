@@ -12,7 +12,7 @@
 #include <charconv>
 #include <chrono>
 #include <ctime>
-#include <cstring>
+#include <string.h>
 
 namespace iqxmlrpc {
 namespace type_names {
@@ -150,7 +150,7 @@ Array& Array::operator =( const Array& other )
 }
 
 
-void Array::swap( Array& other) noexcept
+void Array::swap( Array& other) throw()
 {
   values.swap(other.values);
 }
@@ -225,10 +225,13 @@ Struct& Struct::operator =( const Struct& other )
 }
 
 
-Struct::~Struct() = default;
+Struct::~Struct()
+{
+  // unique_ptr elements are automatically destroyed by map destructor
+}
 
 
-void Struct::swap( Struct& other ) noexcept
+void Struct::swap( Struct& other ) throw()
 {
   values.swap(other.values);
 }
@@ -266,7 +269,7 @@ bool Struct::has_field( const std::string& f ) const
 
 const Value& Struct::operator []( const std::string& f ) const
 {
-  auto i = values.find(f);
+  const_iterator i = values.find(f);
 
   if( i == values.end() )
     throw No_field( f );
@@ -277,7 +280,7 @@ const Value& Struct::operator []( const std::string& f ) const
 
 Value& Struct::operator []( const std::string& f )
 {
-  auto i = values.find(f);
+  const_iterator i = values.find(f);
 
   if( i == values.end() )
     throw No_field( f );
@@ -452,7 +455,7 @@ void Binary_data::encode() const
 // Optimized decode using lookup table - no exceptions, direct buffer write
 void Binary_data::decode()
 {
-  auto src = reinterpret_cast<const unsigned char*>(base64.data());
+  const unsigned char* src = reinterpret_cast<const unsigned char*>(base64.data());
   const size_t src_len = base64.length();
 
   // Reserve space (decoded is at most 3/4 of base64 size)
@@ -599,11 +602,11 @@ Date_time::Date_time( const std::string& s ):
   tm_.tm_min  = parse_field(12, 2);         // mm
   tm_.tm_sec  = parse_field(15, 2);         // ss
 
-  if( (tm_.tm_year < 0) || (tm_.tm_mon < 0 || tm_.tm_mon > 11) ||
-      (tm_.tm_mday < 1 || tm_.tm_mday > 31) ||
-      (tm_.tm_hour < 0 || tm_.tm_hour > 23) ||
-      (tm_.tm_min < 0 || tm_.tm_min > 59) ||
-      (tm_.tm_sec < 0 || tm_.tm_sec > 61)
+  if( (tm_.tm_year < 0) || !(tm_.tm_mon >= 0 && tm_.tm_mon <= 11) ||
+      !(tm_.tm_mday >= 1 && tm_.tm_mday <= 31) ||
+      !(tm_.tm_hour >= 0 && tm_.tm_hour <= 23) ||
+      !(tm_.tm_min >= 0 && tm_.tm_min <= 59) ||
+      !(tm_.tm_sec >= 0 && tm_.tm_sec <= 61)
     )
     throw Malformed_iso8601();
 }

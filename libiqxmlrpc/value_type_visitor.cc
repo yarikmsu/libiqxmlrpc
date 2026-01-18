@@ -53,10 +53,11 @@ void Print_value_visitor::do_visit_struct(const Struct& s)
 {
   out_ << "{";
 
-  for (const auto& [key, value] : s)
+  typedef Struct::const_iterator CI;
+  for(CI i = s.begin(); i != s.end(); ++i )
   {
-    out_ << " '" << key << "' => ";
-    value->apply_visitor(*this);
+    out_ << " '" << i->first << "' => ";
+    i->second->apply_visitor(*this);
     out_ << ",";
   }
 
@@ -67,10 +68,11 @@ void Print_value_visitor::do_visit_array(const Array& a)
 {
   out_ << "[";
 
-  for (const auto& elem : a)
+  typedef Array::const_iterator CI;
+  for(CI i = a.begin(); i != a.end(); ++i )
   {
     out_ << " ";
-    elem.apply_visitor(*this);
+    i->apply_visitor(*this);
     out_ << ",";
   }
 
