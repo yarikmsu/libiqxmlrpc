@@ -5,9 +5,11 @@
 #include <boost/test/unit_test.hpp>
 #include "libiqxmlrpc/method.h"
 #include "libiqxmlrpc/dispatcher_manager.h"
+#include "test_utils.h"
 
 using namespace boost::unit_test;
 using namespace iqxmlrpc;
+using iqxmlrpc::test::MAX_METHOD_NAME_LEN;
 
 // Test method that returns a simple value
 class TestMethod : public Method {
@@ -134,10 +136,9 @@ BOOST_AUTO_TEST_CASE(method_throws_fault)
     Value result = Nil();
     Param_list params;
 
-    BOOST_CHECK_THROW(method.process_execution(nullptr, params, result), Fault);
-
     try {
         method.process_execution(nullptr, params, result);
+        BOOST_FAIL("Expected Fault to be thrown");
     } catch (const Fault& f) {
         BOOST_CHECK_EQUAL(f.code(), 100);
         BOOST_CHECK_EQUAL(f.what(), std::string("Test fault"));
@@ -204,19 +205,19 @@ BOOST_AUTO_TEST_CASE(interceptor_no_yield)
 BOOST_AUTO_TEST_CASE(nested_interceptors)
 {
     TestMethod method;
-    auto* outer = new TrackingInterceptor();
-    auto* inner = new TrackingInterceptor();
-    outer->nest(inner);
+    auto outer = std::make_unique<TrackingInterceptor>();
+    auto inner = std::make_unique<TrackingInterceptor>();
+    auto* inner_ptr = inner.get();  // Save for later checks
+    outer->nest(inner.release());   // Transfer ownership to outer
     Value result = Nil();
     Param_list params;
 
-    method.process_execution(outer, params, result);
+    method.process_execution(outer.get(), params, result);
 
     BOOST_CHECK_EQUAL(outer->process_count, 1);
-    BOOST_CHECK_EQUAL(inner->process_count, 1);
+    BOOST_CHECK_EQUAL(inner_ptr->process_count, 1);
     BOOST_CHECK_EQUAL(method.call_count, 1);
-
-    delete outer;  // Also deletes inner via unique_ptr
+    // outer destructor cleans up both (inner owned via nest)
 }
 
 BOOST_AUTO_TEST_CASE(modifying_interceptor)
@@ -235,23 +236,22 @@ BOOST_AUTO_TEST_CASE(modifying_interceptor)
 BOOST_AUTO_TEST_CASE(chained_modifying_interceptors)
 {
     TestMethod method;  // Returns 42
-    auto* outer = new ModifyingInterceptor();
-    auto* inner = new ModifyingInterceptor();
+    auto outer = std::make_unique<ModifyingInterceptor>();
+    auto inner = std::make_unique<ModifyingInterceptor>();
     outer->multiplier = 2;
     inner->multiplier = 3;
-    outer->nest(inner);
+    outer->nest(inner.release());  // Transfer ownership to outer
     Value result = Nil();
     Param_list params;
 
-    method.process_execution(outer, params, result);
+    method.process_execution(outer.get(), params, result);
 
     // Inner executes first (after method), then outer
     // method returns 42
     // inner multiplies by 3: 42 * 3 = 126
     // outer multiplies by 2: 126 * 2 = 252
     BOOST_CHECK_EQUAL(result.get_int(), 252);
-
-    delete outer;
+    // outer destructor cleans up both (inner owned via nest)
 }
 
 BOOST_AUTO_TEST_SUITE_END()
@@ -490,10 +490,7 @@ BOOST_AUTO_TEST_CASE(server_feedback_null_set_exit_flag)
     // Create Server_feedback with default constructor (null server)
     Server_feedback feedback;
 
-    // Calling set_exit_flag should throw Exception
-    BOOST_CHECK_THROW(feedback.set_exit_flag(), Exception);
-
-    // Verify the exception message
+    // Calling set_exit_flag should throw Exception with "null pointer" message
     try {
         feedback.set_exit_flag();
         BOOST_FAIL("Expected Exception to be thrown");
@@ -509,16 +506,175 @@ BOOST_AUTO_TEST_CASE(server_feedback_null_log_message)
     // Create Server_feedback with default constructor (null server)
     Server_feedback feedback;
 
-    // Calling log_message should throw Exception
-    BOOST_CHECK_THROW(feedback.log_message("test message"), Exception);
-
-    // Verify the exception message
+    // Calling log_message should throw Exception with "null pointer" message
     try {
         feedback.log_message("test message");
         BOOST_FAIL("Expected Exception to be thrown");
     } catch (const Exception& e) {
         BOOST_CHECK(std::string(e.what()).find("null pointer") != std::string::npos);
     }
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+//=============================================================================
+// Security tests - covers dispatcher_manager.cc security checks
+// Note: Dispatcher uses MAX_METHOD_NAME_LEN=256, exception sanitization uses 128
+// This is defense-in-depth: allow reasonable names, but truncate in error logs
+//=============================================================================
+
+BOOST_AUTO_TEST_SUITE(dispatcher_security_tests)
+
+// Test that method names at the limit are accepted
+// Covers dispatcher_manager.cc line 148: length > MAX_METHOD_NAME_LEN check
+BOOST_AUTO_TEST_CASE(method_name_at_limit_accepted)
+{
+    Method_dispatcher_manager manager;
+
+    // Register a method name exactly at the limit (MAX_METHOD_NAME_LEN chars)
+    std::string valid_name(MAX_METHOD_NAME_LEN, 'x');
+    manager.register_method(valid_name, new Method_factory<TestMethod>());
+
+    Method::Data valid_data;
+    valid_data.method_name = valid_name;
+
+    // Should succeed - MAX_METHOD_NAME_LEN chars is within the limit
+    std::unique_ptr<Method> method(manager.create_method(valid_data));
+    BOOST_REQUIRE(method != nullptr);
+    BOOST_CHECK_EQUAL(method->name(), valid_name);
+}
+
+// Test that method names exceeding the limit are rejected
+// Covers dispatcher_manager.cc lines 148-149: early rejection for oversized names
+BOOST_AUTO_TEST_CASE(method_name_over_limit_rejected)
+{
+    Method_dispatcher_manager manager;
+    manager.register_method("test.method", new Method_factory<TestMethod>());
+
+    // Create a method name exceeding the limit (MAX_METHOD_NAME_LEN + 1 chars)
+    std::string long_name(MAX_METHOD_NAME_LEN + 1, 'x');
+    Method::Data long_data;
+    long_data.method_name = long_name;
+
+    // Should throw Unknown_method due to length check (security, line 149)
+    // This check happens BEFORE iterating through dispatchers
+    BOOST_CHECK_THROW(manager.create_method(long_data), Unknown_method);
+}
+
+// Test that very long method names are rejected early (DoS prevention)
+// Covers dispatcher_manager.cc line 149: early rejection prevents CPU exhaustion
+BOOST_AUTO_TEST_CASE(method_name_dos_prevention)
+{
+    Method_dispatcher_manager manager;
+    manager.register_method("test.method", new Method_factory<TestMethod>());
+
+    // Create an extremely long method name (potential DoS vector)
+    std::string extreme_name(10000, 'a');
+    Method::Data extreme_data;
+    extreme_data.method_name = extreme_name;
+
+    // Should be rejected immediately without iterating through dispatchers
+    BOOST_CHECK_THROW(manager.create_method(extreme_data), Unknown_method);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+//=============================================================================
+// Custom dispatcher tests - covers dispatcher_manager.cc push_back() path
+// Exercises the range-based for loop over custom dispatchers
+//=============================================================================
+
+BOOST_AUTO_TEST_SUITE(custom_dispatcher_tests)
+
+// Custom dispatcher that handles methods with a specific prefix
+class PrefixDispatcher : public Method_dispatcher_base {
+    std::string prefix_;
+public:
+    explicit PrefixDispatcher(const std::string& prefix) : prefix_(prefix) {}
+
+    Method* do_create_method(const std::string& name) override {
+        if (name.find(prefix_) == 0) {
+            return new TestMethod();
+        }
+        return nullptr;
+    }
+
+    void do_get_methods_list(Array& arr) const override {
+        arr.push_back(Value(prefix_ + "example"));
+    }
+};
+
+// Test push_back() adds custom dispatcher and create_method() uses it
+// Covers dispatcher_manager.cc lines 138-141 (push_back method)
+// Covers dispatcher_manager.cc line 152 (range-based for loop over dispatchers)
+BOOST_AUTO_TEST_CASE(custom_dispatcher_push_back)
+{
+    Method_dispatcher_manager manager;
+
+    // Add a custom dispatcher that handles "custom." prefix
+    manager.push_back(new PrefixDispatcher("custom."));
+
+    Method::Data data;
+    data.method_name = "custom.mymethod";
+
+    // Should find the method via the custom dispatcher
+    std::unique_ptr<Method> method(manager.create_method(data));
+    BOOST_REQUIRE(method != nullptr);
+    BOOST_CHECK_EQUAL(method->name(), "custom.mymethod");
+}
+
+// Test multiple custom dispatchers in chain
+// Covers dispatcher_manager.cc line 164 (range-based for loop in get_methods_list)
+BOOST_AUTO_TEST_CASE(multiple_custom_dispatchers)
+{
+    Method_dispatcher_manager manager;
+
+    // Register regular method
+    manager.register_method("regular.method", new Method_factory<TestMethod>());
+
+    // Add two custom dispatchers with different prefixes
+    manager.push_back(new PrefixDispatcher("alpha."));
+    manager.push_back(new PrefixDispatcher("beta."));
+
+    // Test alpha prefix
+    Method::Data alpha_data;
+    alpha_data.method_name = "alpha.test";
+    std::unique_ptr<Method> alpha_method(manager.create_method(alpha_data));
+    BOOST_REQUIRE(alpha_method != nullptr);
+
+    // Test beta prefix
+    Method::Data beta_data;
+    beta_data.method_name = "beta.test";
+    std::unique_ptr<Method> beta_method(manager.create_method(beta_data));
+    BOOST_REQUIRE(beta_method != nullptr);
+
+    // Test that methods list includes all dispatchers
+    Array methods;
+    manager.get_methods_list(methods);
+
+    // Should have regular.method + alpha.example + beta.example
+    BOOST_CHECK_GE(methods.size(), 3u);
+
+    std::vector<std::string> names;
+    for (size_t i = 0; i < methods.size(); ++i) {
+        names.push_back(methods[i].get_string());
+    }
+
+    BOOST_CHECK(std::find(names.begin(), names.end(), "regular.method") != names.end());
+    BOOST_CHECK(std::find(names.begin(), names.end(), "alpha.example") != names.end());
+    BOOST_CHECK(std::find(names.begin(), names.end(), "beta.example") != names.end());
+}
+
+// Test that unknown methods still throw even with custom dispatchers
+BOOST_AUTO_TEST_CASE(custom_dispatcher_unknown_method_throws)
+{
+    Method_dispatcher_manager manager;
+    manager.push_back(new PrefixDispatcher("custom."));
+
+    Method::Data data;
+    data.method_name = "other.unknown";
+
+    BOOST_CHECK_THROW(manager.create_method(data), Unknown_method);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
