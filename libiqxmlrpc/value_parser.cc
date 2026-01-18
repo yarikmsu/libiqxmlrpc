@@ -26,7 +26,7 @@ public:
     ValueBuilderBase(parser),
     state_(parser, NONE),
     name_(),
-    value_(nullptr),
+    value_(),
     proxy_(nullptr)
   {
     static const StateMachine::StateTransition trans[] = {
@@ -56,8 +56,11 @@ private:
       break;
 
     case VALUE_READ:
-      value_ = sub_build<Value_type*, ValueBuilder>();
-      value_ = value_ ? value_ : new String("");
+      // Use unique_ptr member for exception safety (CID 641344)
+      value_.reset(sub_build<Value_type*, ValueBuilder>());
+      if (!value_) {
+        value_ = std::make_unique<String>("");
+      }
       break;
 
     case MEMBER:
@@ -76,14 +79,14 @@ private:
         throw XML_RPC_violation(parser_.context());
       }
 
-      proxy_->insert(name_, std::make_unique<Value>(value_));
+      proxy_->insert(name_, std::make_unique<Value>(value_.release()));
       state_.set_state(NONE);
     }
   }
 
   StateMachine state_;
   std::string name_;
-  Value_type* value_;
+  std::unique_ptr<Value_type> value_;  // RAII for exception safety (CID 641344)
   Struct* proxy_;
 };
 
@@ -118,9 +121,12 @@ private:
   do_visit_element(const std::string& tagname) override
   {
     if (state_.change(tagname) == VALUES) {
-      auto* tmp = sub_build<Value_type*, ValueBuilder>();
-      tmp = tmp ? tmp : new String("");
-      proxy_->push_back(std::make_unique<Value>(tmp));
+      // Use unique_ptr for exception safety (CID 641344)
+      std::unique_ptr<Value_type> tmp(sub_build<Value_type*, ValueBuilder>());
+      if (!tmp) {
+        tmp = std::make_unique<String>("");
+      }
+      proxy_->push_back(std::make_unique<Value>(tmp.release()));
     }
   }
 
