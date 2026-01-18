@@ -34,7 +34,7 @@ public:
   Value( const Value& );
   Value( Value&& ) noexcept;
   // cppcheck-suppress noExplicitConstructor
-  Value( Nil );
+  Value( const Nil& );
   // cppcheck-suppress noExplicitConstructor
   Value( int );
   // cppcheck-suppress noExplicitConstructor
