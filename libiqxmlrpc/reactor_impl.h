@@ -247,7 +247,7 @@ void Reactor<Lock>::handle_user_events()
   scoped_lock lk(lock);
 
   handlers_states.copy_for_write();  // COW: copy if readers hold references
-  for( hs_iterator i = begin(); i != end(); ++i )
+  for( auto i = begin(); i != end(); ++i )
   {
     if( i->revents && (i->mask | i->revents) )
     {

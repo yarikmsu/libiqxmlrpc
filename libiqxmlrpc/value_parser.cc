@@ -117,7 +117,7 @@ private:
   do_visit_element(const std::string& tagname) override
   {
     if (state_.change(tagname) == VALUES) {
-      Value_type* tmp = sub_build<Value_type*, ValueBuilder>();
+      auto* tmp = sub_build<Value_type*, ValueBuilder>();
       tmp = tmp ? tmp : new String("");
       proxy_->push_back(std::make_unique<Value>(tmp));
     }
