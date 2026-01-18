@@ -42,7 +42,9 @@ def compare_benchmarks(baseline: Dict[str, float],
                        current: Dict[str, float],
                        threshold: float,
                        relaxed_threshold: Optional[float] = None,
-                       relaxed_benchmarks: Optional[Set[str]] = None) -> Tuple[List, List, List, List, List]:
+                       relaxed_benchmarks: Optional[Set[str]] = None,
+                       relaxed_threshold_2: Optional[float] = None,
+                       relaxed_benchmarks_2: Optional[Set[str]] = None) -> Tuple[List, List, List, List, List]:
     """
     Compare current results against baseline.
 
@@ -50,8 +52,10 @@ def compare_benchmarks(baseline: Dict[str, float],
         baseline: Dict of benchmark_name -> ns_per_op for baseline
         current: Dict of benchmark_name -> ns_per_op for current
         threshold: Default regression threshold percentage
-        relaxed_threshold: Higher threshold for high-variance benchmarks (optional)
-        relaxed_benchmarks: Set of benchmark names that use relaxed_threshold (optional)
+        relaxed_threshold: Higher threshold for high-variance benchmarks (tier 1)
+        relaxed_benchmarks: Set of benchmark names that use relaxed_threshold (tier 1)
+        relaxed_threshold_2: Even higher threshold for very high-variance benchmarks (tier 2)
+        relaxed_benchmarks_2: Set of benchmark names that use relaxed_threshold_2 (tier 2)
 
     Returns:
         (regressions, improvements, unchanged, new_benchmarks, missing_benchmarks)
@@ -66,6 +70,8 @@ def compare_benchmarks(baseline: Dict[str, float],
     # Default to empty set if not provided
     if relaxed_benchmarks is None:
         relaxed_benchmarks = set()
+    if relaxed_benchmarks_2 is None:
+        relaxed_benchmarks_2 = set()
 
     # Detect new benchmarks (in current but not in baseline)
     new_benchmarks = [name for name in current if name not in baseline]
@@ -86,9 +92,11 @@ def compare_benchmarks(baseline: Dict[str, float],
         # Positive delta = regression (slower), negative = improvement (faster)
         delta_percent = ((current_ns - baseline_ns) / baseline_ns) * 100
 
-        # Use relaxed threshold for specified benchmarks
+        # Use appropriate threshold: tier 2 > tier 1 > default
         effective_threshold = threshold
-        if relaxed_threshold is not None and name in relaxed_benchmarks:
+        if relaxed_threshold_2 is not None and name in relaxed_benchmarks_2:
+            effective_threshold = relaxed_threshold_2
+        elif relaxed_threshold is not None and name in relaxed_benchmarks:
             effective_threshold = relaxed_threshold
 
         entry = (name, baseline_ns, current_ns, delta_percent, effective_threshold)
@@ -106,16 +114,24 @@ def compare_benchmarks(baseline: Dict[str, float],
 def print_report(regressions: List, improvements: List, unchanged: List,
                  new_benchmarks: List, missing_benchmarks: List,
                  threshold: float, relaxed_threshold: Optional[float] = None,
-                 relaxed_benchmarks: Optional[Set[str]] = None, github_actions: bool = False):
+                 relaxed_benchmarks: Optional[Set[str]] = None,
+                 relaxed_threshold_2: Optional[float] = None,
+                 relaxed_benchmarks_2: Optional[Set[str]] = None,
+                 github_actions: bool = False):
     """Print a formatted comparison report."""
 
     # Summary
     total = len(regressions) + len(improvements) + len(unchanged)
     print(f"\n{'='*70}")
-    if relaxed_threshold and relaxed_benchmarks:
+    has_tier1 = relaxed_threshold and relaxed_benchmarks
+    has_tier2 = relaxed_threshold_2 and relaxed_benchmarks_2
+    if has_tier1 or has_tier2:
         print(f"BENCHMARK COMPARISON REPORT")
         print(f"  Default threshold: {threshold}%")
-        print(f"  Relaxed threshold: {relaxed_threshold}% for {len(relaxed_benchmarks)} benchmark(s)")
+        if has_tier1:
+            print(f"  Relaxed threshold: {relaxed_threshold}% for {len(relaxed_benchmarks)} benchmark(s)")
+        if has_tier2:
+            print(f"  Relaxed threshold 2: {relaxed_threshold_2}% for {len(relaxed_benchmarks_2)} benchmark(s)")
     else:
         print(f"BENCHMARK COMPARISON REPORT (threshold: {threshold}%)")
     print(f"{'='*70}")
@@ -203,9 +219,13 @@ Examples:
     parser.add_argument("--threshold", type=float, default=20.0,
                         help="Default regression threshold percentage (default: 20)")
     parser.add_argument("--relaxed-threshold", type=float, default=None,
-                        help="Higher threshold for high-variance benchmarks")
+                        help="Higher threshold for high-variance benchmarks (tier 1)")
     parser.add_argument("--relaxed-benchmarks", type=str, default=None,
-                        help="Comma-separated list of benchmarks using relaxed threshold")
+                        help="Comma-separated list of benchmarks using relaxed threshold (tier 1)")
+    parser.add_argument("--relaxed-threshold-2", type=float, default=None,
+                        help="Even higher threshold for very high-variance benchmarks (tier 2)")
+    parser.add_argument("--relaxed-benchmarks-2", type=str, default=None,
+                        help="Comma-separated list of benchmarks using relaxed threshold 2 (tier 2)")
     parser.add_argument("--github-actions", action="store_true",
                         help="Output GitHub Actions annotations")
 
@@ -218,10 +238,17 @@ Examples:
     if args.relaxed_threshold is not None and args.relaxed_threshold <= 0:
         error_exit("Relaxed threshold must be positive", args.github_actions)
 
-    # Parse relaxed benchmarks list
+    if args.relaxed_threshold_2 is not None and args.relaxed_threshold_2 <= 0:
+        error_exit("Relaxed threshold 2 must be positive", args.github_actions)
+
+    # Parse relaxed benchmarks lists
     relaxed_benchmarks = None
     if args.relaxed_benchmarks:
         relaxed_benchmarks = set(b.strip() for b in args.relaxed_benchmarks.split(',') if b.strip())
+
+    relaxed_benchmarks_2 = None
+    if args.relaxed_benchmarks_2:
+        relaxed_benchmarks_2 = set(b.strip() for b in args.relaxed_benchmarks_2.split(',') if b.strip())
 
     # Warn about misconfigured tiered thresholds
     if relaxed_benchmarks and args.relaxed_threshold is None:
@@ -230,6 +257,12 @@ Examples:
     if args.relaxed_threshold is not None and not relaxed_benchmarks:
         print("Warning: --relaxed-threshold specified without --relaxed-benchmarks; "
               "relaxed threshold will not be applied to any benchmarks", file=sys.stderr)
+    if relaxed_benchmarks_2 and args.relaxed_threshold_2 is None:
+        print("Warning: --relaxed-benchmarks-2 specified without --relaxed-threshold-2; "
+              "tier 2 benchmarks will use default threshold", file=sys.stderr)
+    if args.relaxed_threshold_2 is not None and not relaxed_benchmarks_2:
+        print("Warning: --relaxed-threshold-2 specified without --relaxed-benchmarks-2; "
+              "tier 2 threshold will not be applied to any benchmarks", file=sys.stderr)
 
     # Parse both files using shared utility
     baseline = parse_benchmark_file(args.baseline, github_actions=args.github_actions)
@@ -245,13 +278,18 @@ Examples:
     regressions, improvements, unchanged, new_benchmarks, missing_benchmarks = compare_benchmarks(
         baseline, current, args.threshold,
         relaxed_threshold=args.relaxed_threshold,
-        relaxed_benchmarks=relaxed_benchmarks
+        relaxed_benchmarks=relaxed_benchmarks,
+        relaxed_threshold_2=args.relaxed_threshold_2,
+        relaxed_benchmarks_2=relaxed_benchmarks_2
     )
 
     # Report
     print_report(regressions, improvements, unchanged, new_benchmarks, missing_benchmarks,
                  args.threshold, relaxed_threshold=args.relaxed_threshold,
-                 relaxed_benchmarks=relaxed_benchmarks, github_actions=args.github_actions)
+                 relaxed_benchmarks=relaxed_benchmarks,
+                 relaxed_threshold_2=args.relaxed_threshold_2,
+                 relaxed_benchmarks_2=relaxed_benchmarks_2,
+                 github_actions=args.github_actions)
 
     # Exit with error if regressions found
     if regressions:
