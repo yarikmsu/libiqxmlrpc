@@ -607,8 +607,8 @@ std::string Response_header::current_date()
   gmtime_r(&now, &gmt);
 #endif
   char buf[30];  // "Fri, 10 Jan 2026 12:30:45 GMT" = 29 chars + null
-  std::strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S GMT", &gmt);
-  return std::string(buf);
+  size_t len = std::strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S GMT", &gmt);
+  return std::string(buf, len);
 }
 
 std::string Response_header::dump_head() const
