@@ -553,9 +553,11 @@ Date_time::Date_time( bool use_lt ):
   }
 #else
   if (use_lt) {
-    localtime_r(&time, &tm_);
+    // Return value check: localtime_r only fails with invalid time_t,
+    // which can't happen from system_clock::now()
+    (void)localtime_r(&time, &tm_);
   } else {
-    gmtime_r(&time, &tm_);
+    (void)gmtime_r(&time, &tm_);
   }
 #endif
 }
@@ -632,8 +634,8 @@ const std::string& Date_time::to_string() const
   if( cache.empty() )
   {
     char s[18];
-    strftime( s, 18, "%Y%m%dT%H:%M:%S", &tm_ );
-    cache = std::string( s, 17 );
+    size_t len = strftime( s, sizeof(s), "%Y%m%dT%H:%M:%S", &tm_ );
+    cache = std::string( s, len );
   }
 
   return cache;
