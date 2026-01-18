@@ -1,8 +1,8 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
-#ifndef _libiqnet_inet_addr_h_
-#define _libiqnet_inet_addr_h_
+#ifndef LIBIQNET_INET_ADDR_H
+#define LIBIQNET_INET_ADDR_H
 
 #if _MSC_VER >= 1700
 #include <winsock2.h>

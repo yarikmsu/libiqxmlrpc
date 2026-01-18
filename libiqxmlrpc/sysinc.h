@@ -6,8 +6,8 @@
     Insert here include macro of platform dependent headers.
 */
 
-#ifndef _iqxmlrpc_sysinc_h_
-#define _iqxmlrpc_sysinc_h_
+#ifndef IQXMLRPC_SYSINC_H
+#define IQXMLRPC_SYSINC_H
 
 #ifdef WIN32
 

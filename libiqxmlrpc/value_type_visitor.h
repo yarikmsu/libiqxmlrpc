@@ -1,8 +1,8 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
-#ifndef _iqxmlrpc_value_type_visitor_base_
-#define _iqxmlrpc_value_type_visitor_base_
+#ifndef IQXMLRPC_VALUE_TYPE_VISITOR_BASE_H
+#define IQXMLRPC_VALUE_TYPE_VISITOR_BASE_H
 
 #include "value_type.h"
 

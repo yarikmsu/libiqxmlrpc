@@ -2,8 +2,8 @@
 //  Copyright (C) 2011 Anton Dedov
 
 /*! \file */
-#ifndef _iqxmlrpc_value_type_h_
-#define _iqxmlrpc_value_type_h_
+#ifndef IQXMLRPC_VALUE_TYPE_H
+#define IQXMLRPC_VALUE_TYPE_H
 
 #include "except.h"
 #include "util.h"

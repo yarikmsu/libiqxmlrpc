@@ -1,5 +1,5 @@
-#ifndef _iqxmlrpc_test_suite_methods_
-#define _iqxmlrpc_test_suite_methods_
+#ifndef IQXMLRPC_TEST_SUITE_METHODS_H
+#define IQXMLRPC_TEST_SUITE_METHODS_H
 
 #include "libiqxmlrpc/libiqxmlrpc.h"
 

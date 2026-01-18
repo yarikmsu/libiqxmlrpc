@@ -1,8 +1,8 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
-#ifndef _libiqxmlrpc_https_client_h_
-#define _libiqxmlrpc_https_client_h_
+#ifndef LIBIQXMLRPC_HTTPS_CLIENT_H
+#define LIBIQXMLRPC_HTTPS_CLIENT_H
 
 #include "client.h"
 #include "client_conn.h"
