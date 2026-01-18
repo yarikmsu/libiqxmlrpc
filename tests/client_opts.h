@@ -1,5 +1,5 @@
-#ifndef _libiqxmlrcp_test_suite_client_opts_h_
-#define _libiqxmlrcp_test_suite_client_opts_h_
+#ifndef LIBIQXMLRCP_TEST_SUITE_CLIENT_OPTS_H
+#define LIBIQXMLRCP_TEST_SUITE_CLIENT_OPTS_H
 
 #include <string>
 #include <stdexcept>

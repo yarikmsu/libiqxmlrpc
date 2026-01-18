@@ -1,8 +1,8 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
-#ifndef _libiqnet_connection_factory_
-#define _libiqnet_connection_factory_
+#ifndef LIBIQNET_CONNECTION_FACTORY_H
+#define LIBIQNET_CONNECTION_FACTORY_H
 
 #include "inet_addr.h"
 

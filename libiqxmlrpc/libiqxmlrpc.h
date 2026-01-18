@@ -11,8 +11,8 @@
   \endcode
 */
 
-#ifndef _libiqxmlrpc_h_
-#define _libiqxmlrpc_h_
+#ifndef LIBIQXMLRPC_H
+#define LIBIQXMLRPC_H
 
 #include "except.h"
 #include "method.h"

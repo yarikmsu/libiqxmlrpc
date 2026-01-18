@@ -1,5 +1,5 @@
-#ifndef _iqxmlrpc_test_server_config_h_
-#define _iqxmlrpc_test_server_config_h_
+#ifndef IQXMLRPC_TEST_SERVER_CONFIG_H
+#define IQXMLRPC_TEST_SERVER_CONFIG_H
 
 #include <stdexcept>
 

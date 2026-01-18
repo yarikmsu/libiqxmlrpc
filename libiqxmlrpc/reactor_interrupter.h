@@ -1,8 +1,8 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
-#ifndef _iqxmlrpc_reactor_interrupter_h_
-#define _iqxmlrpc_reactor_interrupter_h_
+#ifndef IQXMLRPC_REACTOR_INTERRUPTER_H
+#define IQXMLRPC_REACTOR_INTERRUPTER_H
 
 #include "reactor.h"
 

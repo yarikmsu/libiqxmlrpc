@@ -1,8 +1,8 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
-#ifndef _iqxmlrpc_util_h_
-#define _iqxmlrpc_util_h_
+#ifndef IQXMLRPC_UTIL_H
+#define IQXMLRPC_UTIL_H
 
 #include "lock.h"
 

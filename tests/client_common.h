@@ -1,5 +1,5 @@
-#ifndef _iqxmlrpc_test_suite_client_common_h_
-#define _iqxmlrpc_test_suite_client_common_h_
+#ifndef IQXMLRPC_TEST_SUITE_CLIENT_COMMON_H
+#define IQXMLRPC_TEST_SUITE_CLIENT_COMMON_H
 
 #include <string>
 #include <libiqxmlrpc/client.h>
