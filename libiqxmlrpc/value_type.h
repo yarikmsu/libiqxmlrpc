@@ -230,8 +230,8 @@ public:
   const Value& operator *() const { return *(*i); }
   const Value* operator ->() const { return *i; }
 
-  const_iterator operator ++( int ) { return const_iterator(i++); }
-  const_iterator operator --( int ) { return const_iterator(i--); }
+  const const_iterator operator ++( int ) { return const_iterator(i++); }
+  const const_iterator operator --( int ) { return const_iterator(i--); }
 
   const_iterator& operator ++() { ++i; return *this; }
   const_iterator& operator --() { --i; return *this; }
