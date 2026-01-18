@@ -25,19 +25,16 @@ on:
       threshold:
         description: 'Default regression threshold percentage (must be positive number)'
         required: false
-        default: '20'
+        default: '15'
 
 env:
-  # 20% default threshold balances regression detection with CI variance tolerance
-  # Testing showed ~5-10% run-to-run variance even on identical code
-  REGRESSION_THRESHOLD: ${{ github.event.inputs.threshold || '20' }}
-  # These benchmarks have demonstrated CI failures due to inherent variance:
-  # - perf_lockfree_queue_p90/p95_latency: Thread scheduling noise (50-95% variance)
-  # - perf_string_to_int_new: Sub-nanosecond measurement (~1ns, 69% variance observed)
-  # - perf_struct_iterate: Map iteration sensitive to cache state (~20% variance)
-  # 75% threshold catches real regressions while tolerating normal CI variance
+  # 15% threshold for tight regression detection
+  # Local testing showed max ~8.5% variance on identical code
+  REGRESSION_THRESHOLD: ${{ github.event.inputs.threshold || '15' }}
+  # No relaxed benchmarks - all use the default 15% threshold
+  # If specific benchmarks show consistent CI-only variance, they can be added here
   RELAXED_THRESHOLD: '75'
-  RELAXED_BENCHMARKS: 'perf_lockfree_queue_p90_latency,perf_lockfree_queue_p95_latency,perf_string_to_int_new,perf_struct_iterate'
+  RELAXED_BENCHMARKS: ''
 
 jobs:
   benchmark:
