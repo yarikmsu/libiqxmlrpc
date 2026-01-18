@@ -9,6 +9,7 @@
 #include "reactor.h"
 #include "ssl_lib.h"
 
+#include <cstdint>
 #include <openssl/ssl.h>
 
 namespace iqnet {
@@ -78,7 +79,7 @@ protected:
 class LIBIQXMLRPC_API Reaction_connection: public ssl::Connection {
   Reactor_base* reactor;
 
-  enum State { EMPTY, ACCEPTING, CONNECTING, READING, WRITING, SHUTDOWN };
+  enum State : std::uint8_t { EMPTY, ACCEPTING, CONNECTING, READING, WRITING, SHUTDOWN };
   State state = EMPTY;
 
   char* recv_buf = nullptr;

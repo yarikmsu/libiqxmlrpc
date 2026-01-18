@@ -1,6 +1,7 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
+#include <cstdint>
 #include <stdexcept>
 #include "except.h"
 #include "num_conv.h"
@@ -39,7 +40,7 @@ public:
   }
 
 private:
-  enum State {
+  enum State : std::uint8_t {
     NONE,
     MEMBER,
     NAME_READ,
@@ -107,7 +108,7 @@ public:
   }
 
 private:
-  enum State {
+  enum State : std::uint8_t {
     NONE,
     DATA,
     VALUES
@@ -129,7 +130,7 @@ private:
 
 } // anonymous namespace
 
-enum ValueBuilderState {
+enum ValueBuilderState : std::uint8_t {
   VALUE,
   STRING,
   INT,
