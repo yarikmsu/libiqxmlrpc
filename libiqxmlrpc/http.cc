@@ -567,6 +567,7 @@ Response_header::Response_header( int c, const std::string& p ):
       std::lock_guard<std::mutex> lock(s_config_mutex);
       server_header = s_custom_server_header;
     }
+    // NOLINTNEXTLINE(bugprone-branch-clone) - false positive: different string arguments
     if (server_header.empty()) {
       set_option(names::server, PACKAGE " " VERSION);
     } else {
@@ -696,6 +697,7 @@ bool Packet_reader::read_header( const std::string& s )
 
   // SECURITY: Check header size limit to prevent header-based DoS attacks
   if (header_max_sz) {
+    // NOLINTNEXTLINE(bugprone-branch-clone) - false positive: different size conditions
     if (sep_pos == std::string::npos) {
       // No separator found yet - if accumulated data exceeds limit, reject
       // (headers alone shouldn't be this big)

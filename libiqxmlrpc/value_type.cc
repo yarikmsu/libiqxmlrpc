@@ -488,6 +488,7 @@ void Binary_data::decode()
       continue;
     } else if (v == -2) {
       // Padding '=' - handle end of data
+      // NOLINTNEXTLINE(bugprone-branch-clone) - first byte calc same, second branch adds byte 2
       if (val_idx == 2) {
         data.push_back(static_cast<char>((vals[0] << 2) | (vals[1] >> 4)));
       } else if (val_idx == 3) {

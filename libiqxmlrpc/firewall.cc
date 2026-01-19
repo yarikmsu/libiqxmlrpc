@@ -17,6 +17,7 @@ struct RequestTracker {
   // Mutable to allow cleanup in const methods (count_recent modifies deque)
   mutable std::deque<std::chrono::steady_clock::time_point> timestamps;
 
+  // NOLINTNEXTLINE(modernize-use-equals-default) - explicit init required for -Weffc++
   RequestTracker() : timestamps() {}
 
   void add_request() {
