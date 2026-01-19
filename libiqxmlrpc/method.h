@@ -60,6 +60,7 @@ private:
   XHeaders xheaders_;
 
 public:
+  // NOLINTNEXTLINE(modernize-use-equals-default) - explicit init required for -Weffc++
   Method() : data_(), authname_(), xheaders_() {}
   virtual ~Method() = default;
 
@@ -102,6 +103,7 @@ private:
  */
 class LIBIQXMLRPC_API Interceptor {
 public:
+  // NOLINTNEXTLINE(modernize-use-equals-default) - explicit init required for -Weffc++
   Interceptor(): nested() {}
   Interceptor(const Interceptor&) = delete;
   Interceptor& operator=(const Interceptor&) = delete;

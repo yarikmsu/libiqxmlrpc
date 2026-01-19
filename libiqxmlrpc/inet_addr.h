@@ -32,6 +32,7 @@ class LIBIQXMLRPC_API Inet_addr {
 
 public:
   //! Does nothing.
+  // NOLINTNEXTLINE(modernize-use-equals-default) - explicit init required for -Weffc++
   Inet_addr(): impl_() {}
 
   explicit Inet_addr( const struct sockaddr_in& );
