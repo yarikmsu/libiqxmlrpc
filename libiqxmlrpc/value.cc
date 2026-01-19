@@ -159,6 +159,7 @@ const Value& Value::operator =( const Value& v )
 {
   // Copy-and-swap idiom: provides strong exception safety and
   // automatically handles self-assignment correctly
+  // NOLINTNEXTLINE(performance-unnecessary-copy-initialization) - used in swap below
   Value tmp(v);
   std::swap(value, tmp.value);
   return *this;
