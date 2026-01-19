@@ -13,6 +13,7 @@ class LIBIQXMLRPC_API XHeaders {
 private:
   std::map<std::string, std::string> xheaders_;
 public:
+  // NOLINTNEXTLINE(modernize-use-equals-default) - explicit init required for -Weffc++
   XHeaders() : xheaders_() {}
   typedef std::map<std::string, std::string>::const_iterator const_iterator;
   virtual XHeaders& operator=(const std::map<std::string, std::string>& v);

@@ -174,6 +174,7 @@ ValueBuilder::ValueBuilder(Parser& parser):
 void
 ValueBuilder::do_visit_element(const std::string& tagname)
 {
+  // NOLINTNEXTLINE(bugprone-branch-clone) - branches create different types
   switch (state_.change(tagname)) {
   case STRUCT:
     retval.reset(sub_build<Value_type*, StructBuilder>(true));
@@ -206,6 +207,7 @@ ValueBuilder::do_visit_element_end(const std::string&)
   std::unique_ptr<Int> default_int(Value::get_default_int());
   std::unique_ptr<Int64> default_int64(Value::get_default_int64());
 
+  // NOLINTNEXTLINE(bugprone-branch-clone) - VALUE/STRING intentional fallthrough
   switch (state_.get_state()) {
   case VALUE:
   case STRING:
@@ -239,6 +241,7 @@ ValueBuilder::do_visit_element_end(const std::string&)
 void
 ValueBuilder::do_visit_text(const std::string& text)
 {
+  // NOLINTNEXTLINE(bugprone-branch-clone) - branches create different types
   switch (state_.get_state()) {
   case VALUE:
     want_exit();
