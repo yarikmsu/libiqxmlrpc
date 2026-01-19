@@ -5,6 +5,7 @@
 #include <optional>
 #include "inet_addr.h"
 #include "net_except.h"
+#include "sysinc.h"
 
 namespace iqnet {
 
@@ -100,9 +101,14 @@ Inet_addr::Impl::Impl( int p ):
 Inet_addr::Impl::Impl( const SystemSockAddrIn& s ):
   sa(s),
   sa_init_flag(),
-  host(inet_ntoa( sa->sin_addr )),
+  host(),
   port(ntohs( sa->sin_port ))
 {
+  // inet_ntop is thread-safe (uses caller-provided buffer, unlike inet_ntoa)
+  // Cannot fail: AF_INET is valid, sockaddr_in is valid, buffer is correctly sized
+  char buf[INET_ADDRSTRLEN];
+  inet_ntop(AF_INET, &sa->sin_addr, buf, sizeof(buf));
+  host = buf;
 }
 
 void
@@ -153,6 +159,7 @@ Inet_addr::get_sockaddr() const
   if (!impl_->sa.has_value()) {
     throw network_error("Socket address initialization failed", false);
   }
+  // NOLINTNEXTLINE(bugprone-unchecked-optional-access) - checked above, throw on failure
   return &(*impl_->sa);
 }
 
