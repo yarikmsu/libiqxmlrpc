@@ -140,7 +140,10 @@ BOOST_AUTO_TEST_CASE(get_sockaddr_from_existing_sockaddr)
     const struct sockaddr_in* sa = addr.get_sockaddr();
     BOOST_REQUIRE(sa != nullptr);
     BOOST_CHECK_EQUAL(ntohs(sa->sin_port), 5000);
-    BOOST_CHECK_EQUAL(inet_ntoa(sa->sin_addr), std::string("10.20.30.40"));
+    char buf[INET_ADDRSTRLEN];
+    const char* result = inet_ntop(AF_INET, &sa->sin_addr, buf, sizeof(buf));
+    BOOST_REQUIRE(result != nullptr);
+    BOOST_CHECK_EQUAL(std::string(buf), "10.20.30.40");
 }
 
 BOOST_AUTO_TEST_SUITE_END()
