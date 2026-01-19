@@ -113,6 +113,7 @@ Inet_addr::Impl::init_sockaddr() const
   struct hostent* hent = nullptr;
   {
     std::lock_guard<std::mutex> lock(dns_mutex());
+    // NOLINTNEXTLINE(concurrency-mt-unsafe) - protected by dns_mutex()
     IQXMLRPC_GETHOSTBYNAME(host.c_str());
     sa->sin_family = PF_INET;
     sa->sin_port = htons(port);
