@@ -32,7 +32,8 @@ public:
   void handle_input( bool& ) override;
   void handle_output( bool& ) override;
 
-  void terminate_idle() override;
+ 
+void terminate_idle() override;
 
   bool catch_in_reactor() const override { return true; }
   void log_exception( const std::exception& ) override;
@@ -106,7 +107,8 @@ void Http_server_connection::handle_input( bool& terminate )
   {
     // Close connection after sending HTTP error response
     keep_alive = false;
-    schedule_response( new http::Packet(e) );
+    schedule_response( new http::Packe
+      t(e) );
   }
 }
 
@@ -142,7 +144,6 @@ void Http_server_connection::handle_output( bool& terminate )
     }
     else
       terminate = true;
-
     return;
   }
 
