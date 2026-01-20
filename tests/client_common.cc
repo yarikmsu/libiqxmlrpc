@@ -7,9 +7,7 @@ Method_proxy::Method_proxy(iqxmlrpc::Client_base* cb, const std::string& name):
 {
 }
 
-Method_proxy::~Method_proxy()
-{
-}
+Method_proxy::~Method_proxy() = default;
 
 Response Method_proxy::operator ()(const iqxmlrpc::Value& val)
 {

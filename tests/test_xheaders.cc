@@ -46,9 +46,9 @@ BOOST_FIXTURE_TEST_CASE( find, XHeaders_fixture )
   BOOST_CHECK(h.find("x-cmd") != h.end());
 
   std::string res;
-  for (XHeaders::const_iterator it = h.begin(); it != h.end(); ++it) {
-    res+=it->first;
-    res+=it->second;
+  for (const auto& entry : h) {
+    res += entry.first;
+    res += entry.second;
   }
   BOOST_CHECK(res == "x-id1x-cmd2" || res == "x-cmd2x-id1");
 }
@@ -127,9 +127,9 @@ BOOST_AUTO_TEST_CASE(xheaders_iterate_all)
   h["X-C"] = "3";
 
   int count = 0;
-  for (XHeaders::const_iterator it = h.begin(); it != h.end(); ++it) {
+  for (const auto& entry : h) {
     count++;
-    BOOST_CHECK(it->first.substr(0, 2) == "x-");
+    BOOST_CHECK(entry.first.substr(0, 2) == "x-");
   }
   BOOST_CHECK_EQUAL(count, 3);
 }

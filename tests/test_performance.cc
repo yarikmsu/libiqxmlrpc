@@ -14,6 +14,8 @@
 #include <vector>
 #include <memory>
 #include <cstring>
+#include <ctime>
+#include <cstdint>
 #include <map>
 
 #include <openssl/evp.h>
@@ -24,6 +26,18 @@
 #include "libiqxmlrpc/reactor.h"
 
 using namespace iqxmlrpc;
+
+namespace {
+inline std::tm localtime_safe(std::time_t* now) {
+  std::tm tm_buf{};
+#if defined(_WIN32)
+  localtime_s(&tm_buf, now);
+#else
+  localtime_r(now, &tm_buf);
+#endif
+  return tm_buf;
+}
+}  // namespace
 
 // ============================================================================
 // A. Number Conversion Benchmarks (High Priority)
@@ -63,7 +77,7 @@ void benchmark_number_conversions() {
   // string -> int64_t (num_conv)
   PERF_BENCHMARK("perf_string_to_int64_new", ITERS, {
     std::string s = "9223372036854775807";
-    int64_t val = num_conv::from_string<int64_t>(s);
+    auto val = num_conv::from_string<int64_t>(s);
     perf::do_not_optimize(val);
   });
 
@@ -196,14 +210,14 @@ void benchmark_value_operations() {
   // Simple value clone (int)
   Value int_val(42);
   PERF_BENCHMARK("perf_value_clone_int", ITERS_SIMPLE, {
-    Value copy(int_val);
+    Value copy(int_val);  // NOLINT(performance-unnecessary-copy-initialization) - copy benchmark
     perf::do_not_optimize(copy);
   });
 
   // Simple value clone (string)
   Value str_val("hello world, this is a test string");
   PERF_BENCHMARK("perf_value_clone_string", ITERS_SIMPLE, {
-    Value copy(str_val);
+    Value copy(str_val);  // NOLINT(performance-unnecessary-copy-initialization) - copy benchmark
     perf::do_not_optimize(copy);
   });
 
@@ -213,7 +227,7 @@ void benchmark_value_operations() {
     for (int i = 0; i < 10; i++) arr10.push_back(i);
     Value arr_val(arr10);
     PERF_BENCHMARK("perf_value_clone_array_10", ITERS_SIMPLE / 10, {
-      Value copy(arr_val);
+      Value copy(arr_val);  // NOLINT(performance-unnecessary-copy-initialization) - copy benchmark
       perf::do_not_optimize(copy);
     });
   }
@@ -224,7 +238,7 @@ void benchmark_value_operations() {
     for (int i = 0; i < 100; i++) arr100.push_back(i);
     Value arr_val(arr100);
     PERF_BENCHMARK("perf_value_clone_array_100", ITERS_COMPLEX, {
-      Value copy(arr_val);
+      Value copy(arr_val);  // NOLINT(performance-unnecessary-copy-initialization) - copy benchmark
       perf::do_not_optimize(copy);
     });
   }
@@ -235,7 +249,7 @@ void benchmark_value_operations() {
     for (int i = 0; i < 1000; i++) arr1000.push_back(i);
     Value arr_val(arr1000);
     PERF_BENCHMARK("perf_value_clone_array_1000", ITERS_COMPLEX / 10, {
-      Value copy(arr_val);
+      Value copy(arr_val);  // NOLINT(performance-unnecessary-copy-initialization) - copy benchmark
       perf::do_not_optimize(copy);
     });
   }
@@ -250,7 +264,7 @@ void benchmark_value_operations() {
     s5.insert("f5", true);
     Value struct_val(s5);
     PERF_BENCHMARK("perf_value_clone_struct_5", ITERS_SIMPLE / 10, {
-      Value copy(struct_val);
+      Value copy(struct_val);  // NOLINT(performance-unnecessary-copy-initialization) - copy benchmark
       perf::do_not_optimize(copy);
     });
   }
@@ -263,7 +277,7 @@ void benchmark_value_operations() {
     }
     Value struct_val(s20);
     PERF_BENCHMARK("perf_value_clone_struct_20", ITERS_COMPLEX, {
-      Value copy(struct_val);
+      Value copy(struct_val);  // NOLINT(performance-unnecessary-copy-initialization) - copy benchmark
       perf::do_not_optimize(copy);
     });
   }
@@ -295,8 +309,8 @@ void benchmark_value_operations() {
 
     PERF_BENCHMARK("perf_array_access", ITERS_SIMPLE, {
       int sum = 0;
-      for (unsigned i = 0; i < arr.size(); i++) {
-        sum += arr[i].get_int();
+      for (const auto& entry : arr) {
+        sum += entry.get_int();
       }
       perf::do_not_optimize(sum);
     });
@@ -329,8 +343,8 @@ void benchmark_value_operations() {
 
     PERF_BENCHMARK("perf_array_iterate", ITERS_SIMPLE, {
       int sum = 0;
-      for (auto it = arr.begin(); it != arr.end(); ++it) {
-        sum += (*it).get_int();
+      for (const auto& entry : arr) {
+        sum += entry.get_int();
       }
       perf::do_not_optimize(sum);
     });
@@ -345,8 +359,8 @@ void benchmark_value_operations() {
 
     PERF_BENCHMARK("perf_struct_iterate", ITERS_SIMPLE, {
       int sum = 0;
-      for (auto it = s.begin(); it != s.end(); ++it) {
-        sum += it->second->get_int();
+      for (const auto& entry : s) {
+        sum += entry.second->get_int();
       }
       perf::do_not_optimize(sum);
     });
@@ -356,7 +370,7 @@ void benchmark_value_operations() {
 
   // Array destruction (measures delete overhead)
   PERF_BENCHMARK("perf_array_destroy", ITERS_COMPLEX, {
-    Array* arr = new Array();
+    auto* arr = new Array();
     for (int i = 0; i < 100; i++) {
       arr->push_back(i);
     }
@@ -365,7 +379,7 @@ void benchmark_value_operations() {
 
   // Struct destruction
   PERF_BENCHMARK("perf_struct_destroy", ITERS_COMPLEX, {
-    Struct* s = new Struct();
+    auto* s = new Struct();
     for (int i = 0; i < 20; i++) {
       s->insert("field_" + std::to_string(i), i);
     }
@@ -470,7 +484,7 @@ void benchmark_parse_dump() {
       s.insert("price", i * 1.5);
       arr.push_back(s);
     }
-    Value* v = new Value(arr);
+    auto* v = new Value(arr);
     Response resp(v);
 
     PERF_BENCHMARK("perf_dump_response_10", ITERS * 10, {
@@ -489,7 +503,7 @@ void benchmark_parse_dump() {
       s.insert("price", i * 1.5);
       arr.push_back(s);
     }
-    Value* v = new Value(arr);
+    auto* v = new Value(arr);
     Response resp(v);
 
     PERF_BENCHMARK("perf_dump_response_1000", ITERS, {
@@ -648,7 +662,7 @@ void benchmark_server_performance() {
     s5.insert("price", 99.99);
     s5.insert("active", true);
     s5.insert("count", 42);
-    Value* v5 = new Value(s5);
+    auto* v5 = new Value(s5);
     Response resp5(v5);
 
     PERF_BENCHMARK("perf_serialize_struct_5", 10000, {
@@ -661,7 +675,7 @@ void benchmark_server_performance() {
     for (int i = 0; i < 20; i++) {
       s20.insert("field_" + std::to_string(i), i * 100);
     }
-    Value* v20 = new Value(s20);
+    auto* v20 = new Value(s20);
     Response resp20(v20);
 
     PERF_BENCHMARK("perf_serialize_struct_20", 10000, {
@@ -677,7 +691,7 @@ void benchmark_server_performance() {
       inner.insert("value", "nested_" + std::to_string(i));
       outer.insert("item_" + std::to_string(i), inner);
     }
-    Value* vn = new Value(outer);
+    auto* vn = new Value(outer);
     Response respn(vn);
 
     PERF_BENCHMARK("perf_serialize_struct_nested", 10000, {
@@ -761,8 +775,8 @@ public:
     : paths_(iqxmlrpc_test::create_temp_cert_files())
   {}
   ~TempCertFiles() {
-    std::remove(paths_.first.c_str());
-    std::remove(paths_.second.c_str());
+    (void)std::remove(paths_.first.c_str());
+    (void)std::remove(paths_.second.c_str());
   }
   // Non-copyable, non-movable (Rule of Five)
   TempCertFiles(const TempCertFiles&) = delete;
@@ -812,7 +826,7 @@ void benchmark_cipher_throughput() {
   perf::section("Cipher Throughput (P1b real benefit)");
 
   // Use 64KB buffer to simulate typical TLS record sizes
-  const size_t DATA_SIZE = 64 * 1024;
+  const size_t DATA_SIZE = static_cast<size_t>(64) * 1024;
   const size_t ITERS_CIPHER = 1000;
 
   // Allocate buffers
@@ -832,7 +846,7 @@ void benchmark_cipher_throughput() {
     EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
     int outlen = 0;
     int tmplen = 0;
-    EVP_EncryptInit_ex(ctx, EVP_aes_128_gcm(), NULL, key.data(), iv.data());
+    EVP_EncryptInit_ex(ctx, EVP_aes_128_gcm(), nullptr, key.data(), iv.data());
     EVP_EncryptUpdate(ctx, ciphertext.data(), &outlen, plaintext.data(), DATA_SIZE);
     EVP_EncryptFinal_ex(ctx, ciphertext.data() + outlen, &tmplen);
     EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, 16, tag.data());
@@ -845,7 +859,7 @@ void benchmark_cipher_throughput() {
     EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
     int outlen = 0;
     int tmplen = 0;
-    EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, key.data(), iv.data());
+    EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), nullptr, key.data(), iv.data());
     EVP_EncryptUpdate(ctx, ciphertext.data(), &outlen, plaintext.data(), DATA_SIZE);
     EVP_EncryptFinal_ex(ctx, ciphertext.data() + outlen, &tmplen);
     EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, 16, tag.data());
@@ -860,7 +874,7 @@ void benchmark_cipher_throughput() {
     int tmplen = 0;
     unsigned char nonce[12];
     memcpy(nonce, iv.data(), 12);
-    EVP_EncryptInit_ex(ctx, EVP_chacha20_poly1305(), NULL, key.data(), nonce);
+    EVP_EncryptInit_ex(ctx, EVP_chacha20_poly1305(), nullptr, key.data(), nonce);
     EVP_EncryptUpdate(ctx, ciphertext.data(), &outlen, plaintext.data(), DATA_SIZE);
     EVP_EncryptFinal_ex(ctx, ciphertext.data() + outlen, &tmplen);
     EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_GET_TAG, 16, tag.data());
@@ -873,7 +887,7 @@ void benchmark_cipher_throughput() {
     EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
     int outlen = 0;
     int tmplen = 0;
-    EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key.data(), iv.data());
+    EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key.data(), iv.data());
     EVP_EncryptUpdate(ctx, ciphertext.data(), &outlen, plaintext.data(), DATA_SIZE);
     EVP_EncryptFinal_ex(ctx, ciphertext.data() + outlen, &tmplen);
     perf::do_not_optimize(ciphertext);
@@ -895,7 +909,7 @@ void benchmark_cipher_throughput() {
 // ============================================================================
 
 // Simulate the SSL I/O result codes (for benchmark purposes)
-enum class BenchSslResult { OK, WANT_READ, WANT_WRITE, ERROR, CONNECTION_CLOSE };
+enum class BenchSslResult : std::uint8_t { OK, WANT_READ, WANT_WRITE, ERROR, CONNECTION_CLOSE };
 
 // Simulate checking SSL result with return code (proposed P3 implementation)
 __attribute__((noinline))
@@ -999,6 +1013,7 @@ void benchmark_exception_vs_return_code() {
       } catch (const iqnet::ssl::need_write&) {
         registered_output++;
       } catch (...) {
+        (void)0;
       }
       perf::do_not_optimize(registered_input);
     });
@@ -1019,11 +1034,11 @@ void benchmark_reactor_handler_list() {
     // Old approach: Full std::list copy
     iqnet::Reactor_base::HandlerStateList handlers_copy;
     for (size_t i = 0; i < 100; ++i) {
-      handlers_copy.push_back(iqnet::Reactor_base::HandlerState(static_cast<iqnet::Socket::Handler>(i)));
+      handlers_copy.emplace_back(static_cast<iqnet::Socket::Handler>(i));
     }
 
     PERF_BENCHMARK("perf_handler_list_copy_100", ITERS, {
-      iqnet::Reactor_base::HandlerStateList tmp(handlers_copy);
+      iqnet::Reactor_base::HandlerStateList tmp(handlers_copy);  // NOLINT(performance-unnecessary-copy-initialization) - copy benchmark
       perf::do_not_optimize(tmp);
     });
   }
@@ -1032,11 +1047,11 @@ void benchmark_reactor_handler_list() {
     // New approach: shared_ptr snapshot (COW)
     auto handlers_cow = std::make_shared<iqnet::Reactor_base::HandlerStateList>();
     for (size_t i = 0; i < 100; ++i) {
-      handlers_cow->push_back(iqnet::Reactor_base::HandlerState(static_cast<iqnet::Socket::Handler>(i)));
+      handlers_cow->emplace_back(static_cast<iqnet::Socket::Handler>(i));
     }
 
     PERF_BENCHMARK("perf_handler_list_cow_100", ITERS, {
-      auto snapshot = handlers_cow;  // Just refcount increment
+      auto snapshot = handlers_cow;  // NOLINT(performance-unnecessary-copy-initialization) - COW benchmark
       perf::do_not_optimize(snapshot);
     });
   }
@@ -1045,11 +1060,11 @@ void benchmark_reactor_handler_list() {
   {
     iqnet::Reactor_base::HandlerStateList handlers_copy;
     for (size_t i = 0; i < 1000; ++i) {
-      handlers_copy.push_back(iqnet::Reactor_base::HandlerState(static_cast<iqnet::Socket::Handler>(i)));
+      handlers_copy.emplace_back(static_cast<iqnet::Socket::Handler>(i));
     }
 
     PERF_BENCHMARK("perf_handler_list_copy_1000", ITERS / 10, {
-      iqnet::Reactor_base::HandlerStateList tmp(handlers_copy);
+      iqnet::Reactor_base::HandlerStateList tmp(handlers_copy);  // NOLINT(performance-unnecessary-copy-initialization) - copy benchmark
       perf::do_not_optimize(tmp);
     });
   }
@@ -1057,11 +1072,11 @@ void benchmark_reactor_handler_list() {
   {
     auto handlers_cow = std::make_shared<iqnet::Reactor_base::HandlerStateList>();
     for (size_t i = 0; i < 1000; ++i) {
-      handlers_cow->push_back(iqnet::Reactor_base::HandlerState(static_cast<iqnet::Socket::Handler>(i)));
+      handlers_cow->emplace_back(static_cast<iqnet::Socket::Handler>(i));
     }
 
     PERF_BENCHMARK("perf_handler_list_cow_1000", ITERS / 10, {
-      auto snapshot = handlers_cow;
+      auto snapshot = handlers_cow;  // NOLINT(performance-unnecessary-copy-initialization) - COW benchmark
       perf::do_not_optimize(snapshot);
     });
   }
@@ -1183,11 +1198,13 @@ void benchmark_lockfree_queue() {
     auto start = Clock::now();
 
     std::vector<std::thread> producers;
+    producers.reserve(NUM_PRODUCERS);
     for (size_t i = 0; i < NUM_PRODUCERS; ++i) {
       producers.emplace_back(producer);
     }
 
     std::vector<std::thread> consumers;
+    consumers.reserve(NUM_CONSUMERS);
     for (size_t i = 0; i < NUM_CONSUMERS; ++i) {
       consumers.emplace_back(consumer);
     }
@@ -1244,11 +1261,13 @@ void benchmark_lockfree_queue() {
     auto start = Clock::now();
 
     std::vector<std::thread> producers;
+    producers.reserve(NUM_PRODUCERS);
     for (size_t i = 0; i < NUM_PRODUCERS; ++i) {
       producers.emplace_back(producer);
     }
 
     std::vector<std::thread> consumers;
+    consumers.reserve(NUM_CONSUMERS);
     for (size_t i = 0; i < NUM_CONSUMERS; ++i) {
       consumers.emplace_back(consumer);
     }
@@ -1297,7 +1316,10 @@ int main(int /*argc*/, char* /*argv*/[]) {
   // Get current time
   std::time_t now = std::time(nullptr);
   char time_buf[64];
-  std::strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
+  const std::tm tm_buf = localtime_safe(&now);
+  if (std::strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", &tm_buf) == 0) {
+    time_buf[0] = '\0';
+  }
   std::cout << "Date: " << time_buf << "\n";
   std::cout << "============================================================\n";
 
@@ -1321,7 +1343,10 @@ int main(int /*argc*/, char* /*argv*/[]) {
   benchmark_lockfree_queue();
 
   // Save baseline
-  std::strftime(time_buf, sizeof(time_buf), "%Y%m%d_%H%M%S", std::localtime(&now));
+  const std::tm tm_buf2 = localtime_safe(&now);
+  if (std::strftime(time_buf, sizeof(time_buf), "%Y%m%d_%H%M%S", &tm_buf2) == 0) {
+    time_buf[0] = '\0';
+  }
   std::string baseline_file = "performance_baseline.txt";
   perf::ResultCollector::instance().save_baseline(baseline_file);
 

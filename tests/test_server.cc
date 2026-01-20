@@ -1,4 +1,4 @@
-#include <signal.h>
+#include <csignal>
 #include <memory>
 #include <iostream>
 #include <boost/test/test_tools.hpp>
@@ -21,7 +21,7 @@ using namespace iqxmlrpc;
 
 class LogInterceptor: public Interceptor {
 public:
-  void process(Method* m, const Param_list& p, Value& r)
+  void process(Method* m, const Param_list& p, Value& r) override
   {
     std::cout << "Log Interceptor: " << m->name() << " is executing." << m->xheaders() << "\n";
     yield(m, p, r);
@@ -30,17 +30,17 @@ public:
 
 class TraceInterceptor: public Interceptor {
 public:
-  void process(Method* m, const Param_list& p, Value& r)
+  void process(Method* m, const Param_list& p, Value& r) override
   {
     if( m->name() == "trace" ){
       Param_list np;
-      XHeaders::const_iterator it = m->xheaders().find("X-Correlation-ID");
+      auto it = m->xheaders().find("X-Correlation-ID");
       if (it != m->xheaders().end()) {
-        np.push_back(it->second);
+        np.emplace_back(it->second);
       }
       it = m->xheaders().find("X-Span-ID");
       if (it != m->xheaders().end()) {
-        np.push_back(it->second);
+        np.emplace_back(it->second);
       }
       yield(m, np, r);
     } else {
@@ -55,12 +55,12 @@ class CallCountingInterceptor: public Interceptor {
 public:
   CallCountingInterceptor(): count(0) {}
 
-  ~CallCountingInterceptor()
+  ~CallCountingInterceptor() override
   {
-    std::cout << "Calls Count: " << count << std::endl;
+    std::cout << "Calls Count: " << count << '\n';
   }
 
-  void process(Method* m, const Param_list& p, Value& r)
+  void process(Method* m, const Param_list& p, Value& r) override
   {
     std::cout << "Executing " << ++count << " call\n";
     yield(m, p, r);
@@ -69,14 +69,14 @@ public:
 
 class PermissiveAuthPlugin: public iqxmlrpc::Auth_Plugin_base {
 public:
-  PermissiveAuthPlugin() {}
+  PermissiveAuthPlugin() = default;
 
-  bool do_authenticate(const std::string& username, const std::string& /*pw*/) const
+  bool do_authenticate(const std::string& username, const std::string& /*pw*/) const override
   {
     return username != "badman";
   }
 
-  bool do_authenticate_anonymous() const
+  bool do_authenticate_anonymous() const override
   {
     return true;
   }
@@ -93,7 +93,7 @@ public:
 
   Test_server(const Test_server_config&);
 
-  Server& impl() { return *impl_.get(); }
+  Server& impl() { return *impl_; }
 
   void work();
 };
@@ -107,22 +107,22 @@ Test_server::Test_server(const Test_server_config& conf):
 {
   if (conf.numthreads > 1)
   {
-    ef_.reset(new Pool_executor_factory(conf.numthreads));
+    ef_ = std::make_unique<Pool_executor_factory>(conf.numthreads);
   }
   else
   {
-    ef_.reset(new Serial_executor_factory);
+    ef_ = std::make_unique<Serial_executor_factory>();
   }
 
   if (conf.use_ssl)
   {
     namespace ssl = iqnet::ssl;
     ssl::ctx = ssl::Ctx::server_only("data/cert.pem", "data/pk.pem");
-    impl_.reset(new Https_server(iqnet::Inet_addr(conf.port), ef_.get()));
+    impl_ = std::make_unique<Https_server>(iqnet::Inet_addr(conf.port), ef_.get());
   }
   else
   {
-    impl_.reset(new Http_server(iqnet::Inet_addr(conf.port), ef_.get()));
+    impl_ = std::make_unique<Http_server>(iqnet::Inet_addr(conf.port), ef_.get());
   }
 
   impl_->push_interceptor(new CallCountingInterceptor);
@@ -131,7 +131,7 @@ Test_server::Test_server(const Test_server_config& conf):
 
   impl_->log_errors( &std::cerr );
   impl_->enable_introspection();
-  impl_->set_max_request_sz(1024*1024);
+  impl_->set_max_request_sz(static_cast<size_t>(1024) * 1024);
   impl_->set_verification_level(http::HTTP_CHECK_STRICT);
 
   impl_->set_auth_plugin(auth_plugin_);
@@ -164,12 +164,12 @@ main(int argc, const char** argv)
   try {
     Test_server_config conf(argc, const_cast<char**>(argv));
     test_server = new Test_server(conf);
-    ::signal(SIGINT, &test_server_sig_handler);
+    (void)::signal(SIGINT, &test_server_sig_handler);
     test_server->work();
     return 0;
 
   } catch (const std::exception& e) {
-    std::cerr << "E: " << e.what() << std::endl;
+    std::cerr << "E: " << e.what() << '\n';
     return 1;
   }
 }

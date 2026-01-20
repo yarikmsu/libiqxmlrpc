@@ -32,9 +32,7 @@ Client_opts::Client_opts():
     ("server-finger", value<std::string>(&server_fingerprint_));
 }
 
-Client_opts::~Client_opts()
-{
-}
+Client_opts::~Client_opts() = default;
 
 void Client_opts::configure(int argc, char** argv)
 {
@@ -59,7 +57,7 @@ public:
   }
 
 private:
-  int do_verify(bool, X509_STORE_CTX* ctx) const
+  int do_verify(bool, X509_STORE_CTX* ctx) const override
   {
     return finger_ == cert_finger_sha256(ctx);
   }
@@ -92,7 +90,7 @@ Client_opts::create_instance() const
   if (timeout())
     retval->set_timeout(timeout());
 
-  if (use_ssl_ && server_fingerprint_.size()) {
+  if (use_ssl_ && !server_fingerprint_.empty()) {
     server_verifier = FingerprintVerifier(server_fingerprint_);
     ssl::ctx->verify_server(&server_verifier.value());
   }

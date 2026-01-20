@@ -26,6 +26,7 @@
 #include "libiqxmlrpc/except.h"
 
 #include <cmath>
+#include <cstdlib>
 #include <limits>
 #include <memory>
 #include <string>
@@ -36,19 +37,25 @@ namespace {
 
 // Get server host from environment or use default
 std::string get_server_host() {
-    const char* env = std::getenv("XMLRPC_TEST_HOST");
+    const char* env = std::getenv("XMLRPC_TEST_HOST");  // NOLINT(concurrency-mt-unsafe) - setup-time read
     return env ? env : "localhost";
 }
 
 // Get server port from environment or use default
 int get_server_port() {
-    const char* env = std::getenv("XMLRPC_TEST_PORT");
-    return env ? std::atoi(env) : 8000;
+    const char* env = std::getenv("XMLRPC_TEST_PORT");  // NOLINT(concurrency-mt-unsafe) - setup-time read
+    if (!env) return 8000;
+    char* end = nullptr;
+    long port = std::strtol(env, &end, 10);
+    if (end == env || *end != '\0' || port <= 0 || port > 65535) {
+        return 8000;
+    }
+    return static_cast<int>(port);
 }
 
 // Get URI from environment or use default (Python uses "/")
 std::string get_server_uri() {
-    const char* env = std::getenv("XMLRPC_TEST_URI");
+    const char* env = std::getenv("XMLRPC_TEST_URI");  // NOLINT(concurrency-mt-unsafe) - setup-time read
     return env ? env : "/";
 }
 
@@ -82,14 +89,14 @@ struct WireCompatibilityFixture {
 
     Response call(const std::string& method, const Value& v1) {
         Param_list params;
-        params.push_back(v1);
+        params.emplace_back(v1);
         return client->execute(method, params);
     }
 
     Response call(const std::string& method, const Value& v1, const Value& v2) {
         Param_list params;
-        params.push_back(v1);
-        params.push_back(v2);
+        params.emplace_back(v1);
+        params.emplace_back(v2);
         return client->execute(method, params);
     }
 };
@@ -393,7 +400,7 @@ BOOST_FIXTURE_TEST_CASE(divide_by_zero_fault, WireCompatibilityFixture)
 
     BOOST_CHECK_EQUAL(r.fault_code(), 1);
     // Message should contain "zero"
-    std::string msg = r.fault_string();
+    const std::string& msg = r.fault_string();
     BOOST_CHECK(msg.find("zero") != std::string::npos ||
                 msg.find("Zero") != std::string::npos);
 }

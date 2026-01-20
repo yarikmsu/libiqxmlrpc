@@ -1,7 +1,8 @@
-#include <stdlib.h>
+#include <cstdlib>
 #include <iostream>
 #include <fstream>
 #include <mutex>
+#include <random>
 #include <thread>
 #include <chrono>
 #include <openssl/md5.h>
@@ -55,7 +56,7 @@ void echo_method(
 {
   THREAD_SAFE_TEST_MESSAGE("Echo method invoked.");
 
-  if (args.size())
+  if (!args.empty())
     retval = args[0];
 }
 
@@ -66,9 +67,9 @@ void trace_method(
 {
   THREAD_SAFE_TEST_MESSAGE("Trace method invoked.");
   std::string s;
-  for (std::vector<iqxmlrpc::Value>::const_iterator i = args.begin(); i != args.end(); ++i) {
-    if( i->is_string() ) {
-      s += i->get_string();
+  for (const auto& arg : args) {
+    if (arg.is_string()) {
+      s += arg.get_string();
     }
   }
 
@@ -111,14 +112,6 @@ void unknown_exception_method(
   throw 42;  // Throw a non-exception type
 }
 
-namespace 
-{
-  inline char brand()
-  {
-    return rand()%255;
-  }
-}
-
 void Get_file::execute( 
   const iqxmlrpc::Param_list& args, iqxmlrpc::Value& retval )
 {
@@ -129,9 +122,11 @@ void Get_file::execute(
 	  throw Fault( 0, "requested-size must be > 0" );
 
   THREAD_SAFE_TEST_MESSAGE("Generating data...");
-  srand(time(0));
+  std::random_device rd;
+  std::mt19937 rng(rd());
+  std::uniform_int_distribution<int> dist(0, 255);
   std::string s(retsize, '\0');
-  std::generate(s.begin(), s.end(), brand);
+  std::generate(s.begin(), s.end(), [&]() { return static_cast<char>(dist(rng)); });
 
   retval = Struct();
   retval.insert("data", Binary_data::from_data(s));

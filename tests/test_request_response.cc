@@ -17,8 +17,8 @@ BOOST_AUTO_TEST_SUITE(request_tests)
 BOOST_AUTO_TEST_CASE(request_construction)
 {
     Param_list params;
-    params.push_back(Value(42));
-    params.push_back(Value("hello"));
+    params.emplace_back(42);
+    params.emplace_back("hello");
 
     Request req("test.method", params);
     BOOST_CHECK_EQUAL(req.get_name(), "test.method");
@@ -36,7 +36,7 @@ BOOST_AUTO_TEST_CASE(request_empty_params)
 BOOST_AUTO_TEST_CASE(request_dump_simple)
 {
     Param_list params;
-    params.push_back(Value(42));
+    params.emplace_back(42);
     Request req("test.method", params);
 
     std::string xml = dump_request(req);
@@ -49,9 +49,9 @@ BOOST_AUTO_TEST_CASE(request_dump_simple)
 BOOST_AUTO_TEST_CASE(request_dump_multiple_params)
 {
     Param_list params;
-    params.push_back(Value(1));
-    params.push_back(Value(2));
-    params.push_back(Value(3));
+    params.emplace_back(1);
+    params.emplace_back(2);
+    params.emplace_back(3);
     Request req("sum", params);
 
     std::string xml = dump_request(req);
@@ -132,9 +132,9 @@ BOOST_AUTO_TEST_CASE(request_parse_no_params)
 BOOST_AUTO_TEST_CASE(request_roundtrip)
 {
     Param_list params;
-    params.push_back(Value(123));
-    params.push_back(Value("test"));
-    params.push_back(Value(true));
+    params.emplace_back(123);
+    params.emplace_back("test");
+    params.emplace_back(true);
     Request orig("roundtrip.test", params);
 
     std::string xml = dump_request(orig);
@@ -659,7 +659,7 @@ BOOST_AUTO_TEST_CASE(parse_special_chars_in_string)
 BOOST_AUTO_TEST_CASE(dump_special_chars_in_string)
 {
     Param_list params;
-    params.push_back(Value("<test> & \"quoted\""));
+    params.emplace_back("<test> & \"quoted\"");
     Request req("test", params);
     std::string xml = dump_request(req);
 
@@ -922,12 +922,12 @@ BOOST_AUTO_TEST_CASE(parse_struct_multiple_members)
 BOOST_AUTO_TEST_CASE(dump_request_with_all_types)
 {
     Param_list params;
-    params.push_back(Value(42));
-    params.push_back(Value(static_cast<int64_t>(123456789012LL)));
-    params.push_back(Value(3.14));
-    params.push_back(Value(true));
-    params.push_back(Value("test"));
-    params.push_back(Value(Nil()));
+    params.emplace_back(42);
+    params.emplace_back(static_cast<int64_t>(123456789012LL));
+    params.emplace_back(3.14);
+    params.emplace_back(true);
+    params.emplace_back("test");
+    params.emplace_back(Nil());
     Request req("test.allTypes", params);
     std::string xml = dump_request(req);
     BOOST_CHECK(xml.find("<i4>42</i4>") != std::string::npos);
@@ -943,7 +943,7 @@ BOOST_AUTO_TEST_CASE(dump_request_with_nested_struct)
     Struct outer;
     outer.insert("inner", Value(inner));
     Param_list params;
-    params.push_back(Value(outer));
+    params.emplace_back(outer);
     Request req("test.nested", params);
     std::string xml = dump_request(req);
     BOOST_CHECK(xml.find("<name>inner</name>") != std::string::npos);
@@ -954,7 +954,7 @@ BOOST_AUTO_TEST_CASE(dump_request_with_binary)
 {
     std::unique_ptr<Binary_data> bin(Binary_data::from_data("bin"));
     Param_list params;
-    params.push_back(Value(*bin));
+    params.emplace_back(*bin);
     Request req("test.bin", params);
     std::string xml = dump_request(req);
     BOOST_CHECK(xml.find("<base64>") != std::string::npos);
@@ -964,7 +964,7 @@ BOOST_AUTO_TEST_CASE(dump_request_with_datetime)
 {
     Date_time dt(std::string("20260108T12:30:45"));
     Param_list params;
-    params.push_back(Value(dt));
+    params.emplace_back(dt);
     Request req("test.dt", params);
     std::string xml = dump_request(req);
     BOOST_CHECK(xml.find("<dateTime.iso8601>20260108T12:30:45</dateTime.iso8601>") != std::string::npos);
@@ -1236,19 +1236,19 @@ BOOST_AUTO_TEST_CASE(request_complex_roundtrip)
 {
     // Build a complex request
     Param_list params;
-    params.push_back(Value(42));
-    params.push_back(Value("string"));
-    params.push_back(Value(true));
-    params.push_back(Value(3.14));
+    params.emplace_back(42);
+    params.emplace_back("string");
+    params.emplace_back(true);
+    params.emplace_back(3.14);
 
     Struct s;
     s.insert("nested_key", Value("nested_value"));
-    params.push_back(Value(s));
+    params.emplace_back(s);
 
     Array arr;
     arr.push_back(Value(1));
     arr.push_back(Value(2));
-    params.push_back(Value(arr));
+    params.emplace_back(arr);
 
     Request orig("test.complex", params);
 

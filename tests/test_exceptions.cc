@@ -174,7 +174,7 @@ BOOST_AUTO_TEST_CASE(network_error_with_errno)
     std::string msg = ex.what();
     BOOST_CHECK(msg.find("Connection refused") != std::string::npos);
     // Should contain errno description
-    BOOST_CHECK(msg.find(":") != std::string::npos);
+    BOOST_CHECK(msg.find(':') != std::string::npos);
 }
 
 BOOST_AUTO_TEST_CASE(network_error_with_custom_errno)
@@ -182,7 +182,7 @@ BOOST_AUTO_TEST_CASE(network_error_with_custom_errno)
     iqnet::network_error ex("Custom error", true, EINVAL);
     std::string msg = ex.what();
     BOOST_CHECK(msg.find("Custom error") != std::string::npos);
-    BOOST_CHECK(msg.find(":") != std::string::npos);
+    BOOST_CHECK(msg.find(':') != std::string::npos);
 }
 
 BOOST_AUTO_TEST_CASE(network_error_inheritance)
