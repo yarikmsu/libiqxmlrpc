@@ -186,6 +186,7 @@ BOOST_FIXTURE_TEST_CASE(concurrent_different_methods, IntegrationFixture)
   std::atomic<int> trace_count(0);
 
   // Run echo and trace methods concurrently
+  threads.reserve(10);
   for (int i = 0; i < 5; ++i) {
     threads.emplace_back([this, &echo_count]() {
       auto client = create_client();
@@ -195,8 +196,8 @@ BOOST_FIXTURE_TEST_CASE(concurrent_different_methods, IntegrationFixture)
     threads.emplace_back([this, &trace_count]() {
       auto client = create_client();
       Param_list params;
-      params.push_back(Value("a"));
-      params.push_back(Value("b"));
+      params.emplace_back("a");
+      params.emplace_back("b");
       Response r = client->execute("trace", params);
       if (!r.is_fault()) ++trace_count;
     });
@@ -311,6 +312,7 @@ std::string send_raw_http(const std::string& host, int port, const std::string& 
         response = std::string(buffer, n);
     } catch (...) {
         // Non-blocking recv may throw if no data
+        (void)0;
     }
 
     sock.close();
@@ -326,8 +328,9 @@ BOOST_FIXTURE_TEST_CASE(malformed_http_request_returns_400, IntegrationFixture)
     start_server(1, 110);
 
     // Send completely malformed HTTP (garbage data, not even close to HTTP)
-    std::string response = send_raw_http("127.0.0.1", port_,
-        "\x00\x01\x02GARBAGE\x03\x04\r\n\r\n");
+    std::string raw_data("\x01\x02GARBAGE\x03\x04\r\n\r\n", 15);
+    raw_data.insert(raw_data.begin(), '\0');
+    std::string response = send_raw_http("127.0.0.1", port_, raw_data);
 
     // Server should return an error or close connection - any response is acceptable
     // The main goal is that the error path in server_conn.cc is exercised
@@ -407,7 +410,7 @@ BOOST_FIXTURE_TEST_CASE(incomplete_http_request_waits, IntegrationFixture)
     try {
         size_t n = sock.recv(buffer, sizeof(buffer));
         response = std::string(buffer, n);
-    } catch (...) {}
+    } catch (...) { (void)0; }
 
     sock.close();
 
@@ -445,7 +448,7 @@ BOOST_FIXTURE_TEST_CASE(expect_100_continue_handled, IntegrationFixture)
     try {
         size_t n = sock.recv(buffer, sizeof(buffer));
         response = std::string(buffer, n);
-    } catch (...) {}
+    } catch (...) { (void)0; }
 
     // Should get 100 Continue
     BOOST_CHECK(response.find("100") != std::string::npos);
@@ -462,7 +465,7 @@ BOOST_FIXTURE_TEST_CASE(expect_100_continue_handled, IntegrationFixture)
     try {
         size_t n = sock.recv(buffer, sizeof(buffer));
         response = std::string(buffer, n);
-    } catch (...) {}
+    } catch (...) { (void)0; }
 
     sock.close();
 
@@ -608,8 +611,8 @@ BOOST_AUTO_TEST_CASE(ssl_truncated_cert_file)
         exception_thrown = true;
     }
 
-    std::remove(corrupt_cert_path.c_str());
-    std::remove(corrupt_key_path.c_str());
+    (void)std::remove(corrupt_cert_path.c_str());
+    (void)std::remove(corrupt_key_path.c_str());
     iqnet::ssl::ctx = saved_ctx;
     BOOST_CHECK(exception_thrown);
 }
@@ -643,8 +646,8 @@ BOOST_AUTO_TEST_CASE(ssl_valid_cert_invalid_key)
         exception_thrown = true;
     }
 
-    std::remove(cert_path.c_str());
-    std::remove(key_path.c_str());
+    (void)std::remove(cert_path.c_str());
+    (void)std::remove(key_path.c_str());
     iqnet::ssl::ctx = saved_ctx;
     BOOST_CHECK(exception_thrown);
 }
@@ -671,8 +674,8 @@ BOOST_FIXTURE_TEST_CASE(ssl_handshake_to_non_ssl_server, IntegrationFixture)
 
         iqnet::ssl::ctx = saved;
         delete ctx;
-        std::remove(paths.first.c_str());
-        std::remove(paths.second.c_str());
+        (void)std::remove(paths.first.c_str());
+        (void)std::remove(paths.second.c_str());
     } catch (const iqnet::ssl::exception&) {
         ssl_error = true;
     } catch (const iqnet::network_error&) {
@@ -698,8 +701,8 @@ BOOST_FIXTURE_TEST_CASE(https_keep_alive_multiple_requests, HttpsIntegrationFixt
     start_server(221);
 
     // Create client with keep-alive
-    std::unique_ptr<Client_base> client(
-        new Client<Https_client_connection>(Inet_addr("127.0.0.1", port_)));
+    auto client = std::make_unique<Client<Https_client_connection>>(
+        Inet_addr("127.0.0.1", port_));
     client->set_keep_alive(true);
 
     // Multiple requests on same HTTPS connection
@@ -719,8 +722,8 @@ BOOST_FIXTURE_TEST_CASE(https_no_keep_alive_shutdown, HttpsIntegrationFixture)
 
     start_server(222);
 
-    std::unique_ptr<Client_base> client(
-        new Client<Https_client_connection>(Inet_addr("127.0.0.1", port_)));
+    auto client = std::make_unique<Client<Https_client_connection>>(
+        Inet_addr("127.0.0.1", port_));
     client->set_keep_alive(false);
 
     // Single request with connection close
@@ -738,8 +741,8 @@ BOOST_FIXTURE_TEST_CASE(https_server_logs_exceptions, HttpsIntegrationFixture)
 
     start_server(223);
 
-    std::unique_ptr<Client_base> client(
-        new Client<Https_client_connection>(Inet_addr("127.0.0.1", port_)));
+    auto client = std::make_unique<Client<Https_client_connection>>(
+        Inet_addr("127.0.0.1", port_));
 
     // Call method that throws std::exception
     Response r1 = client->execute("std_exception_method", Param_list());
@@ -763,8 +766,8 @@ BOOST_FIXTURE_TEST_CASE(https_large_data_transfer, HttpsIntegrationFixture)
 
     start_server(224);
 
-    std::unique_ptr<Client_base> client(
-        new Client<Https_client_connection>(Inet_addr("127.0.0.1", port_)));
+    auto client = std::make_unique<Client<Https_client_connection>>(
+        Inet_addr("127.0.0.1", port_));
 
     // Send moderately large data
     std::string large_data(10000, 'x');
@@ -805,6 +808,7 @@ BOOST_AUTO_TEST_CASE(http_client_actual_request_timeout)
             accepted.close();
         } catch (...) {
             // Ignore errors during shutdown
+            (void)0;
         }
     });
 
@@ -855,6 +859,7 @@ BOOST_AUTO_TEST_CASE(http_client_connection_closed_during_read)
             accepted.close();
         } catch (...) {
             // Ignore errors during shutdown
+            (void)0;
         }
     });
 
@@ -872,7 +877,7 @@ BOOST_AUTO_TEST_CASE(http_client_connection_closed_during_read)
         std::string what = e.what();
         BOOST_CHECK(what.find("peer") != std::string::npos ||
                     what.find("closed") != std::string::npos ||
-                    what.length() > 0);
+                    !what.empty());
     } catch (...) {
         // Any network error is acceptable
         network_error_occurred = true;
@@ -918,8 +923,8 @@ BOOST_AUTO_TEST_CASE(firewall_blocks_with_empty_message)
     // Try to connect - should be rejected by firewall
     bool connection_failed = false;
     try {
-        std::unique_ptr<Client_base> client(
-            new Client<Http_client_connection>(Inet_addr("127.0.0.1", port)));
+        auto client = std::make_unique<Client<Http_client_connection>>(
+            Inet_addr("127.0.0.1", port));
         client->set_timeout(2);
         client->execute("echo", Value("should fail"));
     } catch (const iqnet::network_error&) {
@@ -966,8 +971,8 @@ BOOST_AUTO_TEST_CASE(firewall_blocks_with_custom_message)
     // Try to connect - should receive error response
     bool got_error = false;
     try {
-        std::unique_ptr<Client_base> client(
-            new Client<Http_client_connection>(Inet_addr("127.0.0.1", port)));
+        auto client = std::make_unique<Client<Http_client_connection>>(
+            Inet_addr("127.0.0.1", port));
         client->set_timeout(2);
         client->execute("echo", Value("should fail"));
     } catch (const iqnet::network_error&) {
@@ -1028,8 +1033,8 @@ BOOST_FIXTURE_TEST_CASE(http_server_logs_std_exception, IntegrationFixture)
 {
     start_server(1, 233);
 
-    std::unique_ptr<Client_base> client(
-        new Client<Http_client_connection>(Inet_addr("127.0.0.1", port_)));
+    auto client = std::make_unique<Client<Http_client_connection>>(
+        Inet_addr("127.0.0.1", port_));
 
     // Call method that throws std::exception - triggers log_exception
     Response r = client->execute("std_exception_method", Param_list());
@@ -1046,8 +1051,8 @@ BOOST_FIXTURE_TEST_CASE(http_server_logs_unknown_exception, IntegrationFixture)
 {
     start_server(1, 234);
 
-    std::unique_ptr<Client_base> client(
-        new Client<Http_client_connection>(Inet_addr("127.0.0.1", port_)));
+    auto client = std::make_unique<Client<Http_client_connection>>(
+        Inet_addr("127.0.0.1", port_));
 
     // Call method that throws non-std::exception - triggers log_unknown_exception
     Response r = client->execute("unknown_exception_method", Param_list());
@@ -1068,8 +1073,8 @@ BOOST_FIXTURE_TEST_CASE(server_feedback_normal_paths, IntegrationFixture)
 {
     start_server(1, 235);
 
-    std::unique_ptr<Client_base> client(
-        new Client<Http_client_connection>(Inet_addr("127.0.0.1", port_)));
+    auto client = std::make_unique<Client<Http_client_connection>>(
+        Inet_addr("127.0.0.1", port_));
 
     // First verify server is running
     Response r1 = client->execute("echo", Value("before log"));
@@ -1169,10 +1174,10 @@ public:
     running_ = false;
     // Wake up accept() by connecting (only if port was assigned)
     if (port_ > 0) {
-      try { Socket s; s.connect(Inet_addr("127.0.0.1", port_)); s.close(); } catch (...) {}
+      try { Socket s; s.connect(Inet_addr("127.0.0.1", port_)); s.close(); } catch (...) { (void)0; }
     }
     if (worker_.joinable()) worker_.join();
-    try { server_sock_.close(); } catch (...) {}
+    try { server_sock_.close(); } catch (...) { (void)0; }
   }
 
   int port() const { return port_; }
@@ -1223,7 +1228,7 @@ BOOST_AUTO_TEST_CASE(http_proxy_connection_closed)
     std::thread& thr;
     ~ProxyGuard() {
       if (thr.joinable()) thr.join();
-      try { sock.close(); } catch (...) {}
+      try { sock.close(); } catch (...) { (void)0; }
     }
   };
 
@@ -1238,7 +1243,7 @@ BOOST_AUTO_TEST_CASE(http_proxy_connection_closed)
       char buf[1024];
       client.recv(buf, sizeof(buf));
       client.close();  // Close without response
-    } catch (...) {}
+    } catch (...) { (void)0; }
   });
 
   ProxyGuard guard{proxy_sock, proxy_thread};  // Ensures cleanup on any exit
@@ -1278,7 +1283,7 @@ BOOST_AUTO_TEST_CASE(https_proxy_error_response)
     std::thread& thr;
     ~ProxyGuard() {
       if (thr.joinable()) thr.join();
-      try { sock.close(); } catch (...) {}
+      try { sock.close(); } catch (...) { (void)0; }
     }
   };
 
@@ -1297,7 +1302,7 @@ BOOST_AUTO_TEST_CASE(https_proxy_error_response)
       std::string response = "HTTP/1.0 403 Forbidden\r\nContent-Length: 0\r\n\r\n";
       client.send(response.c_str(), response.length());
       client.close();
-    } catch (...) {}
+    } catch (...) { (void)0; }
   });
 
   ProxyGuard guard{proxy_sock, proxy_thread};
@@ -1348,7 +1353,7 @@ BOOST_AUTO_TEST_CASE(https_proxy_auth_required)
     std::thread& thr;
     ~ProxyGuard() {
       if (thr.joinable()) thr.join();
-      try { sock.close(); } catch (...) {}
+      try { sock.close(); } catch (...) { (void)0; }
     }
   };
 
@@ -1370,7 +1375,7 @@ BOOST_AUTO_TEST_CASE(https_proxy_auth_required)
         "Content-Length: 0\r\n\r\n";
       client.send(response.c_str(), response.length());
       client.close();
-    } catch (...) {}
+    } catch (...) { (void)0; }
   });
 
   ProxyGuard guard{proxy_sock, proxy_thread};
@@ -1418,7 +1423,7 @@ BOOST_AUTO_TEST_CASE(https_proxy_connection_closed_during_setup)
     std::thread& thr;
     ~ProxyGuard() {
       if (thr.joinable()) thr.join();
-      try { sock.close(); } catch (...) {}
+      try { sock.close(); } catch (...) { (void)0; }
     }
   };
 
@@ -1434,7 +1439,7 @@ BOOST_AUTO_TEST_CASE(https_proxy_connection_closed_during_setup)
       client.recv(buf, sizeof(buf));
       // Close without sending response
       client.close();
-    } catch (...) {}
+    } catch (...) { (void)0; }
   });
 
   ProxyGuard guard{proxy_sock, proxy_thread};
@@ -1475,7 +1480,7 @@ BOOST_AUTO_TEST_CASE(https_proxy_connect_request_format)
     std::thread& thr;
     ~ProxyGuard() {
       if (thr.joinable()) thr.join();
-      try { sock.close(); } catch (...) {}
+      try { sock.close(); } catch (...) { (void)0; }
     }
   };
 
@@ -1499,7 +1504,7 @@ BOOST_AUTO_TEST_CASE(https_proxy_connect_request_format)
       std::string response = "HTTP/1.0 503 Service Unavailable\r\n\r\n";
       client.send(response.c_str(), response.length());
       client.close();
-    } catch (...) {}
+    } catch (...) { (void)0; }
   });
 
   ProxyGuard guard{proxy_sock, proxy_thread};
@@ -1522,6 +1527,7 @@ BOOST_AUTO_TEST_CASE(https_proxy_connect_request_format)
     conn.process_session(req);
   } catch (...) {
     // Expected to fail - we're verifying the request format
+    (void)0;
   }
 
   // Wait for thread to capture request
@@ -1543,9 +1549,9 @@ BOOST_AUTO_TEST_CASE(https_proxy_tunnel_timeout)
     ~ProxyGuard() {
       running = false;
       // Wake up accept()
-      try { Socket s; s.connect(Inet_addr("127.0.0.1", sock.get_addr().get_port())); s.close(); } catch (...) {}
+      try { Socket s; s.connect(Inet_addr("127.0.0.1", sock.get_addr().get_port())); s.close(); } catch (...) { (void)0; }
       if (thr.joinable()) thr.join();
-      try { sock.close(); } catch (...) {}
+      try { sock.close(); } catch (...) { (void)0; }
     }
   };
 
@@ -1598,6 +1604,7 @@ BOOST_AUTO_TEST_CASE(https_proxy_tunnel_timeout)
     got_timeout = true;
   } catch (const std::exception&) {
     // Any exception is acceptable - timeout path exercised
+    (void)0;
   }
 
   BOOST_CHECK(got_timeout);
@@ -1635,7 +1642,7 @@ BOOST_AUTO_TEST_CASE(https_proxy_ssl_factory_success)
       // Keep connection open for SSL factory to use
       std::this_thread::sleep_for(std::chrono::milliseconds(500));
       client.close();
-    } catch (...) {}
+    } catch (...) { (void)0; }
   });
 
   SslFactoryTestProxyGuard guard{proxy_sock, proxy_thread};
@@ -1700,7 +1707,7 @@ BOOST_AUTO_TEST_CASE(https_proxy_ssl_factory_parameters)
       client.send(response.c_str(), response.length());
       std::this_thread::sleep_for(std::chrono::milliseconds(500));
       client.close();
-    } catch (...) {}
+    } catch (...) { (void)0; }
   });
 
   SslFactoryTestProxyGuard guard{proxy_sock, proxy_thread};
@@ -1736,7 +1743,7 @@ BOOST_AUTO_TEST_CASE(https_proxy_ssl_factory_parameters)
 
     Request req("my_test_method", Param_list());
     conn.process_session(req);
-  } catch (...) {}
+  } catch (...) { (void)0; }
 
   // Verify parameters passed to factory
   BOOST_CHECK_EQUAL(non_blocking_param, false);  // We passed false to constructor
@@ -1761,7 +1768,7 @@ BOOST_AUTO_TEST_CASE(https_proxy_ssl_factory_exception)
       client.send(response.c_str(), response.length());
       std::this_thread::sleep_for(std::chrono::milliseconds(500));
       client.close();
-    } catch (...) {}
+    } catch (...) { (void)0; }
   });
 
   SslFactoryTestProxyGuard guard{proxy_sock, proxy_thread};
@@ -2005,6 +2012,7 @@ BOOST_FIXTURE_TEST_CASE(http_server_rapid_requests, IntegrationFixture)
   std::vector<std::thread> threads;
   std::atomic<int> success_count(0);
 
+  threads.reserve(20);
   for (int i = 0; i < 20; ++i) {
     threads.emplace_back([this, i, &success_count]() {
       try {
@@ -2015,7 +2023,7 @@ BOOST_FIXTURE_TEST_CASE(http_server_rapid_requests, IntegrationFixture)
             ++success_count;
           }
         }
-      } catch (...) {}
+      } catch (...) { (void)0; }
     });
   }
 
@@ -2255,8 +2263,8 @@ BOOST_FIXTURE_TEST_CASE(ssl_blocking_operations_through_client, HttpsIntegration
 
   start_server(240);
 
-  std::unique_ptr<Client_base> client(
-    new Client<Https_client_connection>(Inet_addr("127.0.0.1", port_)));
+  auto client = std::make_unique<Client<Https_client_connection>>(
+    Inet_addr("127.0.0.1", port_));
 
   for (int i = 0; i < 3; ++i) {
     Response r = client->execute("echo", Value(std::string("blocking test ") + num_conv::to_string(i)));
@@ -2295,11 +2303,12 @@ BOOST_FIXTURE_TEST_CASE(pool_executor_concurrent_clients, IntegrationFixture)
   std::atomic<int> success_count(0);
   std::vector<std::thread> threads;
 
+  threads.reserve(4);
   for (int i = 0; i < 4; ++i) {
     threads.emplace_back([this, i, &success_count]() {
       try {
-        std::unique_ptr<Client_base> client(
-          new Client<Http_client_connection>(Inet_addr("127.0.0.1", port_)));
+        auto client = std::make_unique<Client<Http_client_connection>>(
+          Inet_addr("127.0.0.1", port_));
 
         Response r = client->execute("echo", Value(i));
         if (!r.is_fault() && r.value().get_int() == i) {
@@ -2307,6 +2316,7 @@ BOOST_FIXTURE_TEST_CASE(pool_executor_concurrent_clients, IntegrationFixture)
         }
       } catch (...) {
         // Connection errors are acceptable in race conditions
+        (void)0;
       }
     });
   }

@@ -108,7 +108,7 @@ BOOST_AUTO_TEST_CASE(binary_clone)
 {
     std::unique_ptr<Binary_data> original(Binary_data::from_data("test data"));
     std::unique_ptr<Value_type> clone(original->clone());
-    Binary_data* bin_clone = dynamic_cast<Binary_data*>(clone.get());
+    auto* bin_clone = dynamic_cast<Binary_data*>(clone.get());
     BOOST_REQUIRE(bin_clone != nullptr);
     BOOST_CHECK_EQUAL(bin_clone->get_data(), original->get_data());
 }
@@ -221,7 +221,7 @@ BOOST_AUTO_TEST_CASE(datetime_clone)
 {
     Date_time original(std::string("20231225T12:30:45"));
     std::unique_ptr<Value_type> clone(original.clone());
-    Date_time* dt_clone = dynamic_cast<Date_time*>(clone.get());
+    auto* dt_clone = dynamic_cast<Date_time*>(clone.get());
     BOOST_REQUIRE(dt_clone != nullptr);
     BOOST_CHECK_EQUAL(dt_clone->to_string(), original.to_string());
 }
@@ -364,7 +364,7 @@ BOOST_AUTO_TEST_CASE(value_bool_true)
 BOOST_AUTO_TEST_CASE(value_copy_construction)
 {
     Value original = 42;
-    Value copy(original);
+    Value copy(original);  // NOLINT(performance-unnecessary-copy-initialization) - copy constructor under test
     BOOST_CHECK_EQUAL(copy.get_int(), 42);
 }
 
@@ -568,10 +568,10 @@ BOOST_AUTO_TEST_CASE(print_struct)
     Value v = s;
     v.apply_visitor(visitor);
     std::string result = oss.str();
-    BOOST_CHECK(result.find("{") != std::string::npos);
+    BOOST_CHECK(result.find('{') != std::string::npos);
     BOOST_CHECK(result.find("'key'") != std::string::npos);
     BOOST_CHECK(result.find("42") != std::string::npos);
-    BOOST_CHECK(result.find("}") != std::string::npos);
+    BOOST_CHECK(result.find('}') != std::string::npos);
 }
 
 BOOST_AUTO_TEST_CASE(print_array)
@@ -584,10 +584,10 @@ BOOST_AUTO_TEST_CASE(print_array)
     Value v = a;
     v.apply_visitor(visitor);
     std::string result = oss.str();
-    BOOST_CHECK(result.find("[") != std::string::npos);
-    BOOST_CHECK(result.find("1") != std::string::npos);
-    BOOST_CHECK(result.find("2") != std::string::npos);
-    BOOST_CHECK(result.find("]") != std::string::npos);
+    BOOST_CHECK(result.find('[') != std::string::npos);
+    BOOST_CHECK(result.find('1') != std::string::npos);
+    BOOST_CHECK(result.find('2') != std::string::npos);
+    BOOST_CHECK(result.find(']') != std::string::npos);
 }
 
 BOOST_AUTO_TEST_CASE(print_binary)
@@ -824,10 +824,10 @@ BOOST_AUTO_TEST_CASE(nil_type_clone)
 BOOST_AUTO_TEST_CASE(array_type_clone)
 {
     Array original;
-    original.push_back(Value_ptr(new Value(1)));
-    original.push_back(Value_ptr(new Value(2)));
+    original.push_back(std::make_unique<Value>(1));
+    original.push_back(std::make_unique<Value>(2));
     std::unique_ptr<Value_type> cloned(original.clone());
-    Array* arr = dynamic_cast<Array*>(cloned.get());
+    auto* arr = dynamic_cast<Array*>(cloned.get());
     BOOST_REQUIRE(arr != nullptr);
     BOOST_CHECK_EQUAL(arr->size(), 2u);
 }
@@ -835,9 +835,9 @@ BOOST_AUTO_TEST_CASE(array_type_clone)
 BOOST_AUTO_TEST_CASE(struct_type_clone)
 {
     Struct original;
-    original.insert("key", Value_ptr(new Value("val")));
+    original.insert("key", std::make_unique<Value>("val"));
     std::unique_ptr<Value_type> cloned(original.clone());
-    Struct* st = dynamic_cast<Struct*>(cloned.get());
+    auto* st = dynamic_cast<Struct*>(cloned.get());
     BOOST_REQUIRE(st != nullptr);
     BOOST_CHECK(st->has_field("key"));
 }
@@ -846,7 +846,7 @@ BOOST_AUTO_TEST_CASE(binary_type_clone)
 {
     std::unique_ptr<Binary_data> original(Binary_data::from_data("data"));
     std::unique_ptr<Value_type> cloned(original->clone());
-    Binary_data* bin = dynamic_cast<Binary_data*>(cloned.get());
+    auto* bin = dynamic_cast<Binary_data*>(cloned.get());
     BOOST_REQUIRE(bin != nullptr);
     BOOST_CHECK_EQUAL(bin->get_data(), "data");
 }
@@ -855,7 +855,7 @@ BOOST_AUTO_TEST_CASE(datetime_type_clone)
 {
     Date_time original(std::string("20260108T12:30:45"));
     std::unique_ptr<Value_type> cloned(original.clone());
-    Date_time* dt = dynamic_cast<Date_time*>(cloned.get());
+    auto* dt = dynamic_cast<Date_time*>(cloned.get());
     BOOST_REQUIRE(dt != nullptr);
 }
 
@@ -982,7 +982,7 @@ BOOST_AUTO_TEST_CASE(datetime_malformed_throws)
 BOOST_AUTO_TEST_CASE(datetime_to_string)
 {
     Date_time dt(std::string("20260108T12:30:45"));
-    std::string str = dt.to_string();
+    const std::string& str = dt.to_string();
     BOOST_CHECK(str.find("2026") != std::string::npos);
     BOOST_CHECK(str.find("12:30:45") != std::string::npos);
 }
@@ -1302,7 +1302,7 @@ BOOST_AUTO_TEST_SUITE(struct_operations_extended)
 BOOST_AUTO_TEST_CASE(struct_insert_value_ptr)
 {
     Struct s;
-    s.insert("key", Value_ptr(new Value(42)));
+    s.insert("key", std::make_unique<Value>(42));
     BOOST_CHECK(s.has_field("key"));
     BOOST_CHECK_EQUAL(s["key"].get_int(), 42);
 }
@@ -1314,7 +1314,8 @@ BOOST_AUTO_TEST_CASE(struct_iterator)
     s.insert("b", Value(2));
 
     int count = 0;
-    for (Struct::const_iterator it = s.begin(); it != s.end(); ++it) {
+    for (const auto& entry : s) {
+        (void)entry;
         count++;
     }
     BOOST_CHECK_EQUAL(count, 2);
@@ -1346,7 +1347,7 @@ BOOST_AUTO_TEST_CASE(struct_move_constructor)
     BOOST_CHECK_EQUAL(b["z"].get_int(), 30);
 
     // Moved-from struct should be empty
-    BOOST_CHECK_EQUAL(a.size(), 0u);
+    BOOST_CHECK_EQUAL(a.size(), 0u);  // NOLINT(bugprone-use-after-move) - moved-from state under test
 }
 
 BOOST_AUTO_TEST_CASE(struct_move_assignment)
@@ -1368,9 +1369,9 @@ BOOST_AUTO_TEST_CASE(struct_move_assignment)
     BOOST_CHECK_EQUAL(b["key2"].get_int(), 200);
 
     // Moved-from struct has the old values from b (swap semantics)
-    BOOST_CHECK_EQUAL(a.size(), 1u);
-    BOOST_CHECK(a.has_field("old"));
-    BOOST_CHECK_EQUAL(a["old"].get_int(), 999);
+    BOOST_CHECK_EQUAL(a.size(), 1u);  // NOLINT(bugprone-use-after-move) - moved-from state under test
+    BOOST_CHECK(a.has_field("old"));  // NOLINT(bugprone-use-after-move) - moved-from state under test
+    BOOST_CHECK_EQUAL(a["old"].get_int(), 999);  // NOLINT(bugprone-use-after-move) - moved-from state under test
 }
 
 BOOST_AUTO_TEST_SUITE_END()
@@ -1386,8 +1387,8 @@ BOOST_AUTO_TEST_CASE(array_const_iterator)
 
     const Array& ca = a;
     int sum = 0;
-    for (Array::const_iterator it = ca.begin(); it != ca.end(); ++it) {
-        sum += (*it).get_int();
+    for (const auto& entry : ca) {
+        sum += entry.get_int();
     }
     BOOST_CHECK_EQUAL(sum, 6);
 }
@@ -1430,7 +1431,7 @@ BOOST_AUTO_TEST_CASE(array_move_constructor)
     BOOST_CHECK_EQUAL(b[2].get_int(), 3);
 
     // Moved-from array should be empty
-    BOOST_CHECK_EQUAL(a.size(), 0u);
+    BOOST_CHECK_EQUAL(a.size(), 0u);  // NOLINT(bugprone-use-after-move) - moved-from state under test
 }
 
 BOOST_AUTO_TEST_CASE(array_move_assignment)
@@ -1450,8 +1451,8 @@ BOOST_AUTO_TEST_CASE(array_move_assignment)
     BOOST_CHECK_EQUAL(b[1].get_int(), 20);
 
     // Moved-from array has the old values from b (swap semantics)
-    BOOST_CHECK_EQUAL(a.size(), 1u);
-    BOOST_CHECK_EQUAL(a[0].get_int(), 100);
+    BOOST_CHECK_EQUAL(a.size(), 1u);  // NOLINT(bugprone-use-after-move) - moved-from state under test
+    BOOST_CHECK_EQUAL(a[0].get_int(), 100);  // NOLINT(bugprone-use-after-move) - moved-from state under test
 }
 
 // ============================================================================
@@ -1481,9 +1482,9 @@ BOOST_AUTO_TEST_CASE(value_move_constructor_string)
 BOOST_AUTO_TEST_CASE(value_move_constructor_array)
 {
     Array arr;
-    arr.push_back(1);
-    arr.push_back(2);
-    arr.push_back(3);
+    arr.push_back(Value(1));
+    arr.push_back(Value(2));
+    arr.push_back(Value(3));
     Value a(arr);
     Value b(std::move(a));
 
@@ -1539,11 +1540,13 @@ BOOST_AUTO_TEST_CASE(value_use_after_move_throws_bad_cast)
     Value b(std::move(a));
 
     // Accessing moved-from value should throw Bad_cast
+    // NOLINTBEGIN(bugprone-use-after-move) - moved-from state under test
     BOOST_CHECK_THROW(a.get_int(), Value::Bad_cast);
     BOOST_CHECK_THROW(a.get_string(), Value::Bad_cast);
     BOOST_CHECK_THROW(a.get_double(), Value::Bad_cast);
     BOOST_CHECK_THROW(a.get_bool(), Value::Bad_cast);
     BOOST_CHECK_THROW(a.get_int64(), Value::Bad_cast);
+    // NOLINTEND(bugprone-use-after-move)
 }
 
 BOOST_AUTO_TEST_CASE(value_use_after_move_assignment_throws)
@@ -1554,7 +1557,9 @@ BOOST_AUTO_TEST_CASE(value_use_after_move_assignment_throws)
     b = std::move(a);
 
     // Accessing moved-from value should throw Bad_cast
+    // NOLINTBEGIN(bugprone-use-after-move) - moved-from state under test
     BOOST_CHECK_THROW(a.get_string(), Value::Bad_cast);
+    // NOLINTEND(bugprone-use-after-move)
 }
 
 BOOST_AUTO_TEST_CASE(value_is_type_methods_return_false_after_move)
@@ -1563,6 +1568,7 @@ BOOST_AUTO_TEST_CASE(value_is_type_methods_return_false_after_move)
     Value b(std::move(a));
 
     // is_* methods should return false for moved-from value (not throw)
+    // NOLINTBEGIN(bugprone-use-after-move) - moved-from state under test
     BOOST_CHECK(!a.is_int());
     BOOST_CHECK(!a.is_string());
     BOOST_CHECK(!a.is_double());
@@ -1573,6 +1579,7 @@ BOOST_AUTO_TEST_CASE(value_is_type_methods_return_false_after_move)
     BOOST_CHECK(!a.is_array());
     BOOST_CHECK(!a.is_struct());
     BOOST_CHECK(!a.is_nil());
+    // NOLINTEND(bugprone-use-after-move)
 }
 
 BOOST_AUTO_TEST_CASE(array_push_back_rvalue)
@@ -1804,7 +1811,7 @@ BOOST_AUTO_TEST_CASE(scalar_int_operations)
     BOOST_CHECK_EQUAL(i.type_name(), "i4");
 
     std::unique_ptr<Value_type> cloned(i.clone());
-    Int* cloned_int = dynamic_cast<Int*>(cloned.get());
+    auto* cloned_int = dynamic_cast<Int*>(cloned.get());
     BOOST_REQUIRE(cloned_int != nullptr);
     BOOST_CHECK_EQUAL(cloned_int->value(), 42);
 }
@@ -1818,7 +1825,7 @@ BOOST_AUTO_TEST_CASE(scalar_int64_operations)
     BOOST_CHECK_EQUAL(i.type_name(), "i8");
 
     std::unique_ptr<Value_type> cloned(i.clone());
-    Int64* cloned_int64 = dynamic_cast<Int64*>(cloned.get());
+    auto* cloned_int64 = dynamic_cast<Int64*>(cloned.get());
     BOOST_REQUIRE(cloned_int64 != nullptr);
     BOOST_CHECK_EQUAL(cloned_int64->value(), 9876543210LL);
 }
@@ -1834,7 +1841,7 @@ BOOST_AUTO_TEST_CASE(scalar_bool_operations)
     BOOST_CHECK_EQUAL(b_true.type_name(), "boolean");
 
     std::unique_ptr<Value_type> cloned(b_true.clone());
-    Bool* cloned_bool = dynamic_cast<Bool*>(cloned.get());
+    auto* cloned_bool = dynamic_cast<Bool*>(cloned.get());
     BOOST_REQUIRE(cloned_bool != nullptr);
     BOOST_CHECK_EQUAL(cloned_bool->value(), true);
 }
@@ -1848,7 +1855,7 @@ BOOST_AUTO_TEST_CASE(scalar_double_operations)
     BOOST_CHECK_EQUAL(d.type_name(), "double");
 
     std::unique_ptr<Value_type> cloned(d.clone());
-    Double* cloned_double = dynamic_cast<Double*>(cloned.get());
+    auto* cloned_double = dynamic_cast<Double*>(cloned.get());
     BOOST_REQUIRE(cloned_double != nullptr);
     BOOST_CHECK_CLOSE(cloned_double->value(), 3.14159, 0.0001);
 }
@@ -1862,7 +1869,7 @@ BOOST_AUTO_TEST_CASE(scalar_string_operations)
     BOOST_CHECK_EQUAL(s.type_name(), "string");
 
     std::unique_ptr<Value_type> cloned(s.clone());
-    String* cloned_string = dynamic_cast<String*>(cloned.get());
+    auto* cloned_string = dynamic_cast<String*>(cloned.get());
     BOOST_REQUIRE(cloned_string != nullptr);
     BOOST_CHECK_EQUAL(cloned_string->value(), "hello world");
 }

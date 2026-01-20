@@ -103,9 +103,9 @@ BOOST_AUTO_TEST_CASE(method_execute_with_params)
     TestMethod method;
     Value result = Nil();
     Param_list params;
-    params.push_back(Value(1));
-    params.push_back(Value("test"));
-    params.push_back(Value(3.14));
+    params.emplace_back(1);
+    params.emplace_back("test");
+    params.emplace_back(3.14);
 
     method.process_execution(nullptr, params, result);
 
@@ -119,8 +119,8 @@ BOOST_AUTO_TEST_CASE(method_echo_params)
     EchoMethod method;
     Value result = Nil();
     Param_list params;
-    params.push_back(Value(100));
-    params.push_back(Value("hello"));
+    params.emplace_back(100);
+    params.emplace_back("hello");
 
     method.process_execution(nullptr, params, result);
 
@@ -281,9 +281,9 @@ BOOST_AUTO_TEST_CASE(function_adapter_factory)
 
     Value result = Nil();
     Param_list params;
-    params.push_back(Value(1));
-    params.push_back(Value(2));
-    params.push_back(Value(3));
+    params.emplace_back(1);
+    params.emplace_back(2);
+    params.emplace_back(3);
     method->process_execution(nullptr, params, result);
 
     BOOST_CHECK_EQUAL(result.get_int(), 3);  // params.size()
@@ -380,8 +380,9 @@ BOOST_AUTO_TEST_CASE(get_methods_list_with_methods)
 
     // Check that all method names are in the list
     std::vector<std::string> names;
-    for (size_t i = 0; i < methods.size(); ++i) {
-        names.push_back(methods[i].get_string());
+    names.reserve(methods.size());
+    for (const auto& method : methods) {
+        names.emplace_back(method.get_string());
     }
 
     BOOST_CHECK(std::find(names.begin(), names.end(), "alpha") != names.end());
@@ -441,7 +442,7 @@ BOOST_AUTO_TEST_CASE(overwrite_method_registration)
     // Should be EchoMethod (the second registration)
     Value result = Nil();
     Param_list params;
-    params.push_back(Value("test"));
+    params.emplace_back("test");
     method->process_execution(nullptr, params, result);
 
     BOOST_CHECK(result.is_array());  // EchoMethod returns Array
@@ -456,8 +457,8 @@ BOOST_AUTO_TEST_CASE(function_adapter_basic)
     Method_function_adapter adapter(test_function);
     Value result = Nil();
     Param_list params;
-    params.push_back(Value(1));
-    params.push_back(Value(2));
+    params.emplace_back(1);
+    params.emplace_back(2);
 
     adapter.process_execution(nullptr, params, result);
 
@@ -656,8 +657,9 @@ BOOST_AUTO_TEST_CASE(multiple_custom_dispatchers)
     BOOST_CHECK_GE(methods.size(), 3u);
 
     std::vector<std::string> names;
-    for (size_t i = 0; i < methods.size(); ++i) {
-        names.push_back(methods[i].get_string());
+    names.reserve(methods.size());
+    for (const auto& method : methods) {
+        names.emplace_back(method.get_string());
     }
 
     BOOST_CHECK(std::find(names.begin(), names.end(), "regular.method") != names.end());

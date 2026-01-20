@@ -47,7 +47,7 @@ BOOST_FIXTURE_TEST_CASE(method_returns_complex_fault, IntegrationFixture)
   // error_method throws Fault(123, "My fault")
   Response r = client->execute("error_method", Value("test"));
   BOOST_CHECK(r.is_fault());
-  std::string fault_str = r.fault_string();
+  const std::string& fault_str = r.fault_string();
   BOOST_CHECK(fault_str.find("fault") != std::string::npos ||
               fault_str.find("Fault") != std::string::npos);
 }
@@ -197,7 +197,9 @@ BOOST_AUTO_TEST_CASE(connection_closed_by_peer)
             accepted.send(partial, strlen(partial));
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             accepted.close();
-        } catch (...) {}
+        } catch (...) {
+            (void)0;
+        }
     });
 
     try {
@@ -254,8 +256,8 @@ BOOST_AUTO_TEST_CASE(ssl_invalid_cert_path)
         exception_thrown = true;
     }
 
-    std::remove(invalid_cert_path.c_str());
-    std::remove(invalid_key_path.c_str());
+    (void)std::remove(invalid_cert_path.c_str());
+    (void)std::remove(invalid_key_path.c_str());
     iqnet::ssl::ctx = saved_ctx;
 
     BOOST_CHECK(exception_thrown);
@@ -290,8 +292,8 @@ BOOST_AUTO_TEST_CASE(ssl_mismatched_cert_key)
         exception_thrown = true;
     }
 
-    std::remove(cert_path.c_str());
-    std::remove(key_path.c_str());
+    (void)std::remove(cert_path.c_str());
+    (void)std::remove(key_path.c_str());
     iqnet::ssl::ctx = saved_ctx;
 
     BOOST_CHECK(exception_thrown);

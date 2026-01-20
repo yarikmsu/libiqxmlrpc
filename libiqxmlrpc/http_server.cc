@@ -106,7 +106,8 @@ void Http_server_connection::handle_input( bool& terminate )
   {
     // Close connection after sending HTTP error response
     keep_alive = false;
-    schedule_response( new http::Packet(e) );
+    // Packet payload is sufficient here; slicing is intentional.
+    schedule_response( new http::Packet(e) );  // NOLINT(cppcoreguidelines-slicing)
   }
 }
 

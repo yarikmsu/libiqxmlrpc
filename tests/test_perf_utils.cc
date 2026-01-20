@@ -328,7 +328,7 @@ BOOST_AUTO_TEST_CASE(result_collector_save_baseline)
 
     // Cleanup
     collector.clear();
-    std::remove(temp_file.c_str());
+    (void)std::remove(temp_file.c_str());
 }
 
 BOOST_AUTO_TEST_CASE(result_collector_save_baseline_invalid_path)
@@ -418,8 +418,8 @@ BOOST_AUTO_TEST_CASE(print_latency_comparison_basic)
 
     // Add some data
     for (int i = 1; i <= 100; ++i) {
-        stats1.add(i * 10);
-        stats2.add(i * 8);  // stats2 is 20% faster
+        stats1.add(static_cast<int64_t>(i) * 10);
+        stats2.add(static_cast<int64_t>(i) * 8);  // stats2 is 20% faster
     }
 
     // Should print comparison table

@@ -15,6 +15,7 @@
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+#include <string>
 #include <sys/stat.h>
 #include <thread>
 #include <unistd.h>
@@ -32,6 +33,7 @@
 #include <openssl/err.h>
 
 #include "methods.h"
+#include "test_resource_limits.h"
 
 namespace iqxmlrpc_test {
 
@@ -174,7 +176,7 @@ inline std::pair<std::string, std::string> create_temp_cert_files() {
   ssize_t cert_written = write(cert_fd, EMBEDDED_TEST_CERT, cert_len);
   close(cert_fd);
   if (cert_written < 0 || static_cast<size_t>(cert_written) != cert_len) {
-    std::remove(cert_path.c_str());
+    (void)std::remove(cert_path.c_str());
     throw std::runtime_error("Failed to write temp cert file: " + cert_path);
   }
 
@@ -183,14 +185,14 @@ inline std::pair<std::string, std::string> create_temp_cert_files() {
   size_t key_len = strlen(EMBEDDED_TEST_KEY);
   int key_fd = open(key_path.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
   if (key_fd < 0) {
-    std::remove(cert_path.c_str());
+    (void)std::remove(cert_path.c_str());
     throw std::runtime_error("Failed to create temp key file (may already exist): " + key_path);
   }
   ssize_t key_written = write(key_fd, EMBEDDED_TEST_KEY, key_len);
   close(key_fd);
   if (key_written < 0 || static_cast<size_t>(key_written) != key_len) {
-    std::remove(cert_path.c_str());
-    std::remove(key_path.c_str());
+    (void)std::remove(cert_path.c_str());
+    (void)std::remove(key_path.c_str());
     throw std::runtime_error("Failed to write temp key file: " + key_path);
   }
 
@@ -234,13 +236,16 @@ protected:
   std::thread server_thread_;
   std::mutex ready_mutex_;
   std::condition_variable ready_cond_;
+  std::mutex server_error_mutex_;
   bool server_ready_ = false;
+  std::atomic<bool> server_error_{false};
   std::atomic<bool> server_running_{false};
   int port_ = HTTPS_FIXTURE_BASE_PORT;
   iqnet::ssl::Ctx* saved_ctx_ = nullptr;
   iqnet::ssl::Ctx* test_ctx_ = nullptr;
   std::string temp_cert_path_;
   std::string temp_key_path_;
+  std::string server_error_message_;
 
 public:
   HttpsIntegrationFixture(const HttpsIntegrationFixture&) = delete;
@@ -252,9 +257,11 @@ public:
     , server_thread_()
     , ready_mutex_()
     , ready_cond_()
+    , server_error_mutex_()
     , saved_ctx_(iqnet::ssl::ctx)
     , temp_cert_path_()
     , temp_key_path_()
+    , server_error_message_()
   {}
 
   ~HttpsIntegrationFixture() {
@@ -286,18 +293,20 @@ public:
   }
 
   void cleanup_temp_files() {
-    if (!temp_cert_path_.empty()) std::remove(temp_cert_path_.c_str());
-    if (!temp_key_path_.empty()) std::remove(temp_key_path_.c_str());
+    if (!temp_cert_path_.empty()) (void)std::remove(temp_cert_path_.c_str());
+    if (!temp_key_path_.empty()) (void)std::remove(temp_key_path_.c_str());
   }
 
   void start_server(int port_offset = 0) {
+    ensure_fd_limit();
     port_ = HTTPS_FIXTURE_BASE_PORT + port_offset;
+    server_error_ = false;
 
-    exec_factory_.reset(new iqxmlrpc::Serial_executor_factory);
+    exec_factory_ = std::make_unique<iqxmlrpc::Serial_executor_factory>();
 
-    server_.reset(new iqxmlrpc::Https_server(
+    server_ = std::make_unique<iqxmlrpc::Https_server>(
       iqnet::Inet_addr("127.0.0.1", port_),
-      exec_factory_.get()));
+      exec_factory_.get());
 
     register_user_methods(*server_);
 
@@ -308,7 +317,21 @@ public:
         server_ready_ = true;
         ready_cond_.notify_one();
       }
-      server_->work();
+      try {
+        server_->work();
+      } catch (const std::exception& ex) {
+        {
+          std::lock_guard<std::mutex> lk(server_error_mutex_);
+          server_error_message_ = ex.what();
+        }
+        server_error_ = true;
+      } catch (...) {
+        {
+          std::lock_guard<std::mutex> lk(server_error_mutex_);
+          server_error_message_ = "unknown exception";
+        }
+        server_error_ = true;
+      }
       server_running_ = false;
     });
 
@@ -335,9 +358,21 @@ public:
   }
 
   std::unique_ptr<iqxmlrpc::Client_base> create_client() {
-    return std::unique_ptr<iqxmlrpc::Client_base>(
+    if (server_error_) {
+      std::string msg;
+      {
+        std::lock_guard<std::mutex> lk(server_error_mutex_);
+        msg = server_error_message_;
+      }
+      throw std::runtime_error("Server thread failed: " + msg);
+    }
+    auto client = std::unique_ptr<iqxmlrpc::Client_base>(
       new iqxmlrpc::Client<iqxmlrpc::Https_client_connection>(
         iqnet::Inet_addr("127.0.0.1", port_)));
+    if (should_disable_keep_alive()) {
+      client->set_keep_alive(false);
+    }
+    return client;
   }
 
   iqnet::ssl::Ctx* get_context() { return test_ctx_; }

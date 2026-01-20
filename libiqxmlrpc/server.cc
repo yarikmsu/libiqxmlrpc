@@ -269,7 +269,8 @@ void Server::schedule_execute( http::Packet* pkt, Server_connection* conn )
   {
     log_err_msg( e.what() );
     std::unique_ptr<Executor> executor_to_delete(executor);
-    auto *err_pkt = new http::Packet(e);
+    // Packet payload is sufficient here; slicing is intentional.
+    auto *err_pkt = new http::Packet(e);  // NOLINT(cppcoreguidelines-slicing)
     conn->schedule_response( err_pkt );
   }
   catch( const iqxmlrpc::Exception& e )

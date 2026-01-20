@@ -37,9 +37,9 @@ BOOST_FIXTURE_TEST_CASE(client_multiple_params, IntegrationFixture)
   auto client = create_client();
 
   Param_list params;
-  params.push_back(Value("a"));
-  params.push_back(Value("b"));
-  params.push_back(Value("c"));
+  params.emplace_back("a");
+  params.emplace_back("b");
+  params.emplace_back("c");
 
   Response r = client->execute("trace", params);
   BOOST_CHECK(!r.is_fault());
