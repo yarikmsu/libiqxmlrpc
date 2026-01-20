@@ -11,8 +11,8 @@ elseif(DEFINED OPENSSL_VERSION_STRING)
   set(_iqxmlrpc_openssl_version "${OPENSSL_VERSION_STRING}")
 endif()
 
-if(_iqxmlrpc_openssl_version AND _iqxmlrpc_openssl_version VERSION_LESS "1.0.2")
-  message(FATAL_ERROR "OpenSSL >= 1.0.2 is required. Found ${_iqxmlrpc_openssl_version}")
+if(_iqxmlrpc_openssl_version AND _iqxmlrpc_openssl_version VERSION_LESS "1.1.0")
+  message(FATAL_ERROR "OpenSSL >= 1.1.0 is required. Found ${_iqxmlrpc_openssl_version}")
 endif()
 
 include_directories(${XML2_INCLUDE_DIRS} ${LIBXML2_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${PROJECT_BINARY_DIR}/libiqxmlrpc)
