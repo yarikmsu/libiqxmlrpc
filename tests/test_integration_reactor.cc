@@ -99,7 +99,7 @@ BOOST_AUTO_TEST_CASE(inet_addr_operations)
     BOOST_CHECK_EQUAL(addr2.get_host_name(), "127.0.0.1");
 
     // Test copy construction
-    Inet_addr addr3(addr2);
+    Inet_addr addr3(addr2);  // NOLINT(performance-unnecessary-copy-initialization) - copy construction under test
     BOOST_CHECK_EQUAL(addr3.get_port(), addr2.get_port());
 }
 
@@ -160,6 +160,7 @@ BOOST_FIXTURE_TEST_CASE(reactor_mask_with_pool_executor, IntegrationFixture)
   std::vector<std::thread> threads;
   std::atomic<int> success_count(0);
 
+  threads.reserve(10);
   for (int i = 0; i < 10; ++i) {
     threads.emplace_back([this, i, &success_count]() {
       try {
@@ -168,7 +169,9 @@ BOOST_FIXTURE_TEST_CASE(reactor_mask_with_pool_executor, IntegrationFixture)
         if (!r.is_fault() && r.value().get_int() == i) {
           ++success_count;
         }
-      } catch (...) {}
+      } catch (...) {
+        (void)0;
+      }
     });
   }
 

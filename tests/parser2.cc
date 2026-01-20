@@ -72,7 +72,7 @@ BOOST_AUTO_TEST_CASE(test_parse_array)
   BOOST_CHECK_EQUAL(v[5].the_struct().size(), 3);
   BOOST_CHECK_EQUAL(v[5].the_struct()["v1"].get_string(), "str");
   BOOST_CHECK_EQUAL(v[5].the_struct()["v2"].get_int(), 123);
-  BOOST_CHECK_EQUAL(v[5].the_struct()["v3"].get_int64(), 6000000000l);
+  BOOST_CHECK_EQUAL(v[5].the_struct()["v3"].get_int64(), 6000000000LL);
   BOOST_CHECK_EQUAL(v[6].get_int64(), 5000000000);
 }
 

@@ -35,7 +35,7 @@ Test_server_config::Test_server_config(int argc, char** argv):
 
   if (omit_string_tags)
   {
-    std::cout << "Omit string tags in responses" << std::endl;
+    std::cout << "Omit string tags in responses" << '\n';
     iqxmlrpc::Value::omit_string_tag_in_responses(true);
   }
 }

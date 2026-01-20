@@ -1,5 +1,5 @@
 #define BOOST_TEST_MODULE test_client_stress
-#include <stdlib.h>
+#include <cstdlib>
 #include <openssl/md5.h>
 #include <memory>
 #include <iostream>
@@ -70,15 +70,15 @@ void do_call(Client_base* client)
     Response r( get_file(65536) );
 
     if (r.is_fault())
-      std::cerr << "Fault response: " << r.fault_string() << std::endl;
+      std::cerr << "Fault response: " << r.fault_string() << '\n';
   }
   catch(const std::exception& e)
   {
-    std::cerr << "E: " << e.what() << std::endl;
+    std::cerr << "E: " << e.what() << '\n';
   }
   catch(...)
   {
-    std::cerr << "Unexpected exception" << std::endl;
+    std::cerr << "Unexpected exception" << '\n';
   }
 }
 
@@ -92,11 +92,11 @@ void do_test()
   }
   catch(const std::exception& e)
   {
-    std::cerr << "E: " << e.what() << std::endl;
+    std::cerr << "E: " << e.what() << '\n';
   }
   catch(...)
   {
-    std::cerr << "Unexpected exception" << std::endl;
+    std::cerr << "Unexpected exception" << '\n';
   }
 }
 
@@ -105,6 +105,7 @@ BOOST_AUTO_TEST_CASE( stress_test )
   auto start = std::chrono::steady_clock::now();
   std::vector<std::thread> thrds;
 
+  thrds.reserve(test_config.client_threads());
   for(int i = 0; i < test_config.client_threads(); ++i)
     thrds.emplace_back(&do_test);
 

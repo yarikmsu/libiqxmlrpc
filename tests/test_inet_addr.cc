@@ -153,7 +153,7 @@ BOOST_AUTO_TEST_SUITE(inet_addr_copy_tests)
 BOOST_AUTO_TEST_CASE(copy_constructor)
 {
     Inet_addr original("192.168.1.100", 3000);
-    Inet_addr copy(original);
+    Inet_addr copy(original);  // NOLINT(performance-unnecessary-copy-initialization) - copy constructor under test
     BOOST_CHECK_EQUAL(copy.get_host_name(), original.get_host_name());
     BOOST_CHECK_EQUAL(copy.get_port(), original.get_port());
 }

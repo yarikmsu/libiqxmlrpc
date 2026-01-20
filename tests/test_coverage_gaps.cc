@@ -152,6 +152,7 @@ BOOST_AUTO_TEST_CASE(request_header_host_accessor)
     BOOST_CHECK(!host.empty());
   } catch (const http::Malformed_packet&) {
     // Host may not be set by default constructor, that's ok
+    (void)0;
   }
 }
 
@@ -284,6 +285,7 @@ BOOST_FIXTURE_TEST_CASE(pool_executor_factory_coverage, IntegrationFixture)
   std::vector<std::thread> threads;
   std::atomic<int> success_count(0);
 
+  threads.reserve(8);
   for (int i = 0; i < 8; ++i) {
     threads.emplace_back([this, i, &success_count]() {
       try {
@@ -292,7 +294,9 @@ BOOST_FIXTURE_TEST_CASE(pool_executor_factory_coverage, IntegrationFixture)
         if (!r.is_fault()) {
           ++success_count;
         }
-      } catch (...) {}
+      } catch (...) {
+        (void)0;
+      }
     });
   }
 
@@ -327,6 +331,7 @@ BOOST_FIXTURE_TEST_CASE(pool_executor_high_concurrency, IntegrationFixture)
   std::atomic<int> success_count(0);
 
   // Spawn many concurrent requests
+  threads.reserve(20);
   for (int i = 0; i < 20; ++i) {
     threads.emplace_back([this, i, &success_count]() {
       try {
@@ -337,7 +342,9 @@ BOOST_FIXTURE_TEST_CASE(pool_executor_high_concurrency, IntegrationFixture)
             ++success_count;
           }
         }
-      } catch (...) {}
+      } catch (...) {
+        (void)0;
+      }
     });
   }
 
@@ -494,6 +501,7 @@ BOOST_FIXTURE_TEST_CASE(http_server_rapid_large_requests, IntegrationFixture)
   std::vector<std::thread> threads;
   std::atomic<int> success_count(0);
 
+  threads.reserve(5);
   for (int i = 0; i < 5; ++i) {
     threads.emplace_back([this, i, &success_count]() {
       try {
@@ -503,7 +511,9 @@ BOOST_FIXTURE_TEST_CASE(http_server_rapid_large_requests, IntegrationFixture)
         if (!r.is_fault() && r.value().get_string() == data) {
           ++success_count;
         }
-      } catch (...) {}
+      } catch (...) {
+        (void)0;
+      }
     });
   }
 
@@ -541,6 +551,7 @@ BOOST_FIXTURE_TEST_CASE(server_authentication_path_coverage, IntegrationFixture)
     BOOST_CHECK(r.is_fault());
   } catch (...) {
     // Connection error is also acceptable
+    (void)0;
   }
 
   // Now try with valid auth
@@ -678,7 +689,7 @@ BOOST_AUTO_TEST_CASE(packet_destructor_coverage)
   // Packet destructor runs here
 
   // Create another to verify no issues
-  http::Response_header* resp_hdr = new http::Response_header(404, "Not Found");
+  auto* resp_hdr = new http::Response_header(404, "Not Found");
   http::Packet pkt2(resp_hdr, "error");
   BOOST_CHECK_EQUAL(resp_hdr->code(), 404);
 }
@@ -793,6 +804,7 @@ BOOST_FIXTURE_TEST_CASE(reactor_rapid_connect_disconnect, IntegrationFixture)
   std::vector<std::thread> threads;
 
   // Spawn threads that rapidly create and destroy connections
+  threads.reserve(4);
   for (int t = 0; t < 4; ++t) {
     threads.emplace_back([this, t, &success_count]() {
       for (int i = 0; i < 5; ++i) {
@@ -805,6 +817,7 @@ BOOST_FIXTURE_TEST_CASE(reactor_rapid_connect_disconnect, IntegrationFixture)
           }
         } catch (...) {
           // Connection errors acceptable under stress
+          (void)0;
         }
       }
     });

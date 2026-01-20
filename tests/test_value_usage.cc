@@ -122,7 +122,7 @@ BOOST_AUTO_TEST_CASE( struct_test )
 
   {
     BOOST_TEST_CHECKPOINT("Struct iterators");
-    Struct::const_iterator it = s.find("author");
+    auto it = s.find("author");
     BOOST_CHECK_EQUAL( (*it->second).get_string(), "D.D.Salinger" );
     BOOST_CHECK( s.find("nonexistent") == s.end() );
 
@@ -141,15 +141,16 @@ BOOST_AUTO_TEST_CASE( struct_test )
 
   {
     BOOST_TEST_CHECKPOINT("Struct copy ctor");
-    Struct s1(s);
+    Struct s1(s);  // NOLINT(performance-unnecessary-copy-initialization) - copy constructor under test
     check_struct_value(s1);
   }
 
   {
     BOOST_TEST_CHECKPOINT("Struct hand-copy");
     Struct s1;
-    for (Struct::const_iterator i = s.begin(); i != s.end(); ++i)
-      s1.insert(i->first, *i->second);
+    for (const auto& entry : s) {
+      s1.insert(entry.first, *entry.second);
+    }
 
     check_struct_value(s1);
   }
