@@ -15,80 +15,12 @@
 
 #include <mutex>
 
-#ifndef WIN32
-#include <pthread.h>
-#endif
-
 #include <sstream>
 #include "ssl_lib.h"
 #include "net_except.h"
 
 namespace iqnet {
 namespace ssl {
-
-//
-// Mutli-threading support stuff
-// Note: OpenSSL 1.1.0+ handles threading internally, these callbacks are only needed for 1.0.x
-//
-
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-
-class LockContainer {
-public:
-  LockContainer(const LockContainer&) = delete;
-  LockContainer& operator=(const LockContainer&) = delete;
-
-  LockContainer():
-    size(CRYPTO_num_locks()),
-    locks(new std::mutex[size])
-  {
-  }
-
-  ~LockContainer();
-
-  size_t size;
-  std::mutex* locks;
-};
-
-void
-openssl_lock_callback(int mode, int n, const char* /*file*/, int /*line*/)
-{
-  static LockContainer lks;
-  // assert n < lks.size
-
-  std::mutex& m = lks.locks[n];
-  if (mode & CRYPTO_LOCK) {
-    m.lock();
-  } else {
-    m.unlock();
-  }
-}
-
-#ifndef _WIN32
-unsigned long
-openssl_id_function()
-{
-  return (unsigned long)(pthread_self());
-}
-#endif
-
-LockContainer::~LockContainer()
-{
-  if (CRYPTO_get_locking_callback() == &openssl_lock_callback) {
-    CRYPTO_set_locking_callback(nullptr);
-  }
-
-#ifndef _WIN32
-  if (CRYPTO_get_id_callback() == &openssl_id_function) {
-    CRYPTO_set_id_callback(nullptr);
-  }
-#endif
-
-  // do not try to unlock locks
-  delete[] locks;
-}
-
-#endif // OPENSSL_VERSION_NUMBER < 0x10100000L
 
 Ctx* ctx = nullptr;
 std::once_flag ssl_init;
@@ -97,23 +29,8 @@ int iqxmlrpc_ssl_data_idx = 0;
 void
 init_library()
 {
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-  SSL_load_error_strings();
-  SSL_library_init();
-
-  if (!CRYPTO_get_locking_callback()) {
-    CRYPTO_set_locking_callback(&openssl_lock_callback);
-  }
-
-#ifndef _WIN32
-  if (!CRYPTO_get_id_callback()) {
-    CRYPTO_set_id_callback(&openssl_id_function);
-  }
-#endif
-#else
   // OpenSSL 1.1.0+ initializes automatically
   OPENSSL_init_ssl(0, nullptr);
-#endif
 
   iqxmlrpc_ssl_data_idx = SSL_get_ex_new_index(0, const_cast<void*>(static_cast<const void*>("iqxmlrpc verifier")), nullptr, nullptr, nullptr);
 }
@@ -147,15 +64,7 @@ set_common_options(SSL_CTX* ctx)
   // Enforce TLS 1.2 as minimum version (TLS 1.2 released 2008, widely supported)
   // TLS 1.0 and 1.1 are deprecated and have known security weaknesses
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-  // OpenSSL 1.1.0+: Use the modern API (SSL_OP_NO_* flags are deprecated)
   SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
-#else
-  // OpenSSL 1.0.x: Use the legacy flags
-  SSL_CTX_set_options(ctx,
-      SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 |
-      SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
-#endif
 }
 
 // Server-only cipher configuration for optimal performance
@@ -395,8 +304,6 @@ Ctx::prepare_hostname_verify(SSL* ssl)
     return;
   }
 
-#if OPENSSL_VERSION_NUMBER >= 0x10002000L
-  // OpenSSL 1.0.2+: Use X509_VERIFY_PARAM for hostname verification
   X509_VERIFY_PARAM* param = SSL_get0_param(ssl);
   if (!param) {
     return;  // Cannot configure hostname verification without param
@@ -404,12 +311,6 @@ Ctx::prepare_hostname_verify(SSL* ssl)
   X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
   X509_VERIFY_PARAM_set1_host(param, impl_->expected_hostname.c_str(),
                               impl_->expected_hostname.length());
-#else
-  // OpenSSL < 1.0.2: Hostname verification not available
-  // SECURITY WARNING: Connection proceeds without hostname verification
-  // Note: This is a compile-time limitation; users should upgrade OpenSSL
-  (void)ssl;  // Suppress unused parameter warning
-#endif
 }
 
 void
