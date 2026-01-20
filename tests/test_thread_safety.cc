@@ -89,11 +89,13 @@ BOOST_AUTO_TEST_CASE(high_contention_stress)
   std::vector<std::thread> consumers;
 
   // Start consumers first
+  consumers.reserve(NUM_CONSUMERS);
   for (size_t i = 0; i < NUM_CONSUMERS; ++i) {
     consumers.emplace_back(consumer);
   }
 
   // Start producers
+  producers.reserve(NUM_PRODUCERS);
   for (size_t i = 0; i < NUM_PRODUCERS; ++i) {
     producers.emplace_back(producer, i);
   }
@@ -187,6 +189,7 @@ BOOST_AUTO_TEST_CASE(empty_queue_rapid_operations)
   };
 
   std::vector<std::thread> threads;
+  threads.reserve(NUM_THREADS);
   for (size_t i = 0; i < NUM_THREADS; ++i) {
     threads.emplace_back(push_pop_thread);
   }
@@ -287,9 +290,9 @@ BOOST_FIXTURE_TEST_CASE(shutdown_under_load, ThreadSafetyFixture)
           if (!resp.is_fault()) {
             requests_completed.fetch_add(1, std::memory_order_relaxed);
           }
-        } catch (...) {}
+        } catch (...) { (void)0; }
       }
-    } catch (...) {}
+    } catch (...) { (void)0; }
   });
 
   stop_server();
@@ -319,9 +322,9 @@ BOOST_FIXTURE_TEST_CASE(queue_saturation, ThreadSafetyFixture)
           if (!resp.is_fault()) {
             completed.fetch_add(1, std::memory_order_relaxed);
           }
-        } catch (...) {}
+        } catch (...) { (void)0; }
       }
-    } catch (...) {}
+    } catch (...) { (void)0; }
   });
 
   stop_server();
@@ -400,7 +403,7 @@ BOOST_FIXTURE_TEST_CASE(add_threads_under_load, ThreadSafetyFixture)
         if (!resp.is_fault()) {
           completed.fetch_add(1, std::memory_order_relaxed);
         }
-      } catch (...) {}
+      } catch (...) { (void)0; }
     }
   });
 
@@ -450,9 +453,9 @@ BOOST_FIXTURE_TEST_CASE(production_capacity_stress, ThreadSafetyFixture)
           if (!resp.is_fault()) {
             completed.fetch_add(1, std::memory_order_relaxed);
           }
-        } catch (...) {}
+        } catch (...) { (void)0; }
       }
-    } catch (...) {}
+    } catch (...) { (void)0; }
   });
 
   stop_server();
@@ -487,9 +490,9 @@ BOOST_FIXTURE_TEST_CASE(destructor_drains_queue, ThreadSafetyFixture)
           if (!resp.is_fault()) {
             completed.fetch_add(1, std::memory_order_relaxed);
           }
-        } catch (...) {}
+        } catch (...) { (void)0; }
       }
-    } catch (...) {}
+    } catch (...) { (void)0; }
   });
 
   // Stop server - destructor should drain remaining queue items

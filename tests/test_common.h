@@ -6,7 +6,9 @@
 #include <condition_variable>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
@@ -17,6 +19,7 @@
 #include "libiqxmlrpc/executor.h"
 
 #include "methods.h"
+#include "test_resource_limits.h"
 
 namespace iqxmlrpc_test {
 
@@ -67,8 +70,11 @@ protected:
   std::thread server_thread_;
   std::mutex ready_mutex_;
   std::condition_variable ready_cond_;
+  std::mutex server_error_mutex_;
   bool server_ready_;
+  std::atomic<bool> server_error_;
   std::atomic<bool> server_running_;
+  std::string server_error_message_;
   int port_;
   int base_port_;
 
@@ -79,8 +85,11 @@ public:
     , server_thread_()
     , ready_mutex_()
     , ready_cond_()
+    , server_error_mutex_()
     , server_ready_(false)
+    , server_error_(false)
     , server_running_(false)
+    , server_error_message_()
     , port_(base_port)
     , base_port_(base_port) {}
 
@@ -89,17 +98,20 @@ public:
   }
 
   void start_server(int numthreads = 1, int port_offset = 0) {
+    ensure_fd_limit();
     port_ = base_port_ + port_offset;
+    server_error_ = false;
 
-    if (numthreads > 1) {
-      exec_factory_.reset(new iqxmlrpc::Pool_executor_factory(numthreads));
+    const int tuned_threads = tuned_thread_count(numthreads);
+    if (tuned_threads > 1) {
+      exec_factory_ = std::make_unique<iqxmlrpc::Pool_executor_factory>(tuned_threads);
     } else {
-      exec_factory_.reset(new iqxmlrpc::Serial_executor_factory);
+      exec_factory_ = std::make_unique<iqxmlrpc::Serial_executor_factory>();
     }
 
-    server_.reset(new iqxmlrpc::Http_server(
+    server_ = std::make_unique<iqxmlrpc::Http_server>(
       iqnet::Inet_addr("127.0.0.1", port_),
-      exec_factory_.get()));
+      exec_factory_.get());
 
     // Register test methods
     register_user_methods(*server_);
@@ -111,7 +123,21 @@ public:
         server_ready_ = true;
         ready_cond_.notify_one();
       }
-      server_->work();
+      try {
+        server_->work();
+      } catch (const std::exception& ex) {
+        {
+          std::lock_guard<std::mutex> lk(server_error_mutex_);
+          server_error_message_ = ex.what();
+        }
+        server_error_ = true;
+      } catch (...) {
+        {
+          std::lock_guard<std::mutex> lk(server_error_mutex_);
+          server_error_message_ = "unknown exception";
+        }
+        server_error_ = true;
+      }
       server_running_ = false;
     });
 
@@ -141,9 +167,20 @@ public:
   }
 
   std::unique_ptr<iqxmlrpc::Client_base> create_client() {
-    return std::unique_ptr<iqxmlrpc::Client_base>(
-      new iqxmlrpc::Client<iqxmlrpc::Http_client_connection>(
-        iqnet::Inet_addr("127.0.0.1", port_)));
+    if (server_error_) {
+      std::string msg;
+      {
+        std::lock_guard<std::mutex> lk(server_error_mutex_);
+        msg = server_error_message_;
+      }
+      BOOST_REQUIRE_MESSAGE(!server_error_, "Server thread failed: " + msg);
+    }
+    auto client = std::make_unique<iqxmlrpc::Client<iqxmlrpc::Http_client_connection>>(
+      iqnet::Inet_addr("127.0.0.1", port_));
+    if (should_disable_keep_alive()) {
+      client->set_keep_alive(false);
+    }
+    return client;
   }
 
   iqxmlrpc::Server& server() { return *server_; }
@@ -160,11 +197,12 @@ public:
 
 template<typename ClientFunc>
 void run_concurrent_clients(int num_clients, ClientFunc&& fn) {
+  std::decay_t<ClientFunc> fn_copy = std::forward<ClientFunc>(fn);
   std::vector<std::thread> threads;
   threads.reserve(num_clients);
 
   for (int i = 0; i < num_clients; ++i) {
-    threads.emplace_back(std::forward<ClientFunc>(fn), i);
+    threads.emplace_back(fn_copy, i);
   }
 
   for (auto& t : threads) {

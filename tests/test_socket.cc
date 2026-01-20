@@ -113,6 +113,7 @@ BOOST_AUTO_TEST_CASE(socket_send_shutdown)
         client_sock.connect(server_addr);
     } catch (...) {
         // Non-blocking connect may throw or return false
+        (void)0;
     }
 
     Socket accepted = server_sock.accept();
@@ -253,6 +254,7 @@ BOOST_AUTO_TEST_CASE(socket_connect_error)
         (void)result;
     } catch (const network_error&) {
         // Expected for connection refused
+        (void)0;
     }
 
     sock.close();

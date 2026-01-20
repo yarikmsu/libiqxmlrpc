@@ -52,6 +52,7 @@ BOOST_FIXTURE_TEST_CASE(accept_with_thread_pool, IntegrationFixture)
   std::vector<std::thread> threads;
   std::atomic<int> success_count(0);
 
+  threads.reserve(10);
   for (int i = 0; i < 10; ++i) {
     threads.emplace_back([this, i, &success_count]() {
       try {
@@ -60,7 +61,9 @@ BOOST_FIXTURE_TEST_CASE(accept_with_thread_pool, IntegrationFixture)
         if (!r.is_fault() && r.value().get_int() == i) {
           ++success_count;
         }
-      } catch (...) {}
+      } catch (...) {
+        (void)0;
+      }
     });
   }
 

@@ -13,6 +13,15 @@
 #include <vector>
 
 namespace perf {
+inline std::tm localtime_safe(std::time_t* now) {
+  std::tm tm_buf{};
+#if defined(_WIN32)
+  localtime_s(&tm_buf, now);
+#else
+  localtime_r(now, &tm_buf);
+#endif
+  return tm_buf;
+}
 
 // Result from a single benchmark
 struct BenchmarkResult {
@@ -50,7 +59,7 @@ public:
               << std::fixed << std::setprecision(3) << std::setw(10) << std::right << r.total_ms << " ms"
               << " (" << r.iterations << " iters, "
               << std::setprecision(2) << r.ns_per_op << " ns/op)"
-              << std::endl;
+              << '\n';
   }
 
   void save_baseline(const std::string& filename) {
@@ -59,14 +68,17 @@ public:
 
     std::ofstream out(filename);
     if (!out) {
-      std::cerr << "Warning: Could not write to " << filename << std::endl;
+      std::cerr << "Warning: Could not write to " << filename << '\n';
       return;
     }
 
     // Header
     std::time_t now = std::time(nullptr);
     char time_buf[64];
-    std::strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
+    const std::tm tm_buf = localtime_safe(&now);
+    if (std::strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", &tm_buf) == 0) {
+      time_buf[0] = '\0';
+    }
 
     out << "# Performance Baseline - libiqxmlrpc2\n";
     out << "# Run date: " << time_buf << "\n";
@@ -173,7 +185,7 @@ public:
   int64_t percentile(double p) {
     if (samples_.empty()) return 0;
     sort();
-    size_t idx = static_cast<size_t>(p * static_cast<double>(samples_.size() - 1));
+    auto idx = static_cast<size_t>(p * static_cast<double>(samples_.size() - 1));
     return samples_[idx];
   }
 

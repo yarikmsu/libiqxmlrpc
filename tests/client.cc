@@ -1,5 +1,5 @@
 #define BOOST_TEST_MODULE test_client
-#include <stdlib.h>
+#include <cstdlib>
 #include <openssl/md5.h>
 #include <iostream>
 #include <memory>
@@ -138,7 +138,9 @@ BOOST_AUTO_TEST_CASE( stop_server )
 
   try {
     stop();
-  } catch (const iqnet::network_error&) {}
+  } catch (const iqnet::network_error&) {
+    (void)0;
+  }
 }
 
 BOOST_AUTO_TEST_CASE( trace_all ) {
@@ -200,13 +202,13 @@ BOOST_AUTO_TEST_CASE( trace_no ) {
   test_client->set_xheaders(XHeaders());
   Trace_proxy trace(test_client);
   Response retval(trace(""));
-  BOOST_CHECK(retval.value().get_string() == "");
+  BOOST_CHECK(retval.value().get_string().empty());
 }
 
 BOOST_AUTO_TEST_CASE( trace_empty ) {
   BOOST_REQUIRE(test_client);
   Trace_proxy trace(test_client);
   Response retval(trace(""));
-  BOOST_CHECK(retval.value().get_string() == "");
+  BOOST_CHECK(retval.value().get_string().empty());
 }
 // vim:ts=2:sw=2:et

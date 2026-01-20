@@ -166,6 +166,7 @@ BOOST_FIXTURE_TEST_CASE(concurrent_connection_registration, IntegrationFixture)
   std::vector<std::thread> threads;
   std::atomic<int> success_count(0);
 
+  threads.reserve(20);
   for (int i = 0; i < 20; ++i) {
     threads.emplace_back([this, i, &success_count]() {
       try {
@@ -174,7 +175,9 @@ BOOST_FIXTURE_TEST_CASE(concurrent_connection_registration, IntegrationFixture)
         if (!r.is_fault() && r.value().get_int() == i) {
           ++success_count;
         }
-      } catch (...) {}
+      } catch (...) {
+        (void)0;
+      }
     });
   }
 
@@ -211,6 +214,7 @@ BOOST_FIXTURE_TEST_CASE(rapid_connection_cycling, IntegrationFixture)
     std::atomic<int> success_count(0);
 
     // Create burst of connections
+    threads.reserve(5);
     for (int i = 0; i < 5; ++i) {
       threads.emplace_back([this, &success_count]() {
         try {
@@ -219,7 +223,9 @@ BOOST_FIXTURE_TEST_CASE(rapid_connection_cycling, IntegrationFixture)
           if (!r.is_fault()) {
             ++success_count;
           }
-        } catch (...) {}
+        } catch (...) {
+          (void)0;
+        }
       });
     }
 
