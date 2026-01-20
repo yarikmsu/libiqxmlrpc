@@ -4,6 +4,17 @@ include(CheckFunctionExists)
 find_package(Threads REQUIRED)
 find_package(Boost 1.53.0 REQUIRED)
 
+set(_iqxmlrpc_openssl_version "")
+if(DEFINED OPENSSL_VERSION)
+  set(_iqxmlrpc_openssl_version "${OPENSSL_VERSION}")
+elseif(DEFINED OPENSSL_VERSION_STRING)
+  set(_iqxmlrpc_openssl_version "${OPENSSL_VERSION_STRING}")
+endif()
+
+if(_iqxmlrpc_openssl_version AND _iqxmlrpc_openssl_version VERSION_LESS "1.1.0")
+  message(FATAL_ERROR "OpenSSL >= 1.1.0 is required. Found ${_iqxmlrpc_openssl_version}")
+endif()
+
 include_directories(${XML2_INCLUDE_DIRS} ${LIBXML2_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${PROJECT_BINARY_DIR}/libiqxmlrpc)
 
 check_function_exists(poll HAVE_POLL)
