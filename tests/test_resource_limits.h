@@ -3,7 +3,6 @@
 
 #include <algorithm>
 #include <cstdlib>
-#include <string>
 
 #if !defined(_WIN32)
 #include <sys/resource.h>
@@ -120,7 +119,7 @@ inline int tuned_thread_count(int requested, size_t per_thread_budget = 32) {
     return requested;
   }
   const size_t limit = get_fd_soft_limit();
-  if (limit == 0) {
+  if (limit == 0 || per_thread_budget == 0) {
     return requested;
   }
   const size_t max_threads = std::max<size_t>(1, limit / per_thread_budget);
