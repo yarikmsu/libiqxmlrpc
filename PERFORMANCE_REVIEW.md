@@ -4,7 +4,7 @@
 
 ## Summary
 
-20 performance optimizations were implemented across the library:
+21 performance optimizations were implemented across the library:
 
 | Category | Key Improvements |
 |----------|-----------------|
@@ -17,18 +17,7 @@
 | Network | TCP_NODELAY enabled (40-400ms latency reduction) |
 | Thread pool | Lock-free queue with `boost::lockfree::queue` (better multi-core scaling) |
 | Reactor | Copy-on-write handler list (zero-copy reads on hot path) |
-
-## Remaining Opportunities
-
-These are lower-priority items that could be addressed if needed:
-
-| Priority | Area | Recommendation | Impact |
-|----------|------|----------------|--------|
-| Medium | Handler lookup | `unordered_map` indexed by socket descriptor | O(1) vs O(log n) lookup |
-| Low | Socket buffers | Configurable `SO_RCVBUF`/`SO_SNDBUF` | Throughput tuning |
-| Low | Vectored I/O | `writev` for header+body | Minor efficiency gain |
-| Low | Parser | `std::string_view` for XML parsing | Reduced allocations |
-| Low | HTTP version | Make consistent (1.0 vs 1.1) | Correctness |
+| Reactor | `std::map` → `unordered_map` for handler lookup (O(1) vs O(log n)) |
 
 ## Running Benchmarks
 
