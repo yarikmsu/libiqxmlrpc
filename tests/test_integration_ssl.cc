@@ -105,14 +105,16 @@ BOOST_AUTO_TEST_CASE(ssl_exception_types)
 {
   // Test ssl::not_initialized exception
   iqnet::ssl::not_initialized not_init;
-  BOOST_CHECK(std::string(not_init.what()).find("not initialized") != std::string::npos);
+  BOOST_CHECK(std::strstr(not_init.what(), "not initialized") != nullptr);
 
   // Test ssl::connection_close exception
   iqnet::ssl::connection_close close_clean(true);
   BOOST_CHECK(close_clean.is_clean());
+  BOOST_CHECK(close_clean.what() != nullptr && close_clean.what()[0] != '\0');
 
   iqnet::ssl::connection_close close_unclean(false);
   BOOST_CHECK(!close_unclean.is_clean());
+  BOOST_CHECK(close_unclean.what() != nullptr && close_unclean.what()[0] != '\0');
 }
 
 // Test basic HTTPS client/server communication (without custom verifier)
@@ -157,13 +159,11 @@ BOOST_FIXTURE_TEST_CASE(https_handshake_triggers_verify, HttpsIntegrationFixture
 // This validates the null check fix in ssl_lib.cc:227
 BOOST_FIXTURE_TEST_CASE(ssl_cert_fingerprint_valid, HttpsIntegrationFixture)
 {
-  if (!setup_ssl_context()) {
-    BOOST_TEST_MESSAGE("Skipping SSL fingerprint test - context setup failed");
-    return;
-  }
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to set up SSL context with embedded certificates");
 
   FingerprintVerifier client_verifier;
-  test_ctx_->verify_server(&client_verifier);
+  get_context()->verify_server(&client_verifier);
 
   start_server(202);
   auto client = create_client();
@@ -186,10 +186,8 @@ BOOST_FIXTURE_TEST_CASE(ssl_cert_fingerprint_valid, HttpsIntegrationFixture)
 // Test that fingerprint function handles multiple HTTPS requests correctly
 BOOST_FIXTURE_TEST_CASE(ssl_cert_fingerprint_stability, HttpsIntegrationFixture)
 {
-  if (!setup_ssl_context()) {
-    BOOST_TEST_MESSAGE("Skipping SSL fingerprint stability test - context setup failed");
-    return;
-  }
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to set up SSL context with embedded certificates");
 
   start_server(203);
 
@@ -223,13 +221,19 @@ BOOST_FIXTURE_TEST_CASE(ssl_verify_client_required, HttpsIntegrationFixture)
   // This triggers prepare_verify() with server=true and require_client_cert=true (line 246-247)
   auto client = create_client();
 
-  // Connection may succeed or fail depending on OpenSSL behavior without client cert
-  // The important part is that verify_client() and prepare_verify() were exercised
+  // Connection behavior varies by OpenSSL version/configuration.
+  // Key verification: the verify_client() API was exercised (code path covered).
+  bool connection_failed = false;
   try {
     client->execute("echo", Value("test"));
   } catch (const std::exception&) {
-    // Expected: connection fails without client certificate
+    connection_failed = true;
   }
+
+  // Verify the test exercised meaningful code - at least one of:
+  // - Connection failed (verifier rejected), or
+  // - Server verifier was invoked during handshake
+  BOOST_CHECK(connection_failed || server_verifier.get_call_count() > 0);
 }
 
 // Test load_verify_locations() with CA file (covers line 279)
