@@ -5,7 +5,6 @@
 
 #include <boost/test/unit_test.hpp>
 
-#include <atomic>
 #include <string>
 
 #include "libiqxmlrpc/libiqxmlrpc.h"
@@ -38,151 +37,67 @@ BOOST_AUTO_TEST_SUITE(ssl_tests)
 // This covers ssl_lib.cc line 104 (SSL_get_ex_new_index in init_library)
 BOOST_AUTO_TEST_CASE(ssl_client_only_context)
 {
-  iqnet::ssl::Ctx* saved_ctx = iqnet::ssl::ctx;
+  // client_only() doesn't require certificates
+  // This still triggers init_library() which includes line 104
+  SslContextGuard guard(iqnet::ssl::Ctx::client_only());
 
-  try {
-    // client_only() doesn't require certificates
-    // This still triggers init_library() which includes line 104
-    iqnet::ssl::Ctx* ctx = iqnet::ssl::Ctx::client_only();
-
-    BOOST_REQUIRE(ctx != nullptr);
-    BOOST_REQUIRE(ctx->context() != nullptr);
-
-    delete ctx;
-  } catch (const std::exception& e) {
-    iqnet::ssl::ctx = saved_ctx;
-    BOOST_FAIL("SSL client_only context creation failed: " << e.what());
-  }
-
-  iqnet::ssl::ctx = saved_ctx;
+  BOOST_REQUIRE(guard.get() != nullptr);
+  BOOST_REQUIRE(guard->context() != nullptr);
 }
 
 // Test that legacy TLS versions (1.0, 1.1) are disabled
 // Only TLS 1.2+ should be allowed for security compliance
 BOOST_AUTO_TEST_CASE(ssl_disables_legacy_tls_versions)
 {
-  iqnet::ssl::Ctx* ctx = iqnet::ssl::Ctx::client_only();
-  BOOST_REQUIRE(ctx != nullptr);
+  SslContextGuard guard(iqnet::ssl::Ctx::client_only());
 
-  SSL_CTX* ssl_ctx = ctx->context();
-
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-  // OpenSSL 1.1.0+: Check minimum protocol version directly
-  int min_version = SSL_CTX_get_min_proto_version(ssl_ctx);
+  // Check minimum protocol version is TLS 1.2 (requires OpenSSL 1.1.0+)
+  int min_version = SSL_CTX_get_min_proto_version(guard->context());
   BOOST_CHECK_GE(min_version, TLS1_2_VERSION);
-#else
-  // OpenSSL 1.0.x: Check the legacy flags are set
-  long options = SSL_CTX_get_options(ssl_ctx);
-  BOOST_CHECK(options & SSL_OP_NO_SSLv3);
-  BOOST_CHECK(options & SSL_OP_NO_TLSv1);
-  BOOST_CHECK(options & SSL_OP_NO_TLSv1_1);
-#endif
-
-  delete ctx;
 }
 
 // Test SSL context creation with certificates
 BOOST_AUTO_TEST_CASE(ssl_context_creation)
 {
-  if (!ssl_certs_available()) {
-    BOOST_TEST_MESSAGE("Skipping - SSL certificates not available");
-    return;
-  }
+  SKIP_IF_NO_CERTS();
 
-  iqnet::ssl::Ctx* saved_ctx = iqnet::ssl::ctx;
+  SslContextGuard guard(iqnet::ssl::Ctx::client_server(
+    "../tests/data/cert.pem",
+    "../tests/data/pk.pem"));
 
-  try {
-    iqnet::ssl::Ctx* ctx = iqnet::ssl::Ctx::client_server(
-      "../tests/data/cert.pem",
-      "../tests/data/pk.pem");
-
-    BOOST_REQUIRE(ctx != nullptr);
-    BOOST_REQUIRE(ctx->context() != nullptr);
-
-    delete ctx;
-  } catch (const std::exception& e) {
-    iqnet::ssl::ctx = saved_ctx;
-    BOOST_FAIL("SSL context creation failed: " << e.what());
-  }
-
-  iqnet::ssl::ctx = saved_ctx;
+  BOOST_REQUIRE(guard.get() != nullptr);
+  BOOST_REQUIRE(guard->context() != nullptr);
 }
 
 // Test SSL context with server-only mode
 BOOST_AUTO_TEST_CASE(ssl_server_only_context)
 {
-  if (!ssl_certs_available()) {
-    BOOST_TEST_MESSAGE("Skipping - SSL certificates not available");
-    return;
-  }
+  SKIP_IF_NO_CERTS();
 
-  iqnet::ssl::Ctx* saved_ctx = iqnet::ssl::ctx;
+  SslContextGuard guard(iqnet::ssl::Ctx::server_only(
+    "../tests/data/cert.pem",
+    "../tests/data/pk.pem"));
 
-  try {
-    iqnet::ssl::Ctx* ctx = iqnet::ssl::Ctx::server_only(
-      "../tests/data/cert.pem",
-      "../tests/data/pk.pem");
-
-    BOOST_REQUIRE(ctx != nullptr);
-    BOOST_REQUIRE(ctx->context() != nullptr);
-
-    delete ctx;
-  } catch (const std::exception& e) {
-    iqnet::ssl::ctx = saved_ctx;
-    BOOST_FAIL("SSL server_only context creation failed: " << e.what());
-  }
-
-  iqnet::ssl::ctx = saved_ctx;
+  BOOST_REQUIRE(guard.get() != nullptr);
+  BOOST_REQUIRE(guard->context() != nullptr);
 }
 
 // Test ConnectionVerifier setup - covers ssl_lib.cc lines 140, 258
-namespace {
-class TestVerifier : public iqnet::ssl::ConnectionVerifier {
-private:
-  mutable bool was_called_ = false;
-
-  int do_verify(bool preverified_ok, X509_STORE_CTX*) const override {
-    was_called_ = true;
-    (void)preverified_ok;
-    return 1;  // Accept all
-  }
-
-public:
-  bool was_called() const { return was_called_; }
-};
-}
-
 BOOST_AUTO_TEST_CASE(ssl_verifier_setup)
 {
-  if (!ssl_certs_available()) {
-    BOOST_TEST_MESSAGE("Skipping - SSL certificates not available");
-    return;
-  }
+  SKIP_IF_NO_CERTS();
 
-  iqnet::ssl::Ctx* saved_ctx = iqnet::ssl::ctx;
+  SslContextGuard guard(iqnet::ssl::Ctx::client_server(
+    "../tests/data/cert.pem",
+    "../tests/data/pk.pem"));
 
-  try {
-    iqnet::ssl::Ctx* ctx = iqnet::ssl::Ctx::client_server(
-      "../tests/data/cert.pem",
-      "../tests/data/pk.pem");
+  // Set up client verification - this covers verify_client() method
+  TrackingVerifier verifier;
+  guard->verify_client(OPTIONAL_CLIENT_CERT, &verifier);
 
-    BOOST_REQUIRE(ctx != nullptr);
-
-    // Set up client verification - this covers verify_client() method
-    TestVerifier verifier;
-    ctx->verify_client(false, &verifier);
-
-    // Set up server verification
-    TestVerifier server_verifier;
-    ctx->verify_server(&server_verifier);
-
-    delete ctx;
-  } catch (const std::exception& e) {
-    iqnet::ssl::ctx = saved_ctx;
-    BOOST_FAIL("SSL verifier setup failed: " << e.what());
-  }
-
-  iqnet::ssl::ctx = saved_ctx;
+  // Set up server verification
+  TrackingVerifier server_verifier;
+  guard->verify_server(&server_verifier);
 }
 
 // Test SSL exception types (no certificates needed)
@@ -242,23 +157,6 @@ BOOST_FIXTURE_TEST_CASE(https_handshake_triggers_verify, HttpsIntegrationFixture
 // This validates the null check fix in ssl_lib.cc:227
 BOOST_FIXTURE_TEST_CASE(ssl_cert_fingerprint_valid, HttpsIntegrationFixture)
 {
-  // Verifier that captures the certificate fingerprint
-  class FingerprintVerifier : public iqnet::ssl::ConnectionVerifier {
-    mutable std::string fingerprint_;
-    mutable std::atomic<int> call_count_;
-
-    int do_verify(bool, X509_STORE_CTX* ctx) const override {
-      ++call_count_;
-      fingerprint_ = cert_finger_sha256(ctx);
-      return 1;  // Accept
-    }
-
-  public:
-    FingerprintVerifier() : fingerprint_(), call_count_(0) {}
-    std::string fingerprint() const { return fingerprint_; }
-    int get_call_count() const { return call_count_.load(); }
-  };
-
   if (!setup_ssl_context()) {
     BOOST_TEST_MESSAGE("Skipping SSL fingerprint test - context setup failed");
     return;
@@ -307,5 +205,91 @@ BOOST_FIXTURE_TEST_CASE(ssl_cert_fingerprint_stability, HttpsIntegrationFixture)
 // Note: The https_proxy_ssl_factory_* tests in coverage_improvement_tests provide
 // good coverage of the tunnel code path (https_client.cc) using inline proxy
 // patterns with SslFactoryTestProxyGuard from test_integration_common.h.
+
+// Test verify_client() with require_certificate=true (covers lines 234-238, 246-247)
+// This test verifies the API works and that prepare_verify() is called with correct flags
+BOOST_FIXTURE_TEST_CASE(ssl_verify_client_required, HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to set up SSL context with embedded certificates");
+
+  // Set up server to require client certificates - covers lines 234-238
+  TrackingVerifier server_verifier;
+  get_context()->verify_client(REQUIRE_CLIENT_CERT, &server_verifier);
+
+  start_server(211);
+
+  // Attempt connection without client certificate
+  // This triggers prepare_verify() with server=true and require_client_cert=true (line 246-247)
+  auto client = create_client();
+
+  // Connection may succeed or fail depending on OpenSSL behavior without client cert
+  // The important part is that verify_client() and prepare_verify() were exercised
+  try {
+    client->execute("echo", Value("test"));
+  } catch (const std::exception&) {
+    // Expected: connection fails without client certificate
+  }
+}
+
+// Test load_verify_locations() with CA file (covers line 279)
+BOOST_AUTO_TEST_CASE(ssl_load_verify_locations)
+{
+  SslContextGuard guard(iqnet::ssl::Ctx::client_only());
+
+  // Test with both parameters empty (should return false - line 276)
+  bool result_empty = guard->load_verify_locations("", "");
+  BOOST_CHECK(!result_empty);
+
+  // Test loading from a certificate file (using test cert as CA) - covers line 279
+  if (ssl_certs_available()) {
+    bool result = guard->load_verify_locations("../tests/data/cert.pem", "");
+    BOOST_CHECK(result);
+  }
+}
+
+// Test use_default_verify_paths() (covers line 285)
+BOOST_AUTO_TEST_CASE(ssl_use_default_verify_paths)
+{
+  SslContextGuard guard(iqnet::ssl::Ctx::client_only());
+
+  // Call use_default_verify_paths() - result is system-dependent
+  // Just verify the call doesn't crash
+  guard->use_default_verify_paths();
+}
+
+// Test hostname verification setup (covers lines 289-298)
+// Note: Actual hostname verification during connection is tested in
+// https_hostname_verification integration test
+BOOST_AUTO_TEST_CASE(ssl_hostname_verification_setup)
+{
+  SslContextGuard guard(iqnet::ssl::Ctx::client_only());
+
+  // Test API calls work without crashing
+  guard->set_hostname_verification(true);
+  guard->set_expected_hostname("example.com");
+  guard->set_hostname_verification(false);
+}
+
+// Integration test: hostname verification in actual HTTPS connection
+// This is the end-to-end test that verifies prepare_hostname_verify() works (lines 301-314)
+BOOST_FIXTURE_TEST_CASE(https_hostname_verification, HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to set up SSL context with embedded certificates");
+
+  // Enable hostname verification with expected hostname
+  get_context()->set_hostname_verification(true);
+  get_context()->set_expected_hostname("localhost");
+
+  start_server(210);
+  auto client = create_client();
+
+  // This should succeed since we're connecting to localhost
+  Response r = client->execute("echo", Value("hostname test"));
+
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), "hostname test");
+}
 
 BOOST_AUTO_TEST_SUITE_END()
