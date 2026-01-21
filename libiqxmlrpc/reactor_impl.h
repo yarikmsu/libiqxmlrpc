@@ -22,7 +22,7 @@
 #endif // HAVE_POLL
 
 #include <assert.h>
-#include <map>
+#include <unordered_map>
 #include <algorithm>
 
 namespace iqnet
@@ -49,7 +49,7 @@ public:
 
 private:
   typedef iqnet::scoped_lock<Lock>          scoped_lock;
-  typedef std::map<Socket::Handler, Event_handler*> EventHandlersMap;
+  typedef std::unordered_map<Socket::Handler, Event_handler*> EventHandlersMap;
   typedef EventHandlersMap::iterator        h_iterator;
   typedef HandlerStateList::const_iterator  hs_const_iterator;
   typedef HandlerStateList::iterator        hs_iterator;
