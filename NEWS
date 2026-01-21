@@ -1,5 +1,64 @@
 Look into ChangeLog file for full list of changes.
 
+0.13.8 - 0.14.0
+  This release is BINARY INCOMPATIBLE with previous versions!
+
+  BREAKING CHANGES:
+    * C++17 standard is now required (was C++11)
+    * OpenSSL 1.1.0+ is now required (dropped support for OpenSSL 1.0.x)
+
+  New Features:
+    * Comprehensive fuzzing infrastructure with OSS-Fuzz integration
+    * Lock-free thread pool with concurrent queue for improved scalability
+    * TLS session caching for faster HTTPS reconnects
+    * Configurable TLS cipher suites optimized for AES-NI acceleration
+    * XML parsing depth limit to prevent stack overflow attacks
+    * Server connection idle timeout for keep-alive connections
+
+  Security Hardening:
+    * TLS 1.2 enforced as minimum protocol version
+    * Integer overflow protection for buffer size calculations
+    * CRLF injection vulnerability fix in HTTP headers
+    * Replace inet_ntoa with thread-safe inet_ntop
+    * Comprehensive input validation and bounds checking
+
+  Performance Optimizations:
+    * Single-pass HTTP header parsing (3x speedup)
+    * Type tags instead of dynamic_cast for Value::cast<T>() (up to 10x faster)
+    * Lock-free work queue in thread pool
+    * Copy-on-write reactor handler list
+    * unordered_map for Struct (40-55% faster lookups)
+    * Base64 decode lookup table (4x speedup)
+    * TCP_NODELAY enabled by default
+    * Replace boost::lexical_cast with std::to_chars/from_chars (2-12x faster)
+    * strftime for HTTP date formatting (3x faster than boost::posix_time)
+    * Exception-free SSL I/O path (~850x faster per event)
+
+  Code Quality:
+    * Replace Boost with C++ standard library where possible
+    * Comprehensive clang-tidy integration (CI enforced)
+    * CodeQL security scanning
+    * Coverity Scan integration
+    * ASan/UBSan/TSan/Valgrind CI checks
+    * >95% code coverage target with comprehensive test suite
+    * Benchmark CI for performance regression detection (>20% threshold)
+
+  Bug Fixes:
+    * Fix exception safety in value parser (Coverity CID 641344)
+    * Fix socket FD leak in firewall rejection path (Coverity CID 641369)
+    * Fix undefined behavior in Base64 encoding for signed char platforms
+    * Fix EINTR handling in reactor poll/select implementations
+    * Various thread safety improvements with atomics
+
+0.13.7 - 0.13.8
+  * Support for <i8>, a 64-bit integer XML-RPC extension
+
+0.13.6 - 0.13.7
+  * Fix conditional jump or move depends on uninitialised value
+  * Build: Fix clang-tidy warning about redundant casts
+  * Build: Fix cppcheck warning in methods.cc
+  * Build: Fix deprecation warning
+
 0.13.5 - 0.13.6
   * Add support for tracing via HTTP X- headers (thanks to Dmitry Salomatin)
   * Security: Disable SSLv3 (issue #4)
