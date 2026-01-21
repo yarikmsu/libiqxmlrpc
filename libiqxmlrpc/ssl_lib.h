@@ -111,7 +111,7 @@ public:
   //! Enable hostname verification for client connections.
   /*! SECURITY: Verifies that server certificate matches the expected hostname.
       Checks both Common Name (CN) and Subject Alternative Names (SAN).
-      Requires OpenSSL 1.0.2+.
+      Requires OpenSSL 1.1.0+.
       \param enable Whether to enable hostname verification (default: true)
   */
   void set_hostname_verification(bool enable);
