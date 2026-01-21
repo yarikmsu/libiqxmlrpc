@@ -210,18 +210,78 @@ inline bool ssl_certs_available() {
 // SSL Verification Helpers
 //=============================================================================
 
+// Skip test if SSL certificates are not available
+#define SKIP_IF_NO_CERTS() \
+  if (!ssl_certs_available()) { \
+    BOOST_TEST_MESSAGE("Skipping - SSL certificates not available"); \
+    return; \
+  }
+
+// Named constants for verify_client() parameter
+constexpr bool REQUIRE_CLIENT_CERT = true;
+constexpr bool OPTIONAL_CLIENT_CERT = false;
+
+// WARNING: This verifier accepts ALL certificates - TEST USE ONLY
+// Production code MUST check preverified_ok and perform proper validation
 // Verifier that tracks how many times it was called
 class TrackingVerifier : public iqnet::ssl::ConnectionVerifier {
   mutable std::atomic<int> call_count_{0};
 
   int do_verify(bool, X509_STORE_CTX*) const override {
     ++call_count_;
-    return 1;  // Accept all
+    return 1;  // Accept all - TEST ONLY
   }
 
 public:
   int get_call_count() const { return call_count_.load(); }
   void reset() { call_count_ = 0; }
+};
+
+// WARNING: This verifier accepts ALL certificates - TEST USE ONLY
+// Production code MUST check preverified_ok and perform proper validation
+// Verifier that captures certificate fingerprint during verification
+// Note: fingerprint_ is safe without atomic because SSL verification
+// callbacks are synchronous - fingerprint() is only read after handshake completes.
+class FingerprintVerifier : public iqnet::ssl::ConnectionVerifier {
+  mutable std::string fingerprint_;
+  mutable std::atomic<int> call_count_{0};
+
+  int do_verify(bool, X509_STORE_CTX* ctx) const override {
+    ++call_count_;
+    fingerprint_ = cert_finger_sha256(ctx);
+    return 1;  // Accept all - TEST ONLY
+  }
+
+public:
+  FingerprintVerifier() : fingerprint_() {}
+  std::string fingerprint() const { return fingerprint_; }
+  int get_call_count() const { return call_count_.load(); }
+  void reset() { call_count_ = 0; fingerprint_.clear(); }
+};
+
+// RAII helper for SSL context tests that need temporary context without server
+// Automatically saves/restores global ssl::ctx and cleans up test context
+class SslContextGuard {
+  iqnet::ssl::Ctx* saved_ctx_;
+  iqnet::ssl::Ctx* test_ctx_;
+
+public:
+  explicit SslContextGuard(iqnet::ssl::Ctx* ctx)
+    : saved_ctx_(iqnet::ssl::ctx), test_ctx_(ctx) {
+    iqnet::ssl::ctx = test_ctx_;
+  }
+
+  ~SslContextGuard() {
+    iqnet::ssl::ctx = saved_ctx_;
+    delete test_ctx_;
+  }
+
+  // Non-copyable, non-movable
+  SslContextGuard(const SslContextGuard&) = delete;
+  SslContextGuard& operator=(const SslContextGuard&) = delete;
+
+  iqnet::ssl::Ctx* get() const { return test_ctx_; }
+  iqnet::ssl::Ctx* operator->() const { return test_ctx_; }
 };
 
 //=============================================================================
