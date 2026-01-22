@@ -53,6 +53,7 @@ protected:
   std::unique_ptr<http::Packet> resp_packet;
   bool non_blocking;
   std::string out_str;
+  size_t out_str_offset;  // Offset tracking instead of string.erase() for performance
 
 private:
 #ifdef IQXMLRPC_TESTING

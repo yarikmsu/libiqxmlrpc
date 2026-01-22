@@ -6,6 +6,7 @@
 #include "client_opts.h"
 #include "num_conv.h"
 #include "reactor_impl.h"
+#include "safe_math.h"
 
 using namespace iqnet;
 
@@ -46,7 +47,8 @@ Https_proxy_client_connection::Https_proxy_client_connection(
   reactor( new Reactor<Null_lock> ),
   resp_packet(nullptr),
   non_blocking(nb),
-  out_str()
+  out_str(),
+  out_str_offset(0)
 {
   sock.set_non_blocking( nb );
 }
@@ -74,6 +76,7 @@ void Https_proxy_client_connection::setup_tunnel()
 
   Proxy_request_header h(opts().addr());
   out_str = h.dump();
+  out_str_offset = 0;  // Reset offset for new request
 
   do {
     int to = opts().timeout() >= 0 ? opts().timeout() * 1000 : -1;
@@ -91,11 +94,15 @@ void Https_proxy_client_connection::setup_tunnel()
 
 void Https_proxy_client_connection::handle_output( bool& )
 {
-  size_t sz = send( out_str.c_str(), out_str.length() );
-  out_str.erase( 0, sz );
+  // Use offset tracking instead of string.erase() for O(1) vs O(n) performance
+  size_t remaining = out_str.length() - out_str_offset;
+  size_t sz = send( out_str.c_str() + out_str_offset, remaining );
+  safe_math::add_assign(out_str_offset, sz);
 
-  if( out_str.empty() )
+  if( out_str_offset >= out_str.length() )
   {
+    out_str.clear();  // Release memory
+    out_str_offset = 0;
     reactor->unregister_handler( this, Reactor_base::OUTPUT );
     reactor->register_handler( this, Reactor_base::INPUT );
   }
