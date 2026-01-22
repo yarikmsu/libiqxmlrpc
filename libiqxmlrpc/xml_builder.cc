@@ -82,5 +82,13 @@ XmlBuilder::content() const
   return std::string(cdata, buf->use);
 }
 
+std::string_view
+XmlBuilder::content_view() const
+{
+  xmlTextWriterFlush(writer);
+  auto cdata = reinterpret_cast<const char*>(xmlBufferContent(buf));
+  return std::string_view(cdata, buf->use);
+}
+
 } // namespace iqxmlrpc
 // vim:ts=2:sw=2:et

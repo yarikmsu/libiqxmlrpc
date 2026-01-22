@@ -7,6 +7,7 @@
 #include "api_export.h"
 
 #include <string>
+#include <string_view>
 #include <libxml/xmlwriter.h>
 
 namespace iqxmlrpc {
@@ -39,6 +40,13 @@ public:
 
   std::string
   content() const;
+
+  //! Return content as string_view (avoids copy for callers that don't need ownership).
+  //! @warning The returned view is only valid while the XmlBuilder exists and no
+  //!          modifications are made. Caller must not use the view after XmlBuilder
+  //!          is destroyed or modified.
+  std::string_view
+  content_view() const;
 
 private:
   xmlBufferPtr buf;

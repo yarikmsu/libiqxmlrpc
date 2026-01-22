@@ -23,6 +23,7 @@ class LIBIQXMLRPC_API Http_client_connection:
 {
   std::unique_ptr<iqnet::Reactor_base> reactor;
   std::string out_str;
+  size_t out_str_offset;  // Offset tracking instead of string.erase() for performance
   http::Packet* resp_packet;
 
 public:
