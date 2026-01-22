@@ -1,5 +1,6 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2014 Anton Dedov
+//  Copyright (C) 2019-2026 Yaroslav Gorbunov
 
 #include <optional>
 #include <stdexcept>
