@@ -861,4 +861,117 @@ BOOST_AUTO_TEST_CASE(header_option_name_case_insensitive)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+// Edge case tests for HTTP header functionality
+// (covers snprintf buffer limits, xheaders clearing, and header type tags)
+BOOST_AUTO_TEST_SUITE(http_header_edge_cases)
+
+// Test snprintf fallback path for long phrases (>128 chars)
+BOOST_AUTO_TEST_CASE(response_header_dump_long_phrase)
+{
+    // Create a phrase longer than 128 chars to trigger snprintf fallback
+    // Buffer is 128 bytes, "HTTP/1.1 XXX " is 13 bytes + "\r\n" is 2 bytes
+    // So phrase > ~113 chars triggers fallback
+    std::string long_phrase(150, 'X');
+    Response_header hdr(599, long_phrase);
+    std::string dump = hdr.dump();
+
+    // Should still produce valid HTTP response line with original status code
+    BOOST_CHECK(dump.find("HTTP/1.1 599 ") != std::string::npos);
+    BOOST_CHECK(dump.find(long_phrase) != std::string::npos);
+    BOOST_CHECK(dump.find("\r\n") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(response_header_dump_exact_boundary)
+{
+    // Buffer: 128 bytes total
+    // "HTTP/1.1 XXX " = 13 bytes, "\r\n" = 2 bytes
+    // Remaining for phrase: 128 - 15 = 113 bytes exactly
+
+    // 113 chars should fit in buffer (snprintf path)
+    std::string fits_phrase(113, 'Y');
+    Response_header hdr_fits(200, fits_phrase);
+    std::string dump_fits = hdr_fits.dump();
+    BOOST_CHECK(dump_fits.find("HTTP/1.1 200 ") != std::string::npos);
+    BOOST_CHECK(dump_fits.find(fits_phrase) != std::string::npos);
+
+    // 114 chars triggers fallback (string concatenation path)
+    std::string overflow_phrase(114, 'Z');
+    Response_header hdr_overflow(200, overflow_phrase);
+    std::string dump_overflow = hdr_overflow.dump();
+    BOOST_CHECK(dump_overflow.find("HTTP/1.1 200 ") != std::string::npos);
+    BOOST_CHECK(dump_overflow.find(overflow_phrase) != std::string::npos);
+}
+
+// Test get_xheaders clears existing entries before populating
+BOOST_AUTO_TEST_CASE(get_xheaders_clears_existing_entries)
+{
+    Response_header hdr(200, "OK");
+    hdr.set_option("x-new-header", "new-value");
+
+    XHeaders xheaders;
+    xheaders["x-stale-header"] = "old-value";  // Pre-existing entry
+
+    hdr.get_xheaders(xheaders);
+
+    // Stale entry should be cleared (not present)
+    BOOST_CHECK(xheaders.find("x-stale-header") == xheaders.end());
+    // New entry should be present
+    BOOST_CHECK(xheaders.find("x-new-header") != xheaders.end());
+    BOOST_CHECK_EQUAL(xheaders.find("x-new-header")->second, "new-value");
+}
+
+BOOST_AUTO_TEST_CASE(get_xheaders_clears_stale_not_in_header)
+{
+    Response_header hdr(200, "OK");
+    // Header has no x-headers set
+
+    XHeaders xheaders;
+    xheaders["x-stale"] = "should-be-removed";
+
+    hdr.get_xheaders(xheaders);
+
+    // Stale x-header should be cleared even if header has no x-headers
+    // Note: Response_header may have default options that pass XHeaders::validate(),
+    // so we only verify that our specific stale entry was removed
+    BOOST_CHECK(xheaders.find("x-stale") == xheaders.end());
+}
+
+// Test HeaderType enum values and virtual method overrides
+BOOST_AUTO_TEST_CASE(header_type_request_override)
+{
+    Request_header hdr("/RPC2", "localhost", 8080);
+    BOOST_CHECK(hdr.header_type() == HeaderType::REQUEST);
+}
+
+BOOST_AUTO_TEST_CASE(header_type_response_override)
+{
+    Response_header hdr(200, "OK");
+    BOOST_CHECK(hdr.header_type() == HeaderType::RESPONSE);
+}
+
+BOOST_AUTO_TEST_CASE(header_type_enum_distinct_values)
+{
+    // Verify all enum values are distinct
+    // Note: HeaderType::BASE is the default in the abstract Header class
+    // and cannot be tested directly (Header has pure virtual dump_head()).
+    // We verify its existence and distinctness through enum comparisons.
+    BOOST_CHECK(HeaderType::BASE != HeaderType::REQUEST);
+    BOOST_CHECK(HeaderType::BASE != HeaderType::RESPONSE);
+    BOOST_CHECK(HeaderType::BASE != HeaderType::ERROR_RESPONSE);
+    BOOST_CHECK(HeaderType::REQUEST != HeaderType::RESPONSE);
+    BOOST_CHECK(HeaderType::REQUEST != HeaderType::ERROR_RESPONSE);
+    BOOST_CHECK(HeaderType::RESPONSE != HeaderType::ERROR_RESPONSE);
+}
+
+BOOST_AUTO_TEST_CASE(error_response_header_type)
+{
+    Error_response err("Not Found", 404);
+    const Response_header* resp_hdr = err.response_header();
+    BOOST_REQUIRE(resp_hdr != nullptr);
+    BOOST_CHECK(resp_hdr->header_type() == HeaderType::RESPONSE);
+    BOOST_CHECK_EQUAL(resp_hdr->code(), 404);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
 // vim:ts=2:sw=2:et

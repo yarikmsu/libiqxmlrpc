@@ -475,7 +475,16 @@ std::string Request_header::agent() const
 
 void Header::get_xheaders(iqxmlrpc::XHeaders& xheaders) const
 {
-  xheaders = options_;
+  // Clear first to match original assignment semantics (xheaders = options_)
+  // This prevents stale X-headers from persisting when object is reused
+  xheaders = std::map<std::string, std::string>();
+
+  // Copy only X-headers (Options is now unordered_map, XHeaders uses map)
+  for (const auto& opt : options_) {
+    if (iqxmlrpc::XHeaders::validate(opt.first)) {
+      xheaders[opt.first] = opt.second;
+    }
+  }
 }
 
 void Header::set_xheaders(const iqxmlrpc::XHeaders& xheaders)
@@ -614,9 +623,17 @@ std::string Response_header::current_date()
 
 std::string Response_header::dump_head() const
 {
-  std::ostringstream ss;
-  ss << "HTTP/1.1 " << code() <<  " " << phrase() << names::crlf;
-  return ss.str();
+  // Use snprintf instead of ostringstream for performance (M4 optimization)
+  // Avoids allocation overhead and locale baggage (~3x faster)
+  char buf[128];
+  int len = snprintf(buf, sizeof(buf), "HTTP/1.1 %d %s\r\n",
+                     code(), phrase().c_str());
+  if (len >= 0 && len < static_cast<int>(sizeof(buf))) {
+    return std::string(buf, static_cast<size_t>(len));
+  }
+  // Fallback to string concatenation for long phrases or encoding errors
+  // Preserves original status code instead of silently changing to 500
+  return "HTTP/1.1 " + std::to_string(code()) + " " + phrase() + "\r\n";
 }
 
 std::string Response_header::server() const

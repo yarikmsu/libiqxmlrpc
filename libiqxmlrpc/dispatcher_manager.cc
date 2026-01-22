@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <deque>
 #include <iterator>
-#include <map>
+#include <unordered_map>
 
 namespace iqxmlrpc {
 
@@ -17,7 +17,7 @@ namespace iqxmlrpc {
 //
 
 class Default_method_dispatcher: public Method_dispatcher_base {
-  typedef std::map<std::string, Method_factory_base*> Factory_map;
+  typedef std::unordered_map<std::string, Method_factory_base*> Factory_map;
   Factory_map fs;
 
 public:
@@ -43,7 +43,7 @@ Default_method_dispatcher::~Default_method_dispatcher()
 void Default_method_dispatcher::register_method
   ( const std::string& name, Method_factory_base* fb )
 {
-  // Use insert() to avoid double O(log n) lookup
+  // Use insert() to avoid double O(1) lookup
   auto result = fs.insert({name, fb});
   if (!result.second) {
     // Key already existed: delete old factory, update via iterator
@@ -54,7 +54,7 @@ void Default_method_dispatcher::register_method
 
 Method* Default_method_dispatcher::do_create_method(const std::string& name)
 {
-  // Use iterator to avoid double O(log n) lookup
+  // Use iterator to avoid double O(1) lookup
   auto it = fs.find(name);
   if (it == fs.end())
     return nullptr;
