@@ -1268,4 +1268,82 @@ BOOST_AUTO_TEST_CASE(request_complex_roundtrip)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+//=============================================================================
+// XmlBuilder content_view() tests
+// These tests exercise the zero-copy string_view API
+//=============================================================================
+
+#include "libiqxmlrpc/xml_builder.h"
+
+BOOST_AUTO_TEST_SUITE(xml_builder_content_view_tests)
+
+// Test content_view() returns same data as content()
+BOOST_AUTO_TEST_CASE(content_view_matches_content)
+{
+    iqxmlrpc::XmlBuilder builder;
+
+    {
+        iqxmlrpc::XmlBuilder::Node root(builder, "test");
+        root.set_textdata("Hello World");
+    }
+    builder.stop();
+
+    std::string content_copy = builder.content();
+    std::string_view content_view = builder.content_view();
+
+    // content_view should return same data as content
+    BOOST_CHECK_EQUAL(std::string(content_view), content_copy);
+}
+
+// Test content_view() with empty document (only XML declaration)
+BOOST_AUTO_TEST_CASE(content_view_empty_doc)
+{
+    iqxmlrpc::XmlBuilder builder;
+    builder.stop();
+
+    std::string_view view = builder.content_view();
+    BOOST_CHECK(!view.empty());  // Should contain XML declaration
+    BOOST_CHECK(view.find("<?xml") != std::string_view::npos);
+}
+
+// Test content_view() with nested elements
+BOOST_AUTO_TEST_CASE(content_view_nested_elements)
+{
+    iqxmlrpc::XmlBuilder builder;
+
+    {
+        iqxmlrpc::XmlBuilder::Node root(builder, "root");
+        {
+            iqxmlrpc::XmlBuilder::Node child(builder, "child");
+            child.set_textdata("nested content");
+        }
+    }
+    builder.stop();
+
+    std::string_view view = builder.content_view();
+    BOOST_CHECK(view.find("<root>") != std::string_view::npos);
+    BOOST_CHECK(view.find("<child>nested content</child>") != std::string_view::npos);
+}
+
+// Test content_view() can be called multiple times with same result
+BOOST_AUTO_TEST_CASE(content_view_multiple_calls)
+{
+    iqxmlrpc::XmlBuilder builder;
+
+    {
+        iqxmlrpc::XmlBuilder::Node root(builder, "data");
+        root.set_textdata("test");
+    }
+    builder.stop();
+
+    std::string_view view1 = builder.content_view();
+    std::string_view view2 = builder.content_view();
+
+    // Both views should be identical (same pointer and length)
+    BOOST_CHECK_EQUAL(view1.data(), view2.data());
+    BOOST_CHECK_EQUAL(view1.length(), view2.length());
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
 // vim:ts=2:sw=2:et

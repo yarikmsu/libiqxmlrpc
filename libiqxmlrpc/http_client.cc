@@ -5,6 +5,7 @@
 
 #include "client_opts.h"
 #include "reactor_impl.h"
+#include "safe_math.h"
 
 #include <sstream>
 
@@ -17,6 +18,7 @@ Http_client_connection::Http_client_connection( const iqnet::Socket& s, bool nb 
   Connection( s ),
   reactor( new Reactor<Null_lock> ),
   out_str(),
+  out_str_offset(0),
   resp_packet(nullptr)
 {
   sock.set_non_blocking( nb );
@@ -26,6 +28,7 @@ Http_client_connection::Http_client_connection( const iqnet::Socket& s, bool nb 
 http::Packet* Http_client_connection::do_process_session( const std::string& s )
 {
   out_str = s;
+  out_str_offset = 0;  // Reset offset for new request
   resp_packet = nullptr;
   reactor->register_handler( this, Reactor_base::OUTPUT );
 
@@ -43,11 +46,15 @@ http::Packet* Http_client_connection::do_process_session( const std::string& s )
 
 void Http_client_connection::handle_output( bool& )
 {
-  size_t sz = send( out_str.c_str(), out_str.length() );
-  out_str.erase( 0, sz );
+  // Use offset tracking instead of string.erase() for O(1) vs O(n) performance
+  size_t remaining = out_str.length() - out_str_offset;
+  size_t sz = send( out_str.c_str() + out_str_offset, remaining );
+  safe_math::add_assign(out_str_offset, sz);
 
-  if( out_str.empty() )
+  if( out_str_offset >= out_str.length() )
   {
+    out_str.clear();  // Release memory
+    out_str_offset = 0;
     reactor->unregister_handler( this, Reactor_base::OUTPUT );
     reactor->register_handler( this, Reactor_base::INPUT );
   }
