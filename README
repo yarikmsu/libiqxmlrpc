@@ -1,6 +1,20 @@
 Thank you for trying Libiqxmlrpc.
 
+This is a fork of Anton Dedov's original libiqxmlrpc project, maintained and
+enhanced by Yaroslav Gorbunov since 2019.
+
 Please refer documentation on project's wiki:
 	https://github.com/adedov/libiqxmlrpc/wiki
 
-Anton Dedov <adedov@gmail.com>
+## Contributors
+
+Original author:
+  Anton Dedov <adedov@gmail.com>
+
+Fork maintainer and contributor (2019-2026):
+  Yaroslav Gorbunov <ygorbunov@gmail.com>
+
+## License
+
+This project is licensed under the BSD 2-Clause License.
+See the License file for details.

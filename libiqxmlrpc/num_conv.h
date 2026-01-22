@@ -1,5 +1,6 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
+//  Copyright (C) 2019-2026 Yaroslav Gorbunov
 
 #ifndef LIBIQXMLRPC_NUM_CONV_H
 #define LIBIQXMLRPC_NUM_CONV_H
