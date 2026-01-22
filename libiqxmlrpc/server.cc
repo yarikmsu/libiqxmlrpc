@@ -217,8 +217,11 @@ authenticate(const http::Packet& pkt, const Auth_Plugin_base* ap)
   if (!ap)
     return std::nullopt;
 
-  const auto& hdr =
-    dynamic_cast<const Request_header&>(*pkt.header());
+  // Use type tag instead of dynamic_cast for performance (M3 optimization)
+  const Header* hdr_base = pkt.header();
+  if (hdr_base->header_type() != HeaderType::REQUEST)
+    throw http::Malformed_packet("Expected request header");
+  const auto& hdr = static_cast<const Request_header&>(*hdr_base);
 
   if (!hdr.has_authinfo())
   {

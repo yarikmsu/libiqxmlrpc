@@ -15,6 +15,7 @@ on:
       # Run on changes to library code or benchmark infrastructure
       - 'libiqxmlrpc/**'
       - 'tests/test_performance.cc'
+      - 'tests/test_performance_m1_m4.cc'
       - 'tests/perf_utils.h'
       - 'scripts/benchmark_utils.py'
       - 'scripts/compare_benchmarks.py'
@@ -93,7 +94,7 @@ jobs:
       run: |
         set -euo pipefail
         cd build
-        make -j$(nproc) performance-test
+        make -j$(nproc) performance-test performance-m1-m4-test
 
     - name: Benchmark PR branch
       run: |
@@ -111,6 +112,12 @@ jobs:
           -o pr_results.txt \
           --github-actions
         echo "PR benchmark results saved to pr_results.txt"
+
+        # Run M1-M4 optimization benchmarks (verification only, not compared)
+        # These ensure no crashes/regressions in M1-M4 specific optimizations
+        echo "=== Running M1-M4 optimization benchmarks ==="
+        ./tests/performance-m1-m4-test
+        echo "M1-M4 benchmarks completed successfully"
 
     - name: Benchmark master branch
       run: |
