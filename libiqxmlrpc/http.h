@@ -10,7 +10,8 @@
 
 #include <cstdint>
 #include <functional>
-#include <map>
+#include <map>  // For Validators (std::multimap)
+#include <unordered_map>  // For Options
 #include <memory>
 #include <string>
 
@@ -33,10 +34,21 @@ enum Verification_level : std::uint8_t { HTTP_CHECK_WEAK, HTTP_CHECK_STRICT };
 #pragma warning(disable: 4251)
 #endif
 
+//! HTTP header type tags for efficient type checking (replaces dynamic_cast)
+enum class HeaderType : std::uint8_t {
+  BASE,
+  REQUEST,
+  RESPONSE,
+  ERROR_RESPONSE
+};
+
 //! HTTP header. Responsible for parsing,
 //! creating generic HTTP headers.
 class LIBIQXMLRPC_API Header {
 public:
+  //! Get the header type tag (O(1) type check, replaces dynamic_cast)
+  virtual HeaderType header_type() const { return HeaderType::BASE; }
+
   //! Set a custom server header (e.g., "MyServer/1.0").
   /*! Call before creating any Response_header instances.
       \param header Custom server identifier (empty to use default)
@@ -117,7 +129,7 @@ private:
     Option_validator_fn fn;
   };
 
-  typedef std::map<std::string, std::string> Options;
+  typedef std::unordered_map<std::string, std::string> Options;
   typedef std::multimap<std::string, Option_validator> Validators;
 
   std::string head_line_;
@@ -135,6 +147,8 @@ class LIBIQXMLRPC_API Request_header: public Header {
   std::string uri_;
 
 public:
+  HeaderType header_type() const override { return HeaderType::REQUEST; }
+
   Request_header( Verification_level, const std::string& to_parse );
   Request_header( const std::string& uri, const std::string& vhost, int port );
 
@@ -156,6 +170,8 @@ class LIBIQXMLRPC_API Response_header: public Header {
   std::string phrase_;
 
 public:
+  HeaderType header_type() const override { return HeaderType::RESPONSE; }
+
   Response_header( Verification_level, const std::string& to_parse );
   explicit Response_header( int = 200, const std::string& = "OK" );
 
@@ -293,7 +309,12 @@ public:
 
   const Response_header* response_header() const
   {
-    return dynamic_cast<const Response_header*>(header());
+    // Use type tag instead of dynamic_cast for performance (M3 optimization)
+    // This is error path so impact is low, but good for consistency
+    const Header* hdr = header();
+    if (hdr && hdr->header_type() == HeaderType::RESPONSE)
+      return static_cast<const Response_header*>(hdr);
+    return nullptr;
   }
 
   // deprecated

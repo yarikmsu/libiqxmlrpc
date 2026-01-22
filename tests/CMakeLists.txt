@@ -98,6 +98,17 @@ add_custom_target(perf-test
     COMMENT "Running performance benchmarks..."
 )
 
+# M1-M4 optimization baseline benchmarks (separate - run with make perf-m1-m4)
+add_executable(performance-m1-m4-test test_performance_m1_m4.cc)
+target_link_libraries(performance-m1-m4-test iqxmlrpc ${Boost_LIBRARIES} ${LIBXML2_LIBRARIES})
+
+add_custom_target(perf-m1-m4
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/performance-m1-m4-test
+    DEPENDS performance-m1-m4-test
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Running M1-M4 optimization baseline benchmarks..."
+)
+
 # Wire protocol compatibility test (requires external Python XML-RPC server)
 add_executable(wire-compatibility-test test_wire_compatibility.cc)
 target_link_libraries(wire-compatibility-test iqxmlrpc ${Boost_LIBRARIES} ${LIBXML2_LIBRARIES} ${OPENSSL_LIBRARIES})
