@@ -4,14 +4,15 @@
 
 ## Summary
 
-21 performance optimizations were implemented across the library:
+25 performance optimizations were implemented across the library:
 
 | Category | Key Improvements |
 |----------|-----------------|
 | Number conversion | `boost::lexical_cast` → `std::to_chars` (1.2x-12.5x faster) |
 | Type checking | `dynamic_cast` → type tags (1.8x-10.5x faster) |
 | HTTP parsing | Single-pass parser (2.9x-3.3x faster) |
-| Data structures | `std::map` → `unordered_map` for Struct (39-56% faster) |
+| HTTP generation | `ostringstream` → `snprintf` for response header (2.97x faster) |
+| Data structures | `std::map` → `unordered_map` for Struct (39-56% faster), HTTP options (2.54x faster), method dispatcher (3.21x faster) |
 | Base64 | Lookup table decoding (4.1x-4.7x faster) |
 | SSL/TLS | Exception-free I/O (~850x faster per event), session caching, AES-NI |
 | Network | TCP_NODELAY enabled (40-400ms latency reduction) |
