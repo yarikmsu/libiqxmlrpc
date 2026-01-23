@@ -1,20 +1,68 @@
-Thank you for trying Libiqxmlrpc.
+# libiqxmlrpc - High-Performance Fork
 
-This is a fork of Anton Dedov's original libiqxmlrpc project, maintained and
-enhanced by Yaroslav Gorbunov since 2019.
+This is a performance-focused fork of Anton Dedov's libiqxmlrpc, actively maintained and enhanced since 2019.
 
-Please refer documentation on project's wiki:
-	https://github.com/adedov/libiqxmlrpc/wiki
+## Why This Fork?
+
+⚡ **28 performance optimizations** delivering 1.2x to 12.5x speedups on critical operations
+🚀 **Modern C++17** with `string_view`, `to_chars`, and safe integer operations
+🔒 **Enhanced security** with TLS 1.2+, overflow protection, and fuzzing infrastructure
+📦 **Drop-in compatible** with upstream - no breaking API changes
+
+## Quick Start
+
+```bash
+# Ubuntu/Debian
+sudo apt install libboost-dev libxml2-dev libssl-dev cmake g++
+
+# Clone and build
+git clone https://github.com/yarikmsu/libiqxmlrpc.git
+cd libiqxmlrpc
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+sudo cmake --install build
+```
+
+**See the [5-minute Quick Start guide](https://github.com/yarikmsu/libiqxmlrpc/wiki/Quick-Start) for complete instructions.**
+
+## Documentation
+
+📚 **[Fork Wiki](https://github.com/yarikmsu/libiqxmlrpc/wiki)** - Start here for:
+- [Quick Start Guide](https://github.com/yarikmsu/libiqxmlrpc/wiki/Quick-Start) - Get running in 5 minutes
+- [Performance Results](https://github.com/yarikmsu/libiqxmlrpc/wiki/Performance-Results) - Optimization details and benchmarks
+- [What's New](https://github.com/yarikmsu/libiqxmlrpc/wiki/Whats-New) - Migration guide from upstream
+- [Building](https://github.com/yarikmsu/libiqxmlrpc/wiki/Building) - Build requirements and options
+
+📖 **[Upstream Wiki](https://github.com/adedov/libiqxmlrpc/wiki)** - Reference for:
+- [Writing Clients](https://github.com/adedov/libiqxmlrpc/wiki/Writing-Client)
+- [Writing Servers](https://github.com/adedov/libiqxmlrpc/wiki/Writing-Server)
+- [Value API](https://github.com/adedov/libiqxmlrpc/wiki/Value-Manipulations)
+
+## Performance Highlights
+
+| Optimization | Speedup | Impact |
+|--------------|---------|--------|
+| Number conversion | 12.5x | High - affects all numeric values |
+| Type checking | 10.5x | High - frequently used operations |
+| HTTP parsing | 3.3x | Medium - one-time per request |
+| SSL exceptions | 850x | Low - error paths only |
+
+**See [Performance Results](https://github.com/yarikmsu/libiqxmlrpc/wiki/Performance-Results) for complete benchmark data.**
+
+## Requirements
+
+- **Compiler**: GCC 7+ or Clang 5+ (C++17 support)
+- **CMake**: 3.10+
+- **Dependencies**: Boost 1.58+, libxml2 2.9+, OpenSSL 1.1.0+
 
 ## Contributors
 
-Original author:
-  Anton Dedov <adedov@gmail.com>
+**Original author:**
+Anton Dedov <adedov@gmail.com>
 
-Fork maintainer and contributor (2019-2026):
-  Yaroslav Gorbunov <ygorbunov@gmail.com>
+**Fork maintainer and contributor (2019-2026):**
+Yaroslav Gorbunov <ygorbunov@gmail.com>
 
 ## License
 
-This project is licensed under the BSD 2-Clause License.
-See the License file for details.
+BSD 2-Clause License. See the License file for details.
