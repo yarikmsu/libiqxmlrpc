@@ -3,8 +3,13 @@ Thank you for trying Libiqxmlrpc.
 This is a fork of Anton Dedov's original libiqxmlrpc project, maintained and
 enhanced by Yaroslav Gorbunov since 2019.
 
-Please refer documentation on project's wiki:
-	https://github.com/adedov/libiqxmlrpc/wiki
+## Documentation
+
+**Fork Documentation** (Recommended):
+- https://github.com/yarikmsu/libiqxmlrpc/wiki
+
+**Original Documentation** (Some content outdated):
+- https://github.com/adedov/libiqxmlrpc/wiki
 
 ## Contributors
 
