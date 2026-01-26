@@ -15,8 +15,8 @@
 #include <openssl/err.h>
 
 #include <mutex>
+#include <cstdio>
 
-#include <sstream>
 #include "ssl_lib.h"
 #include "net_except.h"
 
@@ -142,11 +142,25 @@ ConnectionVerifier::cert_finger_sha256(X509_STORE_CTX* ctx)
   unsigned char md[EVP_MAX_MD_SIZE];
   X509_digest(x, digest, md, &n);
 
-  std::ostringstream ss;
-  for(int i = 0; i < 32; i++)
-     ss << std::hex << int(md[i]);
+  // Defensive check: SHA256 must produce exactly 32 bytes
+  if (n != 32) {
+    throw iqnet::network_error("SHA256 digest produced unexpected size");
+  }
 
-  return ss.str();
+  // Use zero-padded hex format (%02x) for proper SHA256 fingerprints.
+  // This differs from the original ostringstream implementation which used std::hex
+  // without zero-padding, producing variable-length output (missing leading zeros).
+  // The zero-padded format is the standard representation for cryptographic hashes
+  // and ensures consistent 64-character output for SHA256.
+  char hex_buf[65];  // 32 bytes * 2 chars/byte + null terminator
+  for(size_t i = 0; i < 32; i++) {
+    int written = snprintf(&hex_buf[i * 2], 3, "%02x", md[i]);
+    if (written < 0 || written >= 3) {
+      throw iqnet::network_error("Failed to format certificate fingerprint");
+    }
+  }
+  hex_buf[64] = '\0';
+  return std::string(hex_buf, 64);
 }
 
 //

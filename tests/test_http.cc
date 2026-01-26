@@ -972,6 +972,51 @@ BOOST_AUTO_TEST_CASE(error_response_header_type)
     BOOST_CHECK_EQUAL(resp_hdr->code(), 404);
 }
 
+// E3 Optimization Tests: Host:Port Formatting
+// Tests the string concatenation optimization for host:port formatting
+BOOST_AUTO_TEST_CASE(request_header_host_port_localhost)
+{
+    // Simple hostname with standard port
+    Request_header hdr("/api", "localhost", 8080);
+    BOOST_CHECK_EQUAL(hdr.host(), "localhost:8080");
+}
+
+BOOST_AUTO_TEST_CASE(request_header_host_port_fqdn)
+{
+    // Fully qualified domain name
+    Request_header hdr("/RPC2", "api.example.com", 9000);
+    BOOST_CHECK_EQUAL(hdr.host(), "api.example.com:9000");
+}
+
+BOOST_AUTO_TEST_CASE(request_header_host_port_ipv4)
+{
+    // IPv4 address
+    Request_header hdr("/api", "192.168.1.1", 443);
+    BOOST_CHECK_EQUAL(hdr.host(), "192.168.1.1:443");
+}
+
+BOOST_AUTO_TEST_CASE(request_header_host_port_long_hostname)
+{
+    // Very long hostname to test string capacity handling
+    std::string long_host = "very.long.fully.qualified.domain.name.example.com";
+    Request_header hdr("/api", long_host, 80);
+    BOOST_CHECK_EQUAL(hdr.host(), long_host + ":80");
+}
+
+BOOST_AUTO_TEST_CASE(request_header_host_port_high_port)
+{
+    // Maximum port number (5 digits)
+    Request_header hdr("/api", "example.com", 65535);
+    BOOST_CHECK_EQUAL(hdr.host(), "example.com:65535");
+}
+
+BOOST_AUTO_TEST_CASE(request_header_host_port_low_port)
+{
+    // Minimum port number (1 digit)
+    Request_header hdr("/api", "example.com", 1);
+    BOOST_CHECK_EQUAL(hdr.host(), "example.com:1");
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 // vim:ts=2:sw=2:et
