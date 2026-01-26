@@ -453,9 +453,8 @@ Request_header::Request_header(
 ):
   uri_(req_uri)
 {
-  std::ostringstream host_opt;
-  host_opt << vhost << ":" << port;
-  set_option(names::host, host_opt.str());
+  std::string host_opt = vhost + ":" + std::to_string(port);
+  set_option(names::host, host_opt);
   set_option(names::user_agent, PACKAGE " " VERSION);
 }
 

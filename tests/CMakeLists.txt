@@ -48,6 +48,7 @@ iqxmlrpc_test(safe-math-test test_safe_math.cc)
 iqxmlrpc_test(perf-utils-test test_perf_utils.cc)
 iqxmlrpc_test(security-test test_security.cc)
 iqxmlrpc_test(crlf-injection-test test_crlf_injection.cc)
+iqxmlrpc_test(e1-e3-optimization-test test_e1_e3_optimization.cc)
 
 # Thread safety tests
 # NOTE: These tests stress-test Boost.Lockfree which produces TSan false positives.
@@ -107,6 +108,17 @@ add_custom_target(perf-m1-m4
     DEPENDS performance-m1-m4-test
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Running M1-M4 optimization baseline benchmarks..."
+)
+
+# E1-E3 optimization benchmarks (separate - run with make perf-e1-e3)
+add_executable(performance-e1-e3-test test_performance_e1_e3.cc)
+target_link_libraries(performance-e1-e3-test iqxmlrpc ${Boost_LIBRARIES} ${LIBXML2_LIBRARIES})
+
+add_custom_target(perf-e1-e3
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/performance-e1-e3-test
+    DEPENDS performance-e1-e3-test
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Running E1-E3 ostringstream optimization benchmarks..."
 )
 
 # Wire protocol compatibility test (requires external Python XML-RPC server)
