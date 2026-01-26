@@ -153,7 +153,7 @@ ConnectionVerifier::cert_finger_sha256(X509_STORE_CTX* ctx)
   // The zero-padded format is the standard representation for cryptographic hashes
   // and ensures consistent 64-character output for SHA256.
   char hex_buf[65];  // 32 bytes * 2 chars/byte + null terminator
-  for(int i = 0; i < 32; i++) {
+  for(size_t i = 0; i < 32; i++) {
     int written = snprintf(&hex_buf[i * 2], 3, "%02x", md[i]);
     if (written < 0 || written >= 3) {
       throw iqnet::network_error("Failed to format certificate fingerprint");
