@@ -8,8 +8,6 @@
 #include "reactor_impl.h"
 #include "safe_math.h"
 
-#include <sstream>
-
 using namespace iqxmlrpc;
 using namespace iqnet;
 
@@ -85,15 +83,21 @@ void Http_client_connection::handle_input( bool& )
 
 std::string Http_proxy_client_connection::decorate_uri() const
 {
-  std::ostringstream ss;
-  ss << "http://" << opts().vhost() << ':' << opts().addr().get_port();
+  std::string result = "http://";
+  // Reserve space for: vhost + ':' + port (max 5 digits) + '/' + uri
+  // Reserve is called after initial assignment to avoid reallocation
+  result.reserve(result.size() + opts().vhost().size() + 1 + 5 + 1 + opts().uri().size());
+
+  result += opts().vhost();
+  result += ':';
+  result += std::to_string(opts().addr().get_port());
 
   if (!opts().uri().empty() && opts().uri()[0] != '/')
-    ss << '/';
+    result += '/';
 
-  ss << opts().uri();
+  result += opts().uri();
 
-  return ss.str();
+  return result;
 }
 
 // vim:ts=2:sw=2:et
