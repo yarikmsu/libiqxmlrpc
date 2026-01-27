@@ -16,11 +16,11 @@
 #include <cctype>
 #include <cstring>
 #include <ctime>
-#include <deque>
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <sstream>
+#include <string_view>
 
 namespace iqxmlrpc {
 namespace http {
@@ -50,9 +50,11 @@ inline bool contains(const std::string& s, const char* sub) {
   return s.find(sub) != std::string::npos;
 }
 
-// Helper: split string by whitespace, compressing consecutive delimiters
+// Helper: split string_view by whitespace, zero-allocation version
+// Returns string_view tokens that reference the source string
+// IMPORTANT: Source string must outlive the returned views
 template<typename Container>
-void split_by_whitespace(Container& result, const std::string& s) {
+void split_by_whitespace_sv(Container& result, std::string_view s) {
   result.clear();
   size_t start = 0;
   size_t len = s.size();
@@ -71,9 +73,11 @@ void split_by_whitespace(Container& result, const std::string& s) {
   }
 }
 
-// Helper: split string by any character in delimiters
+// Helper: split string_view by any character in delimiters, zero-allocation version
+// Returns string_view tokens that reference the source string
+// IMPORTANT: Source string must outlive the returned views
 template<typename Container>
-void split_by_chars(Container& result, const std::string& s, const char* delims) {
+void split_by_chars_sv(Container& result, std::string_view s, const char* delims) {
   result.clear();
   size_t start = 0;
   size_t len = s.size();
@@ -81,7 +85,7 @@ void split_by_chars(Container& result, const std::string& s, const char* delims)
   while (start < len) {
     // Find next delimiter
     size_t end = s.find_first_of(delims, start);
-    if (end == std::string::npos) end = len;
+    if (end == std::string_view::npos) end = len;
 
     if (end > start) {
       result.push_back(s.substr(start, end - start));
@@ -431,19 +435,18 @@ Request_header::Request_header(Verification_level lev, const std::string& to_par
   set_option_default(names::host, "");
   set_option_default(names::user_agent, "unknown");
 
-  // parse method
-  typedef std::deque<std::string> Token;
-  Token method_line;
-  split_by_whitespace(method_line, get_head_line());
+  // parse method - using string_view for zero-allocation tokenization
+  std::vector<std::string_view> method_line;
+  split_by_whitespace_sv(method_line, get_head_line());
 
   if (method_line.empty())
     throw Bad_request();
 
-  if( method_line[0] != "POST" )
+  if (method_line[0] != "POST")
     throw Method_not_allowed();
 
   if (method_line.size() > 1)
-    uri_ = method_line[1];
+    uri_ = std::string(method_line[1]);  // Only allocate when storing
 }
 
 Request_header::Request_header(
@@ -504,18 +507,22 @@ void Request_header::get_authinfo(std::string& user, std::string& pw) const
   if (!has_authinfo())
     throw Unauthorized();
 
-  std::vector<std::string> v;
+  // Using string_view for zero-allocation tokenization
+  // authstring must persist since string_views reference it
+  std::vector<std::string_view> v;
   std::string authstring = get_string(names::authorization);
-  split_by_chars(v, authstring, " \t");
+  split_by_chars_sv(v, authstring, " \t");
 
   if (v.size() != 2)
     throw Unauthorized();
 
-  to_lower_inplace(v[0]);
-  if (v[0] != "basic")
+  // Need to convert to string for lowercase comparison
+  std::string auth_type(v[0]);
+  to_lower_inplace(auth_type);
+  if (auth_type != "basic")
     throw Unauthorized();
 
-  std::unique_ptr<Binary_data> bin_authinfo( Binary_data::from_base64(v[1]) );
+  std::unique_ptr<Binary_data> bin_authinfo( Binary_data::from_base64(std::string(v[1])) );
   std::string data = bin_authinfo->get_data();
 
   size_t colon_pos = data.find(':');
@@ -544,22 +551,22 @@ Response_header::Response_header(Verification_level lev, const std::string& to_p
   parse(to_parse);
   set_option_default(names::server, "unknown");
 
-  typedef std::deque<std::string> Token;
-  Token resp_line;
-  split_by_whitespace(resp_line, get_head_line());
+  // parse response - using string_view for zero-allocation tokenization
+  std::vector<std::string_view> resp_line;
+  split_by_whitespace_sv(resp_line, get_head_line());
 
   if (resp_line.size() < 2) {
     throw Malformed_packet("Bad response");
   }
 
   try {
-    code_ = num_conv::from_string<int>(resp_line[1]);
+    code_ = num_conv::from_string<int>(std::string(resp_line[1]));
   } catch (const num_conv::conversion_error&) {
     code_ = 0;
   }
 
   if (resp_line.size() > 2)
-    phrase_ = resp_line[2];
+    phrase_ = std::string(resp_line[2]);
 }
 
 Response_header::Response_header( int c, const std::string& p ):
