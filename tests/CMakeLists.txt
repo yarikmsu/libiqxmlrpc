@@ -121,6 +121,17 @@ add_custom_target(perf-e1-e3
     COMMENT "Running E1-E3 ostringstream optimization benchmarks..."
 )
 
+# Base64 decode optimization benchmark (separate - run with make perf-base64)
+add_executable(base64-benchmark-test test_base64_benchmark.cc)
+target_link_libraries(base64-benchmark-test iqxmlrpc ${Boost_LIBRARIES} ${LIBXML2_LIBRARIES})
+
+add_custom_target(perf-base64
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/base64-benchmark-test
+    DEPENDS base64-benchmark-test
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Running Base64 decode optimization benchmarks..."
+)
+
 # Wire protocol compatibility test (requires external Python XML-RPC server)
 add_executable(wire-compatibility-test test_wire_compatibility.cc)
 target_link_libraries(wire-compatibility-test iqxmlrpc ${Boost_LIBRARIES} ${LIBXML2_LIBRARIES} ${OPENSSL_LIBRARIES})

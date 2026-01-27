@@ -1129,6 +1129,13 @@ BOOST_AUTO_TEST_CASE(binary_empty_data_extended)
     BOOST_CHECK(bin->get_base64().empty());
 }
 
+BOOST_AUTO_TEST_CASE(binary_decode_empty_base64)
+{
+    // Test decoding empty base64 string (covers src_len == 0 early return)
+    std::unique_ptr<Binary_data> bin(Binary_data::from_base64(""));
+    BOOST_CHECK(bin->get_data().empty());
+}
+
 BOOST_AUTO_TEST_CASE(binary_roundtrip_extended)
 {
     // Use explicit length to include null byte in the middle

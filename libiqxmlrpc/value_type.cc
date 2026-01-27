@@ -450,24 +450,39 @@ void Binary_data::encode() const
 }
 
 
-// Optimized decode using lookup table - no exceptions, direct buffer write
+// Optimized decode using single-pass with pre-allocated buffer:
+// Pre-allocate maximum possible size, decode directly, then resize to actual
 void Binary_data::decode()
 {
   auto src = reinterpret_cast<const unsigned char*>(base64.data());
   const size_t src_len = base64.length();
 
-  // Reserve space (decoded is at most 3/4 of base64 size)
+  if (src_len == 0) {
+    return;  // Empty input
+  }
+
+  // Pre-allocate maximum possible size (3/4 of input, rounded up)
   // Use safe arithmetic to prevent integer overflow
-  if (!safe_math::would_overflow_mul(src_len, size_t(3))) {
-    size_t decoded_size = (src_len * 3) / 4;
-    if (!safe_math::would_overflow_add(decoded_size, size_t(1))) {
-      data.reserve(decoded_size + 1);
+  size_t max_output;
+  if (safe_math::would_overflow_mul(src_len, size_t(3))) {
+    max_output = src_len;  // Fallback for huge inputs
+  } else {
+    const size_t product = src_len * 3;
+    // Also check addition overflow for the +3 rounding
+    if (safe_math::would_overflow_add(product, size_t(3))) {
+      max_output = src_len;  // Fallback for huge inputs
+    } else {
+      max_output = (product + 3) / 4;  // Round up
     }
   }
 
-  // Collect 4 valid base64 characters at a time
-  unsigned char vals[4] = {0, 0, 0, 0};  // Zero-init for defensive coding
-  size_t val_idx = 0;
+  data.resize(max_output);
+  char* out = data.data();
+  const char* const out_start = out;
+
+  // Decode in single pass using 4-char accumulator
+  unsigned char v0 = 0, v1 = 0, v2 = 0;
+  size_t char_idx = 0;
   bool done = false;
 
   for (size_t i = 0; i < src_len && !done; ++i) {
@@ -475,14 +490,19 @@ void Binary_data::decode()
 
     if (v >= 0) {
       // Valid base64 character (0-63)
-      vals[val_idx++] = static_cast<unsigned char>(v);
-
-      if (val_idx == 4) {
-        // Decode 4 chars -> 3 bytes
-        data.push_back(static_cast<char>((vals[0] << 2) | (vals[1] >> 4)));
-        data.push_back(static_cast<char>((vals[1] << 4) | (vals[2] >> 2)));
-        data.push_back(static_cast<char>((vals[2] << 6) | vals[3]));
-        val_idx = 0;
+      switch (char_idx) {
+        case 0: v0 = static_cast<unsigned char>(v); ++char_idx; break;
+        case 1: v1 = static_cast<unsigned char>(v); ++char_idx; break;
+        case 2: v2 = static_cast<unsigned char>(v); ++char_idx; break;
+        case 3:
+          // Decode 4 chars -> 3 bytes directly to output
+          *out++ = static_cast<char>((v0 << 2) | (v1 >> 4));
+          *out++ = static_cast<char>((v1 << 4) | (v2 >> 2));
+          *out++ = static_cast<char>((v2 << 6) | static_cast<unsigned char>(v));
+          char_idx = 0;
+          break;
+        default:
+          break;  // char_idx is always 0-3, this satisfies clang-tidy
       }
     } else if (v == -3) {
       // Whitespace - skip
@@ -490,16 +510,16 @@ void Binary_data::decode()
     } else if (v == -2) {
       // Padding '=' - handle end of data
       // NOLINTNEXTLINE(bugprone-branch-clone) - first byte calc same, second branch adds byte 2
-      if (val_idx == 2) {
-        data.push_back(static_cast<char>((vals[0] << 2) | (vals[1] >> 4)));
-      } else if (val_idx == 3) {
-        data.push_back(static_cast<char>((vals[0] << 2) | (vals[1] >> 4)));
-        data.push_back(static_cast<char>((vals[1] << 4) | (vals[2] >> 2)));
+      if (char_idx == 2) {
+        *out++ = static_cast<char>((v0 << 2) | (v1 >> 4));
+      } else if (char_idx == 3) {
+        *out++ = static_cast<char>((v0 << 2) | (v1 >> 4));
+        *out++ = static_cast<char>((v1 << 4) | (v2 >> 2));
       } else {
         throw Malformed_base64();
       }
       done = true;
-      val_idx = 0;
+      char_idx = 0;
     } else {
       // Invalid character
       throw Malformed_base64();
@@ -507,9 +527,12 @@ void Binary_data::decode()
   }
 
   // Incomplete group without padding is malformed (strict mode)
-  if (val_idx != 0) {
+  if (char_idx != 0) {
     throw Malformed_base64();
   }
+
+  // Resize to actual output size
+  data.resize(static_cast<size_t>(out - out_start));
 }
 
 
