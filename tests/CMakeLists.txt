@@ -143,6 +143,17 @@ add_custom_target(perf-xml
     COMMENT "Running XML parsing optimization benchmarks..."
 )
 
+# M6 HTTP tokenization benchmarks (separate - run with make perf-http-tokenize)
+add_executable(http-tokenize-benchmark-test test_http_tokenize_benchmark.cc)
+target_link_libraries(http-tokenize-benchmark-test iqxmlrpc ${Boost_LIBRARIES} ${LIBXML2_LIBRARIES})
+
+add_custom_target(perf-http-tokenize
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/http-tokenize-benchmark-test
+    DEPENDS http-tokenize-benchmark-test
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Running M6 HTTP tokenization benchmarks..."
+)
+
 # Wire protocol compatibility test (requires external Python XML-RPC server)
 add_executable(wire-compatibility-test test_wire_compatibility.cc)
 target_link_libraries(wire-compatibility-test iqxmlrpc ${Boost_LIBRARIES} ${LIBXML2_LIBRARIES} ${OPENSSL_LIBRARIES})
