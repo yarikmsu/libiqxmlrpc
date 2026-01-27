@@ -305,22 +305,15 @@ StateMachine::set_transitions(const StateTransition* t)
 int
 StateMachine::change(const std::string& tag)
 {
-  bool found = false;
-  size_t i = 0;
-  for (; trans_[i].tag != nullptr; ++i) {
+  for (size_t i = 0; trans_[i].tag != nullptr; ++i) {
     if (trans_[i].tag == tag && trans_[i].prev_state == curr_) {
-      found = true;
-      break;
+      curr_ = trans_[i].new_state;
+      return curr_;
     }
   }
 
-  if (!found) {
-    std::string err = "unexpected tag <" + std::string(tag) + "> at " + parser_.context();
-    throw XML_RPC_violation(err);
-  }
-
-  curr_ = trans_[i].new_state;
-  return curr_;
+  std::string err = "unexpected tag <" + std::string(tag) + "> at " + parser_.context();
+  throw XML_RPC_violation(err);
 }
 
 void
