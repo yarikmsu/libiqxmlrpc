@@ -172,6 +172,13 @@ public:
 
   size_t size() const { return values.size(); }
 
+  //! Pre-allocate storage for at least n elements.
+  //! Use before push_back() loops when the size is known to avoid reallocations.
+  void reserve(size_t n) { values.reserve(n); }
+
+  //! Returns the number of elements that can be held without reallocation.
+  size_t capacity() const noexcept { return values.capacity(); }
+
   const Value& operator []( unsigned i ) const
   {
     try {
