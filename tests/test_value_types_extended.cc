@@ -1724,6 +1724,42 @@ BOOST_AUTO_TEST_CASE(array_swap)
     BOOST_CHECK_EQUAL(b[0].get_int(), 1);
 }
 
+// Test Array reserve and capacity
+BOOST_AUTO_TEST_CASE(array_reserve_capacity)
+{
+    Array arr;
+
+    // Initially capacity may be 0 or implementation-defined small value
+    BOOST_CHECK_EQUAL(arr.size(), 0u);
+
+    // reserve(0) should be safe no-op
+    arr.reserve(0);
+    BOOST_CHECK_EQUAL(arr.size(), 0u);
+
+    // Reserve should pre-allocate without changing size
+    arr.reserve(100);
+    BOOST_CHECK(arr.capacity() >= 100);
+    BOOST_CHECK_EQUAL(arr.size(), 0u);  // size unchanged
+
+    // Add some elements
+    arr.push_back(Value(1));
+    arr.push_back(Value(2));
+    arr.push_back(Value(3));
+
+    BOOST_CHECK_EQUAL(arr.size(), 3u);
+    BOOST_CHECK(arr.capacity() >= 100);  // capacity still at least 100
+
+    // Reserve smaller amount should have no effect
+    size_t cap_before = arr.capacity();
+    arr.reserve(10);
+    BOOST_CHECK_EQUAL(arr.capacity(), cap_before);  // unchanged
+
+    // Clear empties the array, capacity behavior is implementation-defined
+    arr.clear();
+    BOOST_CHECK_EQUAL(arr.size(), 0u);
+    // Note: capacity may or may not be preserved after clear - this is OK
+}
+
 // Test Struct swap
 BOOST_AUTO_TEST_CASE(struct_swap)
 {

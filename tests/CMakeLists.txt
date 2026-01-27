@@ -132,6 +132,17 @@ add_custom_target(perf-base64
     COMMENT "Running Base64 decode optimization benchmarks..."
 )
 
+# XML parsing optimization benchmark (separate - run with make perf-xml)
+add_executable(xml-parsing-benchmark-test test_xml_parsing_benchmark.cc)
+target_link_libraries(xml-parsing-benchmark-test iqxmlrpc ${Boost_LIBRARIES} ${LIBXML2_LIBRARIES})
+
+add_custom_target(perf-xml
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/xml-parsing-benchmark-test
+    DEPENDS xml-parsing-benchmark-test
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Running XML parsing optimization benchmarks..."
+)
+
 # Wire protocol compatibility test (requires external Python XML-RPC server)
 add_executable(wire-compatibility-test test_wire_compatibility.cc)
 target_link_libraries(wire-compatibility-test iqxmlrpc ${Boost_LIBRARIES} ${LIBXML2_LIBRARIES} ${OPENSSL_LIBRARIES})
