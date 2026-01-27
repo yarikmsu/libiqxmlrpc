@@ -4,7 +4,6 @@
 #ifndef IQXMLRPC_PARSER2_H
 #define IQXMLRPC_PARSER2_H
 
-#include <map>
 #include <memory>
 #include <string>
 #include <vector>

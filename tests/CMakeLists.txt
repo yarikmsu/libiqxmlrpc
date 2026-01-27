@@ -154,6 +154,17 @@ add_custom_target(perf-http-tokenize
     COMMENT "Running M6 HTTP tokenization benchmarks..."
 )
 
+# M5 State machine lookup benchmarks (separate - run with make perf-state-machine)
+add_executable(state-machine-benchmark-test test_state_machine_benchmark.cc)
+target_link_libraries(state-machine-benchmark-test iqxmlrpc ${Boost_LIBRARIES} ${LIBXML2_LIBRARIES})
+
+add_custom_target(perf-state-machine
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/state-machine-benchmark-test
+    DEPENDS state-machine-benchmark-test
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Running M5 state machine lookup benchmarks..."
+)
+
 # Wire protocol compatibility test (requires external Python XML-RPC server)
 add_executable(wire-compatibility-test test_wire_compatibility.cc)
 target_link_libraries(wire-compatibility-test iqxmlrpc ${Boost_LIBRARIES} ${LIBXML2_LIBRARIES} ${OPENSSL_LIBRARIES})
