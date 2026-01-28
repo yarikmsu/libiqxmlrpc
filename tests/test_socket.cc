@@ -53,7 +53,7 @@ BOOST_AUTO_TEST_CASE(socket_set_non_blocking)
     sock.close();
 }
 
-// Test get_last_error on a fresh socket (covers socket.cc lines 163-173)
+// Test get_last_error on a fresh socket (covers socket.cc lines 196-210)
 BOOST_AUTO_TEST_CASE(socket_get_last_error)
 {
     Socket sock;
@@ -61,6 +61,23 @@ BOOST_AUTO_TEST_CASE(socket_get_last_error)
     // Fresh socket should have no error
     BOOST_CHECK_EQUAL(err, 0);
     sock.close();
+}
+
+// Test get_last_error errno fallback when getsockopt fails (covers socket.cc line 204)
+// Uses an invalid socket descriptor to trigger the getsockopt failure path
+BOOST_AUTO_TEST_CASE(socket_get_last_error_errno_fallback)
+{
+    // Create socket with invalid handler (-1) to trigger getsockopt failure
+    Inet_addr dummy_addr("127.0.0.1", 0);
+    Socket invalid_sock(-1, dummy_addr);
+
+    // getsockopt on fd=-1 will fail, triggering the errno fallback
+    int err = invalid_sock.get_last_error();
+
+    // Should return EBADF (bad file descriptor) since -1 is invalid
+    BOOST_CHECK_EQUAL(err, EBADF);
+
+    // Don't call close() - the socket descriptor is invalid
 }
 
 // Test get_addr on a bound socket (covers socket.cc lines 152-161)
