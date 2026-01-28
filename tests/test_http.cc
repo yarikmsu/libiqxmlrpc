@@ -4,6 +4,7 @@
 #include <boost/test/unit_test.hpp>
 #include "libiqxmlrpc/http.h"
 #include "libiqxmlrpc/http_errors.h"
+#include "libiqxmlrpc/value.h"
 
 using namespace boost::unit_test;
 using namespace iqxmlrpc;
@@ -646,6 +647,28 @@ BOOST_AUTO_TEST_CASE(auth_with_empty_password)
     std::string user, password;
     hdr.get_authinfo(user, password);
     BOOST_CHECK_EQUAL(user, "user");
+    BOOST_CHECK(password.empty());
+}
+
+// Exercises the no-colon branch in get_authinfo() where user = std::move(data).
+// set_authinfo("user", "") encodes as "user:" (with colon), so we must manually
+// construct credentials without a colon to exercise the move optimization path.
+BOOST_AUTO_TEST_CASE(auth_username_without_colon)
+{
+    // Base64-encode "justusername" (no colon in decoded credentials)
+    std::unique_ptr<Binary_data> bin(Binary_data::from_data("justusername"));
+    std::string encoded = "Basic " + bin->get_base64();
+
+    std::string raw_header =
+        "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 0\r\n"
+        "authorization: " + encoded + "\r\n\r\n";
+
+    Request_header hdr(HTTP_CHECK_WEAK, raw_header);
+    BOOST_CHECK(hdr.has_authinfo());
+
+    std::string user, password;
+    hdr.get_authinfo(user, password);
+    BOOST_CHECK_EQUAL(user, "justusername");
     BOOST_CHECK(password.empty());
 }
 
