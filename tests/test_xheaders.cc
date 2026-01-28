@@ -19,19 +19,10 @@ public:
   {
     opt["X-id"] = "1";
     opt["x-cmd"] = "2";
-    opt["Xcmd"] = "3";
-    opt["xmesg"] = "4";
-    opt["content_length"] = "5";
+    opt["My-Custom"] = "3";
+    opt["content-type"] = "4";
   }
 };
-
-BOOST_AUTO_TEST_CASE( validate ) {
-  BOOST_CHECK(XHeaders::validate("X-d"));
-  BOOST_CHECK(XHeaders::validate("x-d"));
-  BOOST_CHECK(!XHeaders::validate("Xd"));
-  BOOST_CHECK(!XHeaders::validate("xd"));
-  BOOST_CHECK(!XHeaders::validate("data"));
-}
 
 BOOST_FIXTURE_TEST_CASE( find, XHeaders_fixture )
 {
@@ -39,18 +30,13 @@ BOOST_FIXTURE_TEST_CASE( find, XHeaders_fixture )
 
   h = opt;
 
-  BOOST_CHECK_EQUAL(h.size(), 2);
+  BOOST_CHECK_EQUAL(h.size(), 4);
   BOOST_CHECK(h.find("X-id") != h.end());
   BOOST_CHECK(h.find("x-id") != h.end());
   BOOST_CHECK(h.find("X-cmd") != h.end());
   BOOST_CHECK(h.find("x-cmd") != h.end());
-
-  std::string res;
-  for (const auto& entry : h) {
-    res += entry.first;
-    res += entry.second;
-  }
-  BOOST_CHECK(res == "x-id1x-cmd2" || res == "x-cmd2x-id1");
+  BOOST_CHECK(h.find("my-custom") != h.end());
+  BOOST_CHECK(h.find("content-type") != h.end());
 }
 
 BOOST_FIXTURE_TEST_CASE( brackets, XHeaders_fixture )
@@ -62,8 +48,6 @@ BOOST_FIXTURE_TEST_CASE( brackets, XHeaders_fixture )
   BOOST_CHECK(h.find("X-new") != h.end());
   BOOST_CHECK(h.find("x-new") != h.end());
   BOOST_CHECK(h.find("X-new1") == h.end());
-
-  BOOST_CHECK_THROW(h["length"], Error_xheader);
 
   BOOST_CHECK_EQUAL(h["X-new"], "new");
   BOOST_CHECK_EQUAL(h["x-new"], "new");
@@ -95,22 +79,23 @@ BOOST_AUTO_TEST_CASE(xheaders_update_existing)
   BOOST_CHECK_EQUAL(h.size(), 1);
 }
 
-BOOST_AUTO_TEST_CASE(xheaders_assignment_filters_invalid)
+BOOST_AUTO_TEST_CASE(xheaders_assignment_accepts_all)
 {
   std::map<std::string, std::string> source;
   source["X-Valid-1"] = "v1";
   source["x-Valid-2"] = "v2";
-  source["Invalid-1"] = "bad1";
-  source["content-type"] = "bad2";
-  source["X-Valid-3"] = "v3";
+  source["Custom-Header"] = "v3";
+  source["content-type"] = "v4";
+  source["Authorization"] = "v5";
 
   XHeaders h;
   h = source;
-  BOOST_CHECK_EQUAL(h.size(), 3);
+  BOOST_CHECK_EQUAL(h.size(), 5);
   BOOST_CHECK(h.find("X-Valid-1") != h.end());
   BOOST_CHECK(h.find("x-Valid-2") != h.end());
-  BOOST_CHECK(h.find("X-Valid-3") != h.end());
-  BOOST_CHECK(h.find("Invalid-1") == h.end());
+  BOOST_CHECK(h.find("Custom-Header") != h.end());
+  BOOST_CHECK(h.find("content-type") != h.end());
+  BOOST_CHECK(h.find("Authorization") != h.end());
 }
 
 BOOST_AUTO_TEST_CASE(xheaders_error_message)
@@ -124,12 +109,12 @@ BOOST_AUTO_TEST_CASE(xheaders_iterate_all)
   XHeaders h;
   h["X-A"] = "1";
   h["X-B"] = "2";
-  h["X-C"] = "3";
+  h["Custom-C"] = "3";
 
   int count = 0;
   for (const auto& entry : h) {
     count++;
-    BOOST_CHECK(entry.first.substr(0, 2) == "x-");
+    (void)entry;
   }
   BOOST_CHECK_EQUAL(count, 3);
 }
@@ -142,17 +127,19 @@ BOOST_AUTO_TEST_CASE(xheaders_find_nonexistent)
   BOOST_CHECK(h.find("x-notexists") == h.end());
 }
 
-BOOST_AUTO_TEST_CASE(validate_edge_cases)
+BOOST_AUTO_TEST_CASE(xheaders_arbitrary_custom_headers)
 {
-  BOOST_CHECK(!XHeaders::validate(""));
-  BOOST_CHECK(!XHeaders::validate("X"));
-  BOOST_CHECK(!XHeaders::validate("x"));
-  BOOST_CHECK(XHeaders::validate("X-"));
-  BOOST_CHECK(XHeaders::validate("x-"));
-  BOOST_CHECK(XHeaders::validate("X-A"));
-  BOOST_CHECK(XHeaders::validate("x-a"));
-  BOOST_CHECK(!XHeaders::validate("Y-Header"));
-  BOOST_CHECK(!XHeaders::validate("Header-X"));
+  XHeaders h;
+  h["My-Custom"] = "val";
+  BOOST_CHECK_EQUAL(h["my-custom"], "val");
+
+  h["Authorization"] = "Bearer token";
+  BOOST_CHECK_EQUAL(h["authorization"], "Bearer token");
+
+  h["Content-Type"] = "text/xml";
+  BOOST_CHECK_EQUAL(h["content-type"], "text/xml");
+
+  BOOST_CHECK_EQUAL(h.size(), 3);
 }
 
 // vim:ts=2:sw=2:et
