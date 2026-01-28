@@ -1,8 +1,7 @@
-// Fuzz target for XHeaders validation
+// Fuzz target for XHeaders container operations
 // Copyright (C) 2026 libiqxmlrpc contributors
 //
-// This fuzzer tests the XHeaders::validate() static method and
-// the XHeaders container operations with arbitrary input.
+// This fuzzer tests the XHeaders container operations with arbitrary input.
 
 #include "fuzz_common.h"
 #include "libiqxmlrpc/xheaders.h"
@@ -14,16 +13,6 @@
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   // Limit input size to prevent slow units
   if (size > fuzz::MAX_INPUT_SIZE) return 0;
-
-  std::string input(reinterpret_cast<const char*>(data), size);
-
-  // Test XHeaders::validate() with fuzzed input
-  try {
-    bool valid = iqxmlrpc::XHeaders::validate(input);
-    (void)valid;
-  } catch (...) {
-    // Exceptions are expected for malformed input
-  }
 
   // Test XHeaders container operations
   try {
@@ -38,10 +27,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         value = std::string(reinterpret_cast<const char*>(data + 1 + split), size - 1 - split);
       }
 
-      // Try to set the header (may throw for invalid values)
-      if (iqxmlrpc::XHeaders::validate(value)) {
-        xheaders[key] = value;
-      }
+      // Set the header with arbitrary key/value
+      xheaders[key] = value;
     }
 
     // Exercise container methods
@@ -78,10 +65,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       std::string val(reinterpret_cast<const char*>(data + offset), val_len);
       offset += val_len;
 
-      // Only add if value is valid
-      if (iqxmlrpc::XHeaders::validate(val)) {
-        map_input[key] = val;
-      }
+      map_input[key] = val;
       count++;
     }
 
