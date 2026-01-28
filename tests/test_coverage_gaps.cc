@@ -398,6 +398,30 @@ BOOST_FIXTURE_TEST_CASE(pool_executor_destructor_no_terminate, IntegrationFixtur
   BOOST_CHECK_GE(completed.load(), 1);  // At least some requests completed
 }
 
+// Exercises the shutdown path of Pool_thread::operator()() when workers are
+// idle in condition_variable::wait(). With 4 threads but only 1 request,
+// 3 workers remain blocked in the predicate wait. When stop_server() calls
+// destruction_started() → notify_all(), the predicate's is_being_destructed()
+// branch must return true so those workers exit cleanly.
+BOOST_FIXTURE_TEST_CASE(pool_thread_shutdown_while_waiting, IntegrationFixture)
+{
+  // 4 worker threads, but only 1 request — 3 threads will be in wait()
+  start_server(4, 514);
+
+  {
+    auto client = create_client();
+    Response r = client->execute("echo", Value(1));
+    BOOST_CHECK(!r.is_fault());
+  }
+
+  // At this point, 3 of 4 threads are blocked in wait_cond.wait(lk, predicate).
+  // stop_server() must wake them via the is_being_destructed() predicate branch.
+  // If the predicate doesn't check shutdown, this will deadlock (test timeout).
+  stop_server();
+
+  BOOST_CHECK(true);  // Reached here = no deadlock from idle workers
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 //=============================================================================
