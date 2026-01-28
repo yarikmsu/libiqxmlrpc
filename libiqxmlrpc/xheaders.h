@@ -29,7 +29,6 @@ public:
   virtual const_iterator end() const;
   virtual ~XHeaders();
 
-  static bool validate(const std::string& val);
 };
 
 inline std::ostream& operator<<(std::ostream& os, const XHeaders& xheaders) {
