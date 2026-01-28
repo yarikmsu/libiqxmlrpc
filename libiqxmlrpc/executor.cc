@@ -226,7 +226,13 @@ Pool_executor::Pool_executor(
 
 Pool_executor::~Pool_executor()
 {
-  interrupt_server();
+  try {
+    interrupt_server();
+  } catch (...) {
+    // Suppress exceptions: destructors are implicitly noexcept (C++11).
+    // interrupt_server() may throw network_error if the interrupter
+    // socket is already closed during shutdown.
+  }
 }
 
 

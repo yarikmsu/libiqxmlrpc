@@ -355,6 +355,49 @@ BOOST_FIXTURE_TEST_CASE(pool_executor_high_concurrency, IntegrationFixture)
   BOOST_CHECK_GE(success_count.load(), 30);  // At least 50% success
 }
 
+// Pool_executor::~Pool_executor() exercises the try-catch around interrupt_server().
+// When stop_server() destroys the factory, remaining queued Pool_executor objects
+// are deleted. Their destructors call interrupt_server(), which may throw
+// network_error if the reactor interrupter socket is already closed.
+// This test verifies the destructor handles that gracefully (no crash/terminate).
+BOOST_FIXTURE_TEST_CASE(pool_executor_destructor_no_terminate, IntegrationFixture)
+{
+  // Use a pool server and exercise the full lifecycle including shutdown.
+  // Pool_executor::~Pool_executor() is called when the factory destructor
+  // drains remaining queued executors. Even if all executors are processed
+  // before shutdown (worker threads delete them after execution), the
+  // destructor path is exercised via process_actual_execution() cleanup.
+  start_server(2, 513);
+
+  // Send concurrent requests to create Pool_executor objects
+  std::atomic<int> completed(0);
+  std::vector<std::thread> clients;
+  clients.reserve(8);
+  for (int i = 0; i < 8; ++i) {
+    clients.emplace_back([this, &completed]() {
+      try {
+        auto client = create_client();
+        client->execute("echo", Value(42));
+        ++completed;
+      } catch (...) {
+        (void)0;
+      }
+    });
+  }
+
+  for (auto& t : clients) {
+    t.join();
+  }
+
+  // stop_server() triggers Pool_executor_factory::~Pool_executor_factory()
+  // which signals threads to exit, joins them, then drains any remaining
+  // queued Pool_executor objects. Their destructors run the try-catch
+  // around interrupt_server() — this must not call std::terminate.
+  stop_server();
+
+  BOOST_CHECK_GE(completed.load(), 1);  // At least some requests completed
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 //=============================================================================
