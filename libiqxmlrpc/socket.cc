@@ -124,8 +124,11 @@ size_t Socket::recv( char* buf, size_t len )
 void Socket::send_shutdown( const char* data, size_t len )
 {
   send(data, len);
+  // SO_LINGER with zero timeout enables abortive close (RST instead of FIN).
+  // Return value intentionally ignored - if it fails, the socket will still
+  // close normally with graceful TCP teardown.
   const struct linger ling = {1, 0};
-  ::setsockopt( sock, SOL_SOCKET, SO_LINGER, reinterpret_cast<const char*>(&ling), sizeof(ling) );
+  (void)::setsockopt( sock, SOL_SOCKET, SO_LINGER, reinterpret_cast<const char*>(&ling), sizeof(ling) );
   ::shutdown( sock, 1 );
 }
 
@@ -195,7 +198,11 @@ int Socket::get_last_error()
   int err = 0;
 #ifndef WIN32
   socklen_t int_sz = sizeof(err);
-  ::getsockopt( sock, SOL_SOCKET, SO_ERROR, &err, &int_sz );
+  // If getsockopt fails, fall back to errno which likely contains
+  // the actual error that caused the socket operation to fail.
+  if (::getsockopt( sock, SOL_SOCKET, SO_ERROR, &err, &int_sz ) != 0) {
+    err = errno;
+  }
 #else
   err=WSAGetLastError();
 #endif
