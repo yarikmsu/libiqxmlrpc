@@ -523,7 +523,7 @@ void Request_header::get_authinfo(std::string& user, std::string& pw) const
 
   size_t colon_pos = data.find(':');
   if (colon_pos == std::string::npos) {
-    user = data;
+    user = std::move(data);
     pw.clear();
   } else {
     user = data.substr(0, colon_pos);
