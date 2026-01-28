@@ -97,18 +97,17 @@ void Pool_executor_factory::Pool_thread::operator ()()
       if (pool_ptr->is_being_destructed())
         return;
 
-      // Wait for work using condition variable
+      // Wait for work or shutdown using condition variable with predicate.
+      // The predicate re-checks on spurious wakeups and prevents lost
+      // wakeups when notify arrives between the check and the wait.
       std::unique_lock<std::mutex> lk(pool_ptr->wait_mutex);
+      pool_ptr->wait_cond.wait(lk, [pool_ptr] {
+        return pool_ptr->pending_count.load(std::memory_order_acquire) > 0
+            || pool_ptr->is_being_destructed();
+      });
 
-      // Double-check shutdown under lock to avoid lost wakeups
       if (pool_ptr->is_being_destructed())
         return;
-
-      // Only sleep if no pending work (avoids spurious wakeups)
-      if (pool_ptr->pending_count.load(std::memory_order_acquire) == 0)
-        pool_ptr->wait_cond.wait(lk);
-
-      // After wakeup, loop back to try pop again
     }
 
     // Successfully dequeued - decrement pending count
