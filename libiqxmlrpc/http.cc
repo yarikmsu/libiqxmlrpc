@@ -478,15 +478,11 @@ std::string Request_header::agent() const
 
 void Header::get_xheaders(iqxmlrpc::XHeaders& xheaders) const
 {
-  // Clear first to match original assignment semantics (xheaders = options_)
-  // This prevents stale X-headers from persisting when object is reused
+  // Clear first to prevent stale headers from persisting when object is reused
   xheaders = std::map<std::string, std::string>();
 
-  // Copy only X-headers (Options is now unordered_map, XHeaders uses map)
   for (const auto& opt : options_) {
-    if (iqxmlrpc::XHeaders::validate(opt.first)) {
-      xheaders[opt.first] = opt.second;
-    }
+    xheaders[opt.first] = opt.second;
   }
 }
 
