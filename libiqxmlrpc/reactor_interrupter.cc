@@ -46,7 +46,10 @@ public:
   Impl& operator=(const Impl&) = delete;
 
   explicit Impl(Reactor_base* reactor);
-  ~Impl() = default;
+  ~Impl() {
+    client_.shutdown();
+    client_.close();
+  }
 
   void make_interrupt();
 
@@ -69,6 +72,7 @@ Reactor_interrupter::Impl::Impl(Reactor_base* reactor):
   Inet_addr srv_addr(srv.get_addr());
   client_.connect( Inet_addr("127.0.0.1", srv_addr.get_port()) );
   Socket srv_conn(srv.accept());
+  srv.close();  // Close listening socket - no longer needed after accept()
 
   server_ = std::make_unique<Interrupter_connection>(reactor, srv_conn);
 }
