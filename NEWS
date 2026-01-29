@@ -1,13 +1,31 @@
 Look into ChangeLog file for full list of changes.
 
 0.14.0 - 0.14.1
+  New Features:
+    * Allow arbitrary custom HTTP headers (RFC 6648 compliance, removes X- prefix restriction)
+
   Bug Fixes:
+    * Fix Struct::insert() ambiguity when called with literal 0 (regression from 0.13.8)
     * Fix socket resource leak in Reactor_interrupter (Coverity CID 641369)
     * Refactor lock scope in reactor for clarity (Coverity CID 641343)
+    * Fix Pool_executor destructor to suppress exceptions (Coverity CID 641352)
+    * Fix Pool_thread wait loop race condition with predicate-based wait (Coverity CID 641406)
+    * Fix unnecessary string copy in HTTP auth parsing (Coverity CID 641411)
+    * Fix unchecked return values in socket operations (Coverity CID 641402, 641404)
+
+  Performance Optimizations:
+    * unordered_map for reactor handler lookup
+    * M1-M4 optimizations: string formatting, integer conversion, HTTP parsing
+    * E1-E3 string formatting optimizations
+    * Base64 decode with direct buffer writes (~70% faster)
+    * Array::reserve() for pre-allocation
+    * HTTP tokenization with string_view (~28% faster)
+    * State machine early-return cleanup
 
   Test Coverage:
     * Add SSL connection coverage tests (ssl_connection.cc, ssl_lib.cc)
     * Add HTTP/HTTPS server error handling coverage tests
+    * Add test coverage for get_last_error errno fallback path
 
 0.13.8 - 0.14.0
   This release is BINARY INCOMPATIBLE with previous versions!
@@ -23,7 +41,6 @@ Look into ChangeLog file for full list of changes.
     * Configurable TLS cipher suites optimized for AES-NI acceleration
     * XML parsing depth limit to prevent stack overflow attacks
     * Server connection idle timeout for keep-alive connections
-    * Allow arbitrary custom HTTP headers (RFC 6648 compliance, removes X- prefix restriction)
 
   Security Hardening:
     * TLS 1.2 enforced as minimum protocol version
@@ -54,16 +71,11 @@ Look into ChangeLog file for full list of changes.
     * Benchmark CI for performance regression detection (>20% threshold)
 
   Bug Fixes:
-    * Fix Struct::insert() ambiguity when called with literal 0 (regression from 0.13.8)
     * Fix exception safety in value parser (Coverity CID 641344)
-    * Fix socket FD leak in firewall rejection path (Coverity CID 641369)
+    * Fix socket FD leak in firewall rejection path
     * Fix undefined behavior in Base64 encoding for signed char platforms
     * Fix EINTR handling in reactor poll/select implementations
     * Various thread safety improvements with atomics
-    * Fix Pool_executor destructor to suppress exceptions (Coverity CID 641352)
-    * Fix Pool_thread wait loop race condition with predicate-based wait (Coverity CID 641406)
-    * Fix unnecessary string copy in HTTP auth parsing (Coverity CID 641411)
-    * Fix unchecked return values in socket operations (Coverity CID 641402, 641404)
 
 0.13.7 - 0.13.8
   * Support for <i8>, a 64-bit integer XML-RPC extension
