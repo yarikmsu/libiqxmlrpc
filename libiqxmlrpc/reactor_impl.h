@@ -245,19 +245,19 @@ template <class Lock>
 void Reactor<Lock>::handle_user_events()
 {
   HandlerStateList called_by_user;
-  scoped_lock lk(lock);
 
-  handlers_states.copy_for_write();  // COW: copy if readers hold references
-  for( auto i = begin(); i != end(); ++i )
-  {
-    if( i->revents && (i->mask | i->revents) )
+  {  // Scope block: hold lock only while accessing shared state
+    scoped_lock lk(lock);
+    handlers_states.copy_for_write();  // COW: copy if readers hold references
+    for( auto i = begin(); i != end(); ++i )
     {
-      called_by_user.push_back( *i );
-      i->revents &= ~i->mask;
+      if( i->revents && (i->mask | i->revents) )
+      {
+        called_by_user.push_back( *i );
+        i->revents &= ~i->mask;
+      }
     }
-  }
-
-  lk.unlock();
+  }  // Lock released here
 
   while( !called_by_user.empty() )
   {
