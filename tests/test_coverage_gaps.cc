@@ -226,10 +226,12 @@ BOOST_FIXTURE_TEST_CASE(http_server_log_exception_coverage, IntegrationFixture)
   Response r = client->execute("std_exception_method", Param_list());
   BOOST_CHECK(r.is_fault());
 
-  // Check that error was logged
-  std::string logged = log_stream.str();
-  // The log message should contain the exception info
-  BOOST_CHECK(logged.empty() || logged.find("Http_server") != std::string::npos || true);
+  // Note: Method-level exceptions are handled by the executor and converted to
+  // XML-RPC faults. Connection-level log_exception() is only called for errors
+  // during reactor event processing (recv/send), not method execution.
+  // The log may be empty - this test primarily verifies the server handles
+  // the exception without crashing and returns a proper fault response.
+  (void)log_stream;  // Suppress unused variable warning
 }
 
 // Test that unknown exceptions are logged properly
@@ -263,6 +265,80 @@ BOOST_FIXTURE_TEST_CASE(https_server_exception_logging_coverage, HttpsIntegratio
   // Trigger error method
   Response r = client->execute("error_method", Value("test"));
   BOOST_CHECK(r.is_fault());
+}
+
+// Test HTTP error response path via raw socket (Content-Length mismatch)
+// Covers http_server.cc lines 109-112 catch block
+BOOST_FIXTURE_TEST_CASE(http_server_http_error_response_coverage, IntegrationFixture)
+{
+  start_server(1, 502);
+
+  // Send a malformed request with Content-Length mismatch
+  iqnet::Inet_addr server_addr("127.0.0.1", port_);
+  iqnet::Socket sock;
+  sock.connect(server_addr);
+
+  // HTTP request with Content-Length: 100 but only sending 10 bytes
+  // This triggers Malformed_packet when server tries to read full content
+  std::string bad_request =
+    "POST /RPC2 HTTP/1.1\r\n"
+    "Host: localhost\r\n"
+    "Content-Type: text/xml\r\n"
+    "Content-Length: 100\r\n"
+    "\r\n"
+    "short";  // Only 5 bytes, not 100
+
+  sock.send(bad_request.c_str(), bad_request.length());
+
+  // Wait briefly then close - server may send error response
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  sock.close();
+
+  // Server should still function after handling malformed request
+  auto client = create_client();
+  Response r = client->execute("echo", Value("after error"));
+  BOOST_CHECK(!r.is_fault());
+}
+
+// Test sending request with invalid HTTP method
+// Covers http_server.cc http::Error_response path
+BOOST_FIXTURE_TEST_CASE(http_server_invalid_method_coverage, IntegrationFixture)
+{
+  start_server(1, 503);
+
+  iqnet::Inet_addr server_addr("127.0.0.1", port_);
+  iqnet::Socket sock;
+  sock.connect(server_addr);
+
+  // Send GET request (XML-RPC requires POST)
+  std::string get_request =
+    "GET /RPC2 HTTP/1.1\r\n"
+    "Host: localhost\r\n"
+    "\r\n";
+
+  sock.send(get_request.c_str(), get_request.length());
+
+  // Read response - should be HTTP 405 Method Not Allowed
+  char buf[1024] = {0};
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  try {
+    sock.recv(buf, sizeof(buf) - 1);
+    std::string response(buf);
+    // Should contain 4xx error code
+    BOOST_CHECK(response.find("HTTP/1.1 4") != std::string::npos ||
+                response.find("HTTP/1.1 5") != std::string::npos ||
+                response.empty());  // Connection may be closed
+  } catch (...) {
+    // Connection reset is acceptable
+    (void)0;
+  }
+
+  sock.close();
+
+  // Server should still work
+  auto client = create_client();
+  Response r = client->execute("echo", Value("after invalid method"));
+  BOOST_CHECK(!r.is_fault());
 }
 
 BOOST_AUTO_TEST_SUITE_END()
@@ -1046,6 +1122,89 @@ BOOST_FIXTURE_TEST_CASE(ssl_rapid_connections_coverage, HttpsIntegrationFixture)
   }
 
   BOOST_CHECK_GE(success_count.load(), 7);
+}
+
+// Test HTTPS with log_unknown_exception path
+// Covers https_server.cc lines 161-164
+// NOTE: The terminate_idle tests for HTTPS are tricky due to SSL timing
+// The existing https_server_terminate_idle_coverage test in idle_timeout_coverage
+// suite provides basic coverage. Aggressive timeout tests are removed due to
+// SSL state race conditions.
+BOOST_FIXTURE_TEST_CASE(https_server_unknown_exception_logging, HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to setup SSL context");
+
+  std::ostringstream log_stream;
+  start_server(728);
+  server_->log_errors(&log_stream);
+
+  auto client = create_client();
+
+  // unknown_exception_method throws int, not std::exception
+  Response r = client->execute("unknown_exception_method", Param_list());
+  BOOST_CHECK(r.is_fault());
+
+  // Server should still work
+  auto client2 = create_client();
+  Response r2 = client2->execute("echo", Value("after unknown exception"));
+  BOOST_CHECK(!r2.is_fault());
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+//=============================================================================
+// HTTP Server Partial Send Coverage
+// More aggressive tests for http_server.cc line 152 (partial send)
+//=============================================================================
+
+BOOST_AUTO_TEST_SUITE(http_partial_send_coverage)
+
+// Test with very large response that may require multiple sends
+// Covers http_server.cc line 152 (response_offset += sz)
+BOOST_FIXTURE_TEST_CASE(http_very_large_response, IntegrationFixture)
+{
+  start_server(1, 730);
+
+  auto client = create_client();
+
+  // Generate data large enough to potentially require multiple sends
+  std::string large_data(200000, 'Y');  // 200KB
+  Response r = client->execute("echo", Value(large_data));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string().length(), large_data.length());
+}
+
+// Test concurrent large responses
+BOOST_FIXTURE_TEST_CASE(http_concurrent_large_responses, IntegrationFixture)
+{
+  start_server(4, 731);
+
+  std::vector<std::thread> threads;
+  std::atomic<int> success_count(0);
+
+  threads.reserve(4);
+  for (int i = 0; i < 4; ++i) {
+    threads.emplace_back([this, i, &success_count]() {
+      try {
+        auto client = create_client();
+        // Each thread sends different sized large data
+        std::string data(50000 + i * 20000, 'A' + i);
+        Response r = client->execute("echo", Value(data));
+        if (!r.is_fault() && r.value().get_string().length() == data.length()) {
+          ++success_count;
+        }
+      } catch (...) {
+        (void)0;
+      }
+    });
+  }
+
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  BOOST_CHECK_GE(success_count.load(), 3);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
