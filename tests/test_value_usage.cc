@@ -171,6 +171,30 @@ BOOST_AUTO_TEST_CASE( struct_test )
   BOOST_CHECK_EQUAL(v.type_name(), "struct");
 }
 
+// Regression test: insert("key", 0) must not be ambiguous
+// In 0.14.0, Value_ptr became std::unique_ptr<Value>, which is constructible
+// from nullptr. The literal 0 is both an int and a null pointer constant,
+// causing ambiguity between insert(const Value&) and insert(Value_ptr).
+// The SFINAE template overload for Value_ptr prevents this ambiguity.
+BOOST_AUTO_TEST_CASE(struct_insert_zero_no_ambiguity)
+{
+  Struct s;
+
+  // These must compile without ambiguity and work correctly
+  s.insert("zero", 0);
+  BOOST_CHECK_EQUAL(s["zero"].get_int(), 0);
+
+  s.insert("negative", -1);
+  BOOST_CHECK_EQUAL(s["negative"].get_int(), -1);
+
+  s.insert("positive", 42);
+  BOOST_CHECK_EQUAL(s["positive"].get_int(), 42);
+
+  // Value_ptr overload still works with explicit unique_ptr
+  s.insert("from_ptr", std::make_unique<Value>(123));
+  BOOST_CHECK_EQUAL(s["from_ptr"].get_int(), 123);
+}
+
 #if 0
 BOOST_AUTO_TEST_CASE( binary_test )
 {
