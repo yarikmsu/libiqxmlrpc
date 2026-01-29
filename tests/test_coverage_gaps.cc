@@ -899,3 +899,153 @@ BOOST_FIXTURE_TEST_CASE(reactor_rapid_connect_disconnect, IntegrationFixture)
 }
 
 BOOST_AUTO_TEST_SUITE_END()
+
+//=============================================================================
+// SSL Connection and Library Coverage
+// Covers ssl_connection.cc and ssl_lib.cc uncovered paths
+//=============================================================================
+
+BOOST_AUTO_TEST_SUITE(ssl_coverage)
+
+// Test SSL context creation for server-only mode
+// Covers ssl_lib.cc line 49-52 (Ctx::server_only)
+BOOST_FIXTURE_TEST_CASE(ssl_ctx_server_only_coverage, HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to setup SSL context");
+
+  // The ssl_ctx setup exercises Ctx::server_only internally when
+  // creating a server-mode SSL context
+  start_server(720);
+
+  // Verify server works
+  auto client = create_client();
+  Response r = client->execute("echo", Value("ssl test"));
+  BOOST_CHECK(!r.is_fault());
+}
+
+// Test SSL connection with multiple requests (exercises send path)
+// Covers ssl_connection.cc lines 90-115 (send with loop)
+BOOST_FIXTURE_TEST_CASE(ssl_connection_send_coverage, HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to setup SSL context");
+
+  start_server(721);
+
+  auto client = create_client();
+  client->set_keep_alive(true);
+
+  // Multiple requests on same connection exercise the SSL send path
+  for (int i = 0; i < 5; ++i) {
+    std::string data(1000 * (i + 1), 'x');  // Varying sizes
+    Response r = client->execute("echo", Value(data));
+    BOOST_CHECK(!r.is_fault());
+    BOOST_CHECK_EQUAL(r.value().get_string().length(), data.length());
+  }
+}
+
+// Test SSL connection shutdown path
+// Covers ssl_connection.cc lines 68-87 (shutdown)
+BOOST_FIXTURE_TEST_CASE(ssl_connection_shutdown_coverage, HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to setup SSL context");
+
+  start_server(722);
+
+  // Create connection, use it, then close (triggers SSL shutdown)
+  {
+    auto client = create_client();
+    client->set_keep_alive(false);  // Will trigger proper SSL shutdown
+    Response r = client->execute("echo", Value("shutdown test"));
+    BOOST_CHECK(!r.is_fault());
+  }
+  // Client destructor triggers SSL shutdown sequence
+
+  // Server should still work after client shutdown
+  auto client2 = create_client();
+  Response r2 = client2->execute("echo", Value("after shutdown"));
+  BOOST_CHECK(!r2.is_fault());
+}
+
+// Test SSL with large data transfer
+// Covers ssl_connection.cc send() partial write handling
+BOOST_FIXTURE_TEST_CASE(ssl_large_data_transfer_coverage, HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to setup SSL context");
+
+  start_server(723);
+
+  auto client = create_client();
+
+  // Large data that may require multiple SSL_write calls
+  std::string large_data(100000, 'L');
+  Response r = client->execute("echo", Value(large_data));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string().length(), large_data.length());
+}
+
+// Test concurrent SSL connections
+// Covers ssl_connection.cc post_accept/post_connect paths under load
+BOOST_FIXTURE_TEST_CASE(ssl_concurrent_connections_coverage, HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to setup SSL context");
+
+  start_server(724);
+
+  std::vector<std::thread> threads;
+  std::atomic<int> success_count(0);
+
+  threads.reserve(6);
+  for (int i = 0; i < 6; ++i) {
+    threads.emplace_back([this, i, &success_count]() {
+      try {
+        auto client = create_client();
+        Response r = client->execute("echo", Value(i));
+        if (!r.is_fault()) {
+          ++success_count;
+        }
+      } catch (...) {
+        (void)0;
+      }
+    });
+  }
+
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  BOOST_CHECK_GE(success_count.load(), 4);
+}
+
+// Test SSL server with rapid connect/disconnect
+// Exercises ssl_lib.cc handle_io_result paths
+BOOST_FIXTURE_TEST_CASE(ssl_rapid_connections_coverage, HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to setup SSL context");
+
+  start_server(725);
+
+  std::atomic<int> success_count(0);
+
+  for (int i = 0; i < 10; ++i) {
+    try {
+      auto client = create_client();
+      client->set_keep_alive(false);
+      Response r = client->execute("echo", Value(i));
+      if (!r.is_fault()) {
+        ++success_count;
+      }
+    } catch (...) {
+      (void)0;
+    }
+  }
+
+  BOOST_CHECK_GE(success_count.load(), 7);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
