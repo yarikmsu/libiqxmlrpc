@@ -28,6 +28,10 @@ public:
   //! Create object from existing socket handler.
   Socket( Handler, const Inet_addr& );
   //! Destructor. Does not close actual socket.
+  //! Socket uses explicit close() for resource management to support
+  //! value semantics and ownership transfer (e.g., from accept()).
+  // coverity[autosar_cpp14_a15_5_1_violation : FALSE_POSITIVE]
+  // coverity[CTOR_DTOR_LEAK : FALSE_POSITIVE]
   virtual ~Socket() = default;
 
   Handler get_handler() const { return sock; }
