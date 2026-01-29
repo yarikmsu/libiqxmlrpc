@@ -45,6 +45,7 @@ Look into ChangeLog file for full list of changes.
     * Benchmark CI for performance regression detection (>20% threshold)
 
   Bug Fixes:
+    * Fix Struct::insert() ambiguity when called with literal 0 (regression from 0.13.8)
     * Fix exception safety in value parser (Coverity CID 641344)
     * Fix socket FD leak in firewall rejection path (Coverity CID 641369)
     * Fix undefined behavior in Base64 encoding for signed char platforms

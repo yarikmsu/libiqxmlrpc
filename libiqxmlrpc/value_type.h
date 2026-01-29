@@ -14,7 +14,9 @@
 #include <map>
 #include <string>
 #include <time.h>
+#include <type_traits>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #ifdef _MSC_VER
@@ -306,7 +308,14 @@ public:
   Value&       operator []( const std::string& );
 
   void clear();
-  void insert( const std::string&, Value_ptr );
+  //! SFINAE overload: only matches actual unique_ptr<Value>, not nullptr/int.
+  //! This prevents ambiguity when calling insert("key", 0) where 0 could match
+  //! both Value(int) and unique_ptr<Value>(nullptr).
+  template<typename T, typename = std::enable_if_t<
+      std::is_same<std::decay_t<T>, Value_ptr>::value>>
+  void insert(const std::string& f, T&& val) {
+    values[f] = std::forward<T>(val);
+  }
   void insert( const std::string&, const Value& );
   void insert( const std::string&, Value&& );
 

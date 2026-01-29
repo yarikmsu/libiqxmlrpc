@@ -293,12 +293,6 @@ void Struct::clear()
   values.clear();
 }
 
-void Struct::insert( const std::string& f, Value_ptr val )
-{
-  values[f] = std::move(val);
-}
-
-
 void Struct::insert( const std::string& f, const Value& val )
 {
   values[f] = std::make_unique<Value>(val);
