@@ -14,6 +14,7 @@ Look into ChangeLog file for full list of changes.
     * Configurable TLS cipher suites optimized for AES-NI acceleration
     * XML parsing depth limit to prevent stack overflow attacks
     * Server connection idle timeout for keep-alive connections
+    * Allow arbitrary custom HTTP headers (RFC 6648 compliance, removes X- prefix restriction)
 
   Security Hardening:
     * TLS 1.2 enforced as minimum protocol version
@@ -49,6 +50,10 @@ Look into ChangeLog file for full list of changes.
     * Fix undefined behavior in Base64 encoding for signed char platforms
     * Fix EINTR handling in reactor poll/select implementations
     * Various thread safety improvements with atomics
+    * Fix Pool_executor destructor to suppress exceptions (Coverity CID 641352)
+    * Fix Pool_thread wait loop race condition with predicate-based wait (Coverity CID 641406)
+    * Fix unnecessary string copy in HTTP auth parsing (Coverity CID 641411)
+    * Fix unchecked return values in socket operations (Coverity CID 641402, 641404)
 
 0.13.7 - 0.13.8
   * Support for <i8>, a 64-bit integer XML-RPC extension
