@@ -78,7 +78,8 @@ jobs:
       run: |
         set -euo pipefail
         mkdir build && cd build
-        cmake -Dbuild_tests=ON \
+        # Disable tests - Coverity should only analyze library code, not test code
+        cmake -Dbuild_tests=OFF \
           -DCMAKE_CXX_FLAGS="-DBOOST_TIMER_ENABLE_DEPRECATED -Wall -Wextra" \
           ..
 
