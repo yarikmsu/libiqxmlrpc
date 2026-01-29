@@ -1,5 +1,14 @@
 Look into ChangeLog file for full list of changes.
 
+0.14.0 - 0.14.1
+  Bug Fixes:
+    * Fix socket resource leak in Reactor_interrupter (Coverity CID 641369)
+    * Refactor lock scope in reactor for clarity (Coverity CID 641343)
+
+  Test Coverage:
+    * Add SSL connection coverage tests (ssl_connection.cc, ssl_lib.cc)
+    * Add HTTP/HTTPS server error handling coverage tests
+
 0.13.8 - 0.14.0
   This release is BINARY INCOMPATIBLE with previous versions!
 
