@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <type_traits>
 
@@ -42,9 +43,12 @@ inline std::string double_to_string(double value) {
   return std::string(buf, static_cast<size_t>(len));
 }
 
-// String to integer using std::from_chars
+// String to integer using std::from_chars (string_view version - zero allocation)
+// This is the primary implementation that works directly with character ranges.
+// Throws: conversion_error if parsing fails (empty, invalid, overflow, trailing chars)
+// Exception guarantee: Strong (no side effects on failure)
 template<typename T>
-inline T from_string(const std::string& str) {
+inline T from_string(std::string_view str) {
   static_assert(std::is_integral_v<T>, "from_string requires integral type");
   T value{};
   const char* first = str.data();
@@ -54,6 +58,13 @@ inline T from_string(const std::string& str) {
     throw conversion_error("from_chars failed");
   }
   return value;
+}
+
+// String to integer using std::from_chars (std::string overload)
+// Delegates to the string_view version for consistency
+template<typename T>
+inline T from_string(const std::string& str) {
+  return from_string<T>(std::string_view(str));
 }
 
 // String to double
