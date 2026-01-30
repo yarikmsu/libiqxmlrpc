@@ -3,8 +3,11 @@
 // Run: cd build && ./tests/http-tokenize-benchmark-test
 
 #include "perf_utils.h"
+#include "libiqxmlrpc/num_conv.h"
 
 #include <cctype>
+#include <charconv>
+#include <cstdlib>
 #include <deque>
 #include <string>
 #include <string_view>
@@ -178,6 +181,46 @@ void benchmark_m6_realistic_usage() {
   });
 }
 
+// ============================================================================
+// M6: Number Conversion Benchmarks (string vs string_view)
+// Tests the new from_string<T>(string_view) overload
+// ============================================================================
+
+void benchmark_m6_num_conversion() {
+  section("M6: Number Conversion (string vs string_view)");
+
+  const size_t ITERS = 500000;
+  const std::string code_str = "200";
+  const std::string_view code_sv = "200";
+
+  // Baseline: atoi (traditional C-style conversion)
+  PERF_BENCHMARK("m6_int_from_string_atoi", ITERS, {
+    int code = std::atoi(code_str.c_str());
+    do_not_optimize(code);
+  });
+
+  // num_conv with std::string (existing API, delegates to string_view version)
+  PERF_BENCHMARK("m6_int_from_string_numconv", ITERS, {
+    int code = iqxmlrpc::num_conv::from_string<int>(code_str);
+    do_not_optimize(code);
+  });
+
+  // num_conv with string_view (new API, zero allocation)
+  PERF_BENCHMARK("m6_int_from_sv_numconv", ITERS, {
+    int code = iqxmlrpc::num_conv::from_string<int>(code_sv);
+    do_not_optimize(code);
+  });
+
+  // Direct std::from_chars (baseline for comparison)
+  PERF_BENCHMARK("m6_int_from_chars_direct", ITERS, {
+    int code{};
+    const char* first = code_sv.data();
+    const char* last = first + code_sv.size();
+    std::from_chars(first, last, code);
+    do_not_optimize(code);
+  });
+}
+
 int main() {
   std::cout << "============================================================\n";
   std::cout << "libiqxmlrpc - M6 HTTP Tokenization Benchmarks\n";
@@ -188,6 +231,7 @@ int main() {
 
   benchmark_m6_http_tokenization();
   benchmark_m6_realistic_usage();
+  benchmark_m6_num_conversion();
 
   // Save results
   ResultCollector::instance().save_baseline("performance_m6_http_tokenize.txt");
