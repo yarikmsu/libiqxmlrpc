@@ -14,6 +14,7 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
+#include <cerrno>
 #include <mutex>
 #include <cstdio>
 
@@ -377,6 +378,14 @@ exception::exception( const std::string& msg_ ) noexcept:
 SslIoResult check_io_result( SSL* ssl, int ret, bool& clean_close )
 {
   clean_close = false;
+
+  // Save errno/WSAGetLastError() before SSL_get_error() which may clobber it
+#ifdef WIN32
+  int saved_wsa_err = WSAGetLastError();
+#else
+  int saved_errno = errno;
+#endif
+
   int code = SSL_get_error( ssl, ret );
 
   switch( code )
@@ -396,9 +405,41 @@ SslIoResult check_io_result( SSL* ssl, int ret, bool& clean_close )
 
     case SSL_ERROR_SYSCALL:
       if( !ret ) {
+        // ret == 0: EOF observed, peer closed connection
         clean_close = false;
         return SslIoResult::CONNECTION_CLOSE;
       }
+      // ret < 0: Check error code to distinguish real errors from normal shutdown
+      // During non-blocking SSL shutdown, EAGAIN/EWOULDBLOCK or no-error
+      // can occur as part of normal operation
+#ifdef WIN32
+      if( saved_wsa_err == 0 || saved_wsa_err == WSAEWOULDBLOCK ) {
+        // Check if OpenSSL queued an error (protocol violation, etc.)
+        if( ERR_peek_error() != 0 ) {
+          return SslIoResult::ERROR;
+        }
+        return SslIoResult::WANT_READ;
+      }
+      if( saved_wsa_err == WSAECONNRESET || saved_wsa_err == WSAECONNABORTED ) {
+        clean_close = false;
+        return SslIoResult::CONNECTION_CLOSE;
+      }
+#else
+      if( saved_errno == 0 || saved_errno == EAGAIN || saved_errno == EWOULDBLOCK ) {
+        // Check if OpenSSL queued an error (protocol violation, etc.)
+        if( ERR_peek_error() != 0 ) {
+          return SslIoResult::ERROR;
+        }
+        // No actual error - this happens during normal SSL shutdown
+        // when the peer has already closed or during handshake
+        return SslIoResult::WANT_READ;
+      }
+      if( saved_errno == EPIPE || saved_errno == ECONNRESET ) {
+        // Peer closed connection - not an error, just connection close
+        clean_close = false;
+        return SslIoResult::CONNECTION_CLOSE;
+      }
+#endif
       return SslIoResult::ERROR;
 
     default:
