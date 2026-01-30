@@ -560,7 +560,7 @@ Response_header::Response_header(Verification_level lev, const std::string& to_p
   }
 
   try {
-    code_ = num_conv::from_string<int>(std::string(resp_line[1]));
+    code_ = num_conv::from_string<int>(resp_line[1]);  // string_view, no allocation
   } catch (const num_conv::conversion_error&) {
     code_ = 0;
   }

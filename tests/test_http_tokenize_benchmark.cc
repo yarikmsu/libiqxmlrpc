@@ -3,8 +3,10 @@
 // Run: cd build && ./tests/http-tokenize-benchmark-test
 
 #include "perf_utils.h"
+#include "libiqxmlrpc/num_conv.h"
 
 #include <cctype>
+#include <charconv>
 #include <deque>
 #include <string>
 #include <string_view>
@@ -161,20 +163,58 @@ void benchmark_m6_realistic_usage() {
     do_not_optimize(phrase);
   });
 
-  // Response parsing: tokenize + extract code + phrase (optimized)
+  // Response parsing: tokenize + extract code + phrase (optimized with from_chars)
   PERF_BENCHMARK("m6_response_parse_sv", ITERS, {
     std::vector<std::string_view> tokens;
     split_by_whitespace_sv(tokens, response_line);
     int code = 0;
     std::string phrase;
     if (tokens.size() >= 2) {
-      // string_view doesn't have c_str(), so convert
-      std::string code_str(tokens[1]);
-      code = std::atoi(code_str.c_str());
+      // Use from_chars directly on string_view - zero allocation
+      auto sv = tokens[1];
+      std::from_chars(sv.data(), sv.data() + sv.size(), code);
     }
     if (tokens.size() > 2) phrase = std::string(tokens[2]);
     do_not_optimize(code);
     do_not_optimize(phrase);
+  });
+}
+
+// ============================================================================
+// Number conversion benchmarks: string vs string_view
+// ============================================================================
+
+void benchmark_m6_num_conversion() {
+  section("M6: Number Conversion (string vs string_view)");
+
+  const size_t ITERS = 500000;
+
+  const std::string code_str = "200";
+  const std::string_view code_sv = "200";
+
+  // Parse integer from std::string (original - allocates via c_str() path)
+  PERF_BENCHMARK("m6_int_from_string_atoi", ITERS, {
+    int code = std::atoi(code_str.c_str());
+    do_not_optimize(code);
+  });
+
+  // Parse integer via num_conv from std::string
+  PERF_BENCHMARK("m6_int_from_string_numconv", ITERS, {
+    int code = iqxmlrpc::num_conv::from_string<int>(code_str);
+    do_not_optimize(code);
+  });
+
+  // Parse integer via num_conv from string_view (zero allocation)
+  PERF_BENCHMARK("m6_int_from_sv_numconv", ITERS, {
+    int code = iqxmlrpc::num_conv::from_string<int>(code_sv);
+    do_not_optimize(code);
+  });
+
+  // Parse integer via from_chars directly (baseline)
+  PERF_BENCHMARK("m6_int_from_chars_direct", ITERS, {
+    int code = 0;
+    std::from_chars(code_sv.data(), code_sv.data() + code_sv.size(), code);
+    do_not_optimize(code);
   });
 }
 
@@ -188,6 +228,7 @@ int main() {
 
   benchmark_m6_http_tokenization();
   benchmark_m6_realistic_usage();
+  benchmark_m6_num_conversion();
 
   // Save results
   ResultCollector::instance().save_baseline("performance_m6_http_tokenize.txt");
