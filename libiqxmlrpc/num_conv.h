@@ -44,7 +44,9 @@ inline std::string double_to_string(double value) {
 }
 
 // String to integer using std::from_chars (string_view version - zero allocation)
-// This is the primary implementation that works directly with character ranges
+// This is the primary implementation that works directly with character ranges.
+// Throws: conversion_error if parsing fails (empty, invalid, overflow, trailing chars)
+// Exception guarantee: Strong (no side effects on failure)
 template<typename T>
 inline T from_string(std::string_view str) {
   static_assert(std::is_integral_v<T>, "from_string requires integral type");

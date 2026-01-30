@@ -165,15 +165,14 @@ void benchmark_m6_realistic_usage() {
   });
 
   // Response parsing: tokenize + extract code + phrase (optimized)
+  // Uses from_string<int>(string_view) directly - zero allocation for parsing
   PERF_BENCHMARK("m6_response_parse_sv", ITERS, {
     std::vector<std::string_view> tokens;
     split_by_whitespace_sv(tokens, response_line);
     int code = 0;
     std::string phrase;
     if (tokens.size() >= 2) {
-      // string_view doesn't have c_str(), so convert
-      std::string code_str(tokens[1]);
-      code = std::atoi(code_str.c_str());
+      code = iqxmlrpc::num_conv::from_string<int>(tokens[1]);
     }
     if (tokens.size() > 2) phrase = std::string(tokens[2]);
     do_not_optimize(code);
