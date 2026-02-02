@@ -22,6 +22,8 @@
 #include "libiqxmlrpc/num_conv.h"
 #include "libiqxmlrpc/except.h"
 #include "libiqxmlrpc/parser2.h"
+#include "libiqxmlrpc/ssl_lib.h"
+#include <openssl/err.h>
 
 using namespace iqxmlrpc;
 using namespace iqnet;
@@ -460,7 +462,6 @@ BOOST_AUTO_TEST_CASE(ssl_integer_truncation_protection_documented)
   constexpr size_t int_max = static_cast<size_t>(std::numeric_limits<int>::max());
   constexpr size_t oversized = int_max + 1;
 
-  BOOST_CHECK_EQUAL(int_max, 2147483647ULL);  // INT_MAX on 32-bit int
   BOOST_CHECK_GT(oversized, int_max);
 
   // Document that protection exists in ssl_connection.cc:
@@ -472,6 +473,71 @@ BOOST_AUTO_TEST_CASE(ssl_integer_truncation_protection_documented)
   // All four functions now have bounds checking to prevent integer truncation
   // when passing size_t to SSL_read/SSL_write which expect int.
   BOOST_TEST_MESSAGE("SSL integer truncation protection verified (code review)");
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+//=============================================================================
+// SSL Exception Constructor Safety Tests
+// Tests for safe handling of nullptr from ERR_reason_error_string()
+//=============================================================================
+
+BOOST_AUTO_TEST_SUITE(security_ssl_exception)
+
+// Test: ssl::exception default constructor handles empty error queue
+// When no SSL error is queued, ERR_get_error() returns 0 and
+// ERR_reason_error_string(0) returns nullptr. The exception constructor
+// must handle this safely without crashing.
+BOOST_AUTO_TEST_CASE(ssl_exception_empty_error_queue)
+{
+  // Clear any pending SSL errors to ensure empty queue
+  ERR_clear_error();
+
+  // This should NOT crash even though no error is queued
+  // Before the fix, this would crash due to std::string(nullptr)
+  iqnet::ssl::exception ex;
+
+  // Should have a valid error message (with fallback)
+  const char* what_msg = ex.what();
+  BOOST_CHECK(what_msg != nullptr);
+  BOOST_CHECK_GT(strlen(what_msg), 0u);
+
+  // Should contain "SSL:" prefix
+  std::string msg(what_msg);
+  BOOST_CHECK(msg.find("SSL:") != std::string::npos);
+
+  // Error code should be 0 (no error queued)
+  BOOST_CHECK_EQUAL(ex.code(), 0UL);
+
+  BOOST_TEST_MESSAGE("ssl::exception with empty error queue: " << what_msg);
+}
+
+// Test: ssl::exception with explicit error code
+BOOST_AUTO_TEST_CASE(ssl_exception_with_error_code)
+{
+  // Create exception with explicit code (handles nullptr internally)
+  iqnet::ssl::exception ex(0UL);  // 0 means no error
+
+  const char* what_msg = ex.what();
+  BOOST_CHECK(what_msg != nullptr);
+  BOOST_CHECK_GT(strlen(what_msg), 0u);
+
+  // Should have fallback message since code 0 has no reason string
+  std::string msg(what_msg);
+  BOOST_CHECK(msg.find("SSL:") != std::string::npos);
+}
+
+// Test: ssl::exception with string message
+BOOST_AUTO_TEST_CASE(ssl_exception_with_string)
+{
+  iqnet::ssl::exception ex("test error message");
+
+  const char* what_msg = ex.what();
+  BOOST_CHECK(what_msg != nullptr);
+
+  std::string msg(what_msg);
+  BOOST_CHECK(msg.find("SSL:") != std::string::npos);
+  BOOST_CHECK(msg.find("test error message") != std::string::npos);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

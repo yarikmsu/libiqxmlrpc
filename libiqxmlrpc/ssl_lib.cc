@@ -346,8 +346,13 @@ Ctx::prepare_sni(SSL* ssl)
 // ----------------------------------------------------------------------------
 exception::exception() noexcept:
   ssl_err( ERR_get_error() ),
-  msg( ERR_reason_error_string(ssl_err) )
+  msg()
 {
+  // SECURITY: ERR_reason_error_string() returns nullptr when no error is queued
+  // (ssl_err == 0). Constructing std::string from nullptr is undefined behavior
+  // and causes a crash. Handle this case by providing a fallback message.
+  const char* reason = ERR_reason_error_string(ssl_err);
+  msg = reason ? reason : "unknown SSL error";
   msg.insert(0, "SSL: ");
 }
 
