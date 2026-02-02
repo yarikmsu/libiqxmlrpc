@@ -49,6 +49,14 @@ public:
               std::to_string(depth) + " > " + std::to_string(max_depth) + ")", -32700) {}
 };
 
+//! XML Parser element count exceeded error (DoS protection).
+class LIBIQXMLRPC_API Parse_element_count_error: public Exception {
+public:
+  explicit Parse_element_count_error( int count, int max_count ):
+    Exception("Parser error. Maximum XML element count exceeded (" +
+              std::to_string(count) + " > " + std::to_string(max_count) + ")", -32700) {}
+};
+
 //! XML Parser error.
 class LIBIQXMLRPC_API XmlBuild_error: public Exception {
 public:

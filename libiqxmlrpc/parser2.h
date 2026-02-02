@@ -18,6 +18,11 @@ public:
   //! XML-RPC typically needs ~10 levels; 32 is generous for legitimate use.
   static constexpr int MAX_PARSE_DEPTH = 32;
 
+  //! Maximum allowed XML element count (DoS protection).
+  //! Prevents "wide" XML attacks with millions of sibling elements.
+  //! 100,000 elements is far more than any legitimate XML-RPC call needs.
+  static constexpr int MAX_ELEMENT_COUNT = 100000;
+
   BuilderBase(Parser&, bool expect_text = false);
   virtual ~BuilderBase() = default;
 
@@ -98,6 +103,14 @@ public:
   //! Returns the current XML nesting depth from libxml2.
   int
   xml_depth() const;
+
+  //! Returns the total element count seen so far.
+  int
+  element_count() const;
+
+  //! Increments and returns the element count.
+  int
+  increment_element_count();
 
 private:
   class Impl;
