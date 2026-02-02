@@ -14,6 +14,7 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
+#include <cerrno>
 #include <mutex>
 #include <cstdio>
 
@@ -377,6 +378,14 @@ exception::exception( const std::string& msg_ ) noexcept:
 SslIoResult check_io_result( SSL* ssl, int ret, bool& clean_close )
 {
   clean_close = false;
+
+  // Save errno/WSAGetLastError() before SSL_get_error() which may clobber it
+#ifdef WIN32
+  int saved_wsa_err = WSAGetLastError();
+#else
+  int saved_errno = errno;
+#endif
+
   int code = SSL_get_error( ssl, ret );
 
   switch( code )
@@ -396,9 +405,32 @@ SslIoResult check_io_result( SSL* ssl, int ret, bool& clean_close )
 
     case SSL_ERROR_SYSCALL:
       if( !ret ) {
+        // ret == 0: EOF observed, peer closed connection
         clean_close = false;
         return SslIoResult::CONNECTION_CLOSE;
       }
+      // ret < 0: Check error code to distinguish real errors from normal shutdown
+#ifdef WIN32
+      if( saved_wsa_err == WSAEWOULDBLOCK ) {
+        // Socket would block - retry later
+        return SslIoResult::WANT_READ;
+      }
+      if( saved_wsa_err == 0 || saved_wsa_err == WSAECONNRESET || saved_wsa_err == WSAECONNABORTED || saved_wsa_err == WSAENOTCONN ) {
+        // Peer closed connection (with or without proper shutdown)
+        clean_close = false;
+        return SslIoResult::CONNECTION_CLOSE;
+      }
+#else
+      if( saved_errno == EAGAIN || saved_errno == EWOULDBLOCK ) {
+        // Socket would block - retry later
+        return SslIoResult::WANT_READ;
+      }
+      if( saved_errno == 0 || saved_errno == EPIPE || saved_errno == ECONNRESET || saved_errno == ENOTCONN ) {
+        // Peer closed connection (errno==0 means unexpected EOF without close_notify)
+        clean_close = false;
+        return SslIoResult::CONNECTION_CLOSE;
+      }
+#endif
       return SslIoResult::ERROR;
 
     default:
