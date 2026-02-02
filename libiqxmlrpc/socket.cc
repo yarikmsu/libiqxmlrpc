@@ -2,6 +2,7 @@
 //  Copyright (C) 2011 Anton Dedov
 
 #include <cerrno>
+#include <limits>
 #include "socket.h"
 #include "net_except.h"
 
@@ -103,6 +104,13 @@ void Socket::set_nodelay( bool enable )
 
 size_t Socket::send( const char* data, size_t len )
 {
+  // SECURITY: Prevent integer truncation when casting size_t to int.
+  // On 64-bit systems, len > INT_MAX would wrap to negative/small value,
+  // causing undefined behavior in the system call.
+  if (len > static_cast<size_t>(std::numeric_limits<int>::max())) {
+    throw network_error("Socket::send: buffer size exceeds INT_MAX");
+  }
+
   int ret = ::send( sock, data, static_cast<int>(len), IQXMLRPC_NOPIPE);
 
   if( ret == -1 )
@@ -113,6 +121,13 @@ size_t Socket::send( const char* data, size_t len )
 
 size_t Socket::recv( char* buf, size_t len )
 {
+  // SECURITY: Prevent integer truncation when casting size_t to int.
+  // On 64-bit systems, len > INT_MAX would wrap to negative/small value,
+  // causing undefined behavior in the system call.
+  if (len > static_cast<size_t>(std::numeric_limits<int>::max())) {
+    throw network_error("Socket::recv: buffer size exceeds INT_MAX");
+  }
+
   int ret = ::recv( sock, buf, static_cast<int>(len), 0 );
 
   if( ret == -1 )
