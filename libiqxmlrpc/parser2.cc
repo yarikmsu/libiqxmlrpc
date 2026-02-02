@@ -8,7 +8,6 @@
 #include <libxml/xmlIO.h>
 #include "parser2.h"
 #include "except.h"
-#include <iostream>
 
 namespace iqxmlrpc {
 
@@ -62,6 +61,11 @@ BuilderBase::visit_element(const std::string& tag)
 {
   depth_++;
   int xml_depth = parser_.xml_depth();
+  // SECURITY: xmlTextReaderDepth() returns -1 on error.
+  // Check both error condition and depth limit.
+  if (xml_depth < 0) {
+    throw Parse_error("Failed to get XML depth (parser error)");
+  }
   if (xml_depth > MAX_PARSE_DEPTH) {
     throw Parse_depth_error(xml_depth, MAX_PARSE_DEPTH);
   }
