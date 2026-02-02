@@ -298,8 +298,7 @@ BOOST_AUTO_TEST_CASE(send_rejects_oversized_buffer_documented)
     constexpr size_t int_max = static_cast<size_t>(std::numeric_limits<int>::max());
     constexpr size_t oversized = int_max + 1;
 
-    // Verify the boundary values are as expected
-    BOOST_CHECK_EQUAL(int_max, 2147483647ULL);  // INT_MAX on 32-bit int
+    // Verify overflow arithmetic is correct (portable across int sizes)
     BOOST_CHECK_GT(oversized, int_max);
 
     // Note: Actually testing with oversized buffers is impractical (>2GB allocation)
@@ -317,7 +316,7 @@ BOOST_AUTO_TEST_CASE(recv_rejects_oversized_buffer_documented)
     constexpr size_t int_max = static_cast<size_t>(std::numeric_limits<int>::max());
     constexpr size_t oversized = int_max + 1;
 
-    BOOST_CHECK_EQUAL(int_max, 2147483647ULL);
+    // Verify overflow arithmetic is correct (portable across int sizes)
     BOOST_CHECK_GT(oversized, int_max);
 
     // The implementation in socket.cc lines 119-126 checks:
