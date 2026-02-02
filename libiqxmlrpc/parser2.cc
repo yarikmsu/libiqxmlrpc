@@ -61,10 +61,20 @@ void
 BuilderBase::visit_element(const std::string& tag)
 {
   depth_++;
+
+  // SECURITY: Check element count limit (prevents "wide" XML DoS attacks)
+  // Element count is tracked at Parser level to count across all sub-builders.
+  int count = parser_.increment_element_count();
+  if (count > MAX_ELEMENT_COUNT) {
+    throw Parse_element_count_error(count, MAX_ELEMENT_COUNT);
+  }
+
+  // SECURITY: Check depth limit (prevents deeply nested XML attacks)
   int xml_depth = parser_.xml_depth();
   if (xml_depth > MAX_PARSE_DEPTH) {
     throw Parse_depth_error(xml_depth, MAX_PARSE_DEPTH);
   }
+
   do_visit_element(tag);
 }
 
@@ -108,7 +118,8 @@ public:
     buf(str),
     reader(nullptr),
     curr(),
-    pushed_back(false)
+    pushed_back(false),
+    element_count(0)
   {
     const char* buf2 = str.data();
     int sz = static_cast<int>(str.size());
@@ -236,6 +247,7 @@ public:
   xmlTextReaderPtr reader;
   ParseStep curr;
   bool pushed_back;
+  int element_count;
 };
 
 Parser::Parser(const std::string& buf):
@@ -284,6 +296,18 @@ int
 Parser::xml_depth() const
 {
   return impl_->depth();
+}
+
+int
+Parser::element_count() const
+{
+  return impl_->element_count;
+}
+
+int
+Parser::increment_element_count()
+{
+  return ++impl_->element_count;
 }
 
 //
