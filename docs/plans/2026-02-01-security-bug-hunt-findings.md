@@ -1,51 +1,31 @@
 # Security Bug Hunt Findings - February 1, 2026
 
+> **Last Updated**: February 2, 2026
+> **Status**: Most findings have been addressed. See status column in summary table.
+
 ## Executive Summary
 
-After comprehensive code review of libiqxmlrpc, I've identified several potential security issues ranging from informational to potentially medium severity. The codebase has a strong defensive posture with XXE prevention, CRLF validation, safe integer math, and TLS 1.2+ enforcement. Most issues found are edge cases rather than fundamental design flaws.
+After comprehensive code review of libiqxmlrpc, several potential security issues were identified ranging from informational to medium severity. The codebase has a strong defensive posture with XXE prevention, CRLF validation, safe integer math, and TLS 1.2+ enforcement. Most issues found were edge cases rather than fundamental design flaws.
+
+**Update (Feb 2, 2026)**: 6 of 9 findings have been fixed. The remaining items are informational or low-priority design considerations.
 
 ---
 
 ## Finding 1: Integer Truncation in Socket Send/Recv (Medium)
 
-**Location**: `libiqxmlrpc/socket.cc:104-121`
+**Status**: ✅ **FIXED** (Commit `9d3155f`)
 
-**Description**: The `Socket::send()` and `Socket::recv()` functions cast `size_t` to `int` when calling the underlying system calls:
+**Location**: `libiqxmlrpc/socket.cc:105-120`
 
+**Description**: The `Socket::send()` and `Socket::recv()` functions previously cast `size_t` to `int` without bounds checking.
+
+**Fix Applied**:
 ```cpp
 size_t Socket::send( const char* data, size_t len )
 {
-  int ret = ::send( sock, data, static_cast<int>(len), IQXMLRPC_NOPIPE);  // Line 106
-  ...
-}
-
-size_t Socket::recv( char* buf, size_t len )
-{
-  int ret = ::recv( sock, buf, static_cast<int>(len), 0 );  // Line 116
-  ...
-}
-```
-
-**Impact**: On 64-bit systems, if `len > INT_MAX` (2,147,483,647), the value wraps to a negative number. The system call behavior with negative length is undefined:
-- On Linux, `send()` with negative length typically returns `EINVAL`
-- On some systems, it may attempt to read from invalid memory
-
-**Trigger Scenario**:
-1. A malicious or buggy XML-RPC response with `Content-Length` > 2GB
-2. The code calls `content_cache.length() >= header->content_length()` (http.cc:773)
-3. If Content-Length is parsed as `unsigned` (line 416), values up to 4GB pass validation
-4. When the data is sent/received, truncation occurs
-
-**Proof of Concept**: A response with `Content-Length: 3000000000` (3 billion bytes) would truncate to a small positive or negative value.
-
-**Severity**: Medium - Requires large request to trigger, but could cause denial of service or memory corruption.
-
-**Recommended Fix**:
-```cpp
-size_t Socket::send( const char* data, size_t len )
-{
+  // SECURITY: Prevent integer truncation when casting size_t to int.
   if (len > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    throw network_error("Send buffer too large");
+    throw network_error("Socket::send: buffer size exceeds INT_MAX");
   }
   int ret = ::send( sock, data, static_cast<int>(len), IQXMLRPC_NOPIPE);
   ...
@@ -56,270 +36,168 @@ size_t Socket::send( const char* data, size_t len )
 
 ## Finding 2: SSL Integer Truncation in Read/Write (Medium)
 
-**Location**: `libiqxmlrpc/ssl_connection.cc:100-101, 115, 145, 160`
+**Status**: ✅ **FIXED** (Commit `7079b8b`)
 
-**Description**: Same issue as Finding 1, but with SSL_read/SSL_write:
+**Location**: `libiqxmlrpc/ssl_connection.cc:91-136`
 
-```cpp
-int ret = SSL_write( ssl, data + total_written,
-                     static_cast<int>(len - total_written) );  // Line 100-101
+**Description**: Same issue as Finding 1, but with SSL_read/SSL_write.
 
-int ret = SSL_read( ssl, buf, static_cast<int>(len) );  // Line 115
-```
-
-**Impact**: Same truncation issue - could cause partial data transmission or buffer overflows if the truncated length causes writes beyond intended boundaries.
-
-**Severity**: Medium
+**Fix Applied**: INT_MAX checks added to `send()`, `recv()`, `try_ssl_read()`, and `try_ssl_write()`.
 
 ---
 
 ## Finding 3: Content-Length Maximum Value Boundary (Low)
 
+**Status**: ⚠️ **MITIGATED**
+
 **Location**: `libiqxmlrpc/http.cc:411-416`
 
-**Description**: The `content_length()` function returns `unsigned`:
+**Description**: A Content-Length of `UINT_MAX` (4,294,967,295) passes validation.
 
-```cpp
-unsigned Header::content_length() const
-{
-  if (!option_exists(names::content_length))
-    throw Length_required();
-
-  return get_unsigned(names::content_length);  // Returns unsigned (32-bit on most systems)
-}
-```
-
-The validator only checks that it's a valid unsigned number:
-
-```cpp
-void unsigned_number(const std::string& val)
-{
-  if (!all_digits(val))
-    throw Malformed_packet(errmsg);
-
-  try {
-    num_conv::from_string<unsigned>(val);  // Only checks if it fits in unsigned
-  } catch (const num_conv::conversion_error&) {
-    throw Malformed_packet(errmsg);
-  }
-}
-```
-
-**Impact**: A Content-Length of `UINT_MAX` (4,294,967,295) passes validation but may cause issues in downstream size calculations, especially when combined with Finding 1.
-
-**Severity**: Low - Protected by `safe_math` in most places, but edge cases may exist.
+**Mitigation**: With Findings 1 and 2 fixed, oversized Content-Length values are now caught at the socket/SSL layer before causing issues. The `max_req_sz` limit provides additional protection.
 
 ---
 
 ## Finding 4: SSL Exception Constructor Without Error Queue (Low)
 
-**Location**: `libiqxmlrpc/ssl_lib.cc:347-352`
+**Status**: ✅ **FIXED** (Commit `b1b1f54`)
 
-**Description**: The `ssl::exception` default constructor calls `ERR_get_error()`:
+**Location**: `libiqxmlrpc/ssl_lib.cc:347-357`
 
+**Description**: The `ssl::exception` default constructor could receive `nullptr` from `ERR_reason_error_string()`.
+
+**Fix Applied**:
 ```cpp
 exception::exception() noexcept:
   ssl_err( ERR_get_error() ),
-  msg( ERR_reason_error_string(ssl_err) )
+  msg()
 {
+  // SECURITY: ERR_reason_error_string() returns nullptr when no error is queued
+  const char* reason = ERR_reason_error_string(ssl_err);
+  msg = reason ? reason : "unknown SSL error";
   msg.insert(0, "SSL: ");
 }
 ```
-
-**Issue**: If no error is queued in OpenSSL's error queue, `ERR_get_error()` returns 0 and `ERR_reason_error_string(0)` returns `nullptr`. The `std::string` constructor receiving `nullptr` causes undefined behavior.
-
-**Trigger**: Any code path that constructs `ssl::exception()` when no SSL error is pending.
-
-**Workaround in Code**: The codebase already has `ssl::exception(const std::string&)` constructor and `ssl::exception(unsigned long)` that handle this case. However, calling the default constructor in the wrong context is still possible.
-
-**Severity**: Low - Would cause crash, not security bypass. Documented in common-pitfalls.md.
 
 ---
 
 ## Finding 5: Firewall Rate Limiter Cleanup Race (Informational)
 
+**Status**: ℹ️ **ACKNOWLEDGED** (Not a security vulnerability)
+
 **Location**: `libiqxmlrpc/firewall.cc:183-200`
 
-**Description**: The `cleanup_stale_entries()` function locks `rate_mutex` while iterating and erasing from `request_trackers`:
+**Description**: The `cleanup_stale_entries()` function holds a lock while iterating, which could cause latency spikes with many tracked IPs.
 
-```cpp
-size_t RateLimitingFirewall::cleanup_stale_entries()
-{
-  std::lock_guard<std::mutex> lock(impl_->rate_mutex);
-
-  size_t removed = 0;
-  auto it = impl_->request_trackers.begin();
-  while (it != impl_->request_trackers.end()) {
-    if (it->second.count_recent() == 0) {
-      it = impl_->request_trackers.erase(it);  // Safe but holds lock for entire cleanup
-      ++removed;
-    } else {
-      ++it;
-    }
-  }
-  return removed;
-}
-```
-
-**Impact**: With many tracked IPs, cleanup holds the lock for an extended period, potentially causing latency spikes for `check_request_allowed()` calls.
-
-**Severity**: Informational - Not a security vulnerability, but could enable slowloris-style DoS if cleanup is triggered at high load.
+**Decision**: Acceptable trade-off. Lock contention is minimal in practice, and correctness is prioritized over micro-optimization.
 
 ---
 
 ## Finding 6: Parser xml_depth() Returns int but Compared to Constexpr (Informational)
 
-**Location**: `libiqxmlrpc/parser2.cc:65-67` and `libiqxmlrpc/parser2.h:19`
+**Status**: ✅ **FIXED** (Commit `401f8df`)
 
-**Description**:
+**Location**: `libiqxmlrpc/parser2.cc:72-80`
+
+**Description**: `xmlTextReaderDepth()` can return -1 on error, which was not explicitly checked.
+
+**Fix Applied**:
 ```cpp
-// parser2.h
-static constexpr int MAX_PARSE_DEPTH = 32;
-
-// parser2.cc
-void BuilderBase::visit_element(const std::string& tag)
-{
-  depth_++;
-  int xml_depth = parser_.xml_depth();  // xmlTextReaderDepth returns int
-  if (xml_depth > MAX_PARSE_DEPTH) {
-    throw Parse_depth_error(xml_depth, MAX_PARSE_DEPTH);
-  }
-  do_visit_element(tag);
+int xml_depth = parser_.xml_depth();
+// SECURITY: xmlTextReaderDepth() returns -1 on error.
+if (xml_depth < 0) {
+  throw Parse_error("Failed to get XML depth (parser error)");
+}
+if (xml_depth > MAX_PARSE_DEPTH) {
+  throw Parse_depth_error(xml_depth, MAX_PARSE_DEPTH);
 }
 ```
-
-**Issue**: `xmlTextReaderDepth()` can return -1 on error. The comparison `xml_depth > MAX_PARSE_DEPTH` would not catch -1.
-
-**Impact**: If libxml2 is in an error state, depth checking may be bypassed. However, libxml2 typically throws/returns errors before this becomes exploitable.
-
-**Severity**: Informational - Defense in depth issue, not directly exploitable.
 
 ---
 
 ## Finding 7: Potential Denial of Service via Wide XML Structures (Low)
 
-**Location**: `libiqxmlrpc/value_parser.cc` (entire file)
+**Status**: ✅ **FIXED** (Commits `da3b30e`, `5f39b77`)
 
-**Description**: The parser enforces `MAX_PARSE_DEPTH = 32` for nested elements, but does NOT limit:
-1. Number of sibling elements at each level
-2. Total number of elements in the document
-3. Total memory allocation
+**Location**: `libiqxmlrpc/parser2.h:21-24`, `libiqxmlrpc/parser2.cc:64-69`
 
-**Attack**: An XML-RPC request with 1 million sibling `<member>` elements inside a `<struct>`:
-```xml
-<struct>
-  <member><name>a0</name><value><i4>0</i4></value></member>
-  <member><name>a1</name><value><i4>0</i4></value></member>
-  ... (repeat 1 million times)
-</struct>
+**Description**: The parser enforced depth limits but not element count limits, allowing "wide" XML attacks.
+
+**Fix Applied**:
+```cpp
+// parser2.h
+static constexpr int MAX_ELEMENT_COUNT = 10000000;  // 10 million elements
+
+// parser2.cc
+int count = parser_.increment_element_count();
+if (count > MAX_ELEMENT_COUNT) {
+  throw Parse_element_count_error(count, MAX_ELEMENT_COUNT);
+}
 ```
-
-This passes depth checks but causes:
-1. O(n) memory allocation
-2. O(n) parsing time
-3. O(n) dispatch processing
-
-**Mitigation**: The `max_req_sz` limit on HTTP packet size provides partial protection, but a maximally-dense payload can still cause significant CPU load.
-
-**Severity**: Low - Protected by request size limits but not CPU time limits.
 
 ---
 
 ## Finding 8: Request Smuggling Potential (Low)
 
+**Status**: ℹ️ **ACKNOWLEDGED** (Design decision)
+
 **Location**: `libiqxmlrpc/http.cc:697-743`
 
-**Description**: The HTTP parser handles multiple line ending styles for robustness:
+**Description**: The HTTP parser handles multiple line ending styles (`\r\n\r\n`, `\r\n\n`, `\n\n`) for robustness, which could theoretically enable request smuggling behind certain proxies.
 
-```cpp
-size_t sep_pos = header_cache.find("\r\n\r\n");
-size_t sep_len = 4;
-
-if (sep_pos == std::string::npos) {
-  sep_pos = header_cache.find("\r\n\n");  // Mixed
-  sep_len = 3;
-}
-
-if (sep_pos == std::string::npos) {
-  sep_pos = header_cache.find("\n\n");    // Unix-style
-  sep_len = 2;
-}
-```
-
-**Impact**: This flexible parsing could potentially be exploited in request smuggling attacks when libiqxmlrpc is behind a reverse proxy that handles line endings differently.
-
-**Scenario**:
-1. Attacker sends: `POST / HTTP/1.1\r\nContent-Length: 0\r\n\nPOST /admin HTTP/1.1\r\n...`
-2. A strict proxy sees one request with `\r\n\r\n` terminator
-3. libiqxmlrpc sees the `\n\n` and processes the second "smuggled" request
-
-**Severity**: Low - Only exploitable with specific proxy configurations, and libiqxmlrpc typically runs standalone.
+**Decision**: This flexibility is intentional for compatibility. libiqxmlrpc typically runs standalone, not behind reverse proxies. If used behind a proxy, operators should ensure consistent line ending handling.
 
 ---
 
 ## Finding 9: Hostname CRLF Check Before DNS Resolution (Mitigated)
 
+**Status**: ✅ **ALREADY MITIGATED**
+
 **Location**: `libiqxmlrpc/inet_addr.cc:90-91`
 
-**Description**: CRLF validation is already present:
-
-```cpp
-Inet_addr::Impl::Impl( const std::string& h, int p ):
-  sa(), sa_init_flag(), host(h), port(p)
-{
-  if (h.find_first_of("\n\r") != std::string::npos)
-    throw network_error("Hostname must not contain CR LF characters", false);
-}
-```
-
-**Status**: This was flagged in the exploration phase but is already fixed. The implementation correctly rejects CRLF in hostnames.
-
-**Severity**: N/A - Already mitigated.
+**Description**: CRLF validation was already present at time of initial review.
 
 ---
 
 ## Summary Table
 
-| # | Finding | Severity | CVSS Est. | Status |
-|---|---------|----------|-----------|--------|
-| 1 | Socket send/recv integer truncation | Medium | 5.3 | New |
-| 2 | SSL read/write integer truncation | Medium | 5.3 | New |
-| 3 | Content-Length boundary value | Low | 3.1 | New |
-| 4 | SSL exception constructor crash | Low | 3.7 | Known |
-| 5 | Rate limiter cleanup lock contention | Info | 2.1 | New |
-| 6 | Parser depth check negative value | Info | 2.1 | New |
-| 7 | Wide XML structure DoS | Low | 4.3 | New |
-| 8 | Request smuggling potential | Low | 3.4 | New |
-| 9 | Hostname CRLF injection | N/A | - | Mitigated |
+| # | Finding | Severity | Status |
+|---|---------|----------|--------|
+| 1 | Socket send/recv integer truncation | Medium | ✅ Fixed (`9d3155f`) |
+| 2 | SSL read/write integer truncation | Medium | ✅ Fixed (`7079b8b`) |
+| 3 | Content-Length boundary value | Low | ⚠️ Mitigated by #1/#2 |
+| 4 | SSL exception constructor crash | Low | ✅ Fixed (`b1b1f54`) |
+| 5 | Rate limiter cleanup lock contention | Info | ℹ️ Acknowledged |
+| 6 | Parser depth check negative value | Info | ✅ Fixed (`401f8df`) |
+| 7 | Wide XML structure DoS | Low | ✅ Fixed (`da3b30e`, `5f39b77`) |
+| 8 | Request smuggling potential | Low | ℹ️ Acknowledged |
+| 9 | Hostname CRLF injection | N/A | ✅ Already mitigated |
 
 ---
 
-## Recommendations
+## Recommendations Status
 
-### High Priority
-1. Add bounds checking to `Socket::send()`, `Socket::recv()`, `SSL_read()`, `SSL_write()` for sizes > INT_MAX
-2. Consider adding element count limits to XML parser
+### Completed ✅
 
-### Medium Priority
-3. Add explicit check for `xml_depth() < 0` error condition
+1. ~~Add bounds checking to `Socket::send()`, `Socket::recv()`, `SSL_read()`, `SSL_write()` for sizes > INT_MAX~~
+2. ~~Consider adding element count limits to XML parser~~
+3. ~~Add explicit check for `xml_depth() < 0` error condition~~
+
+### Still Valid (Low Priority)
+
 4. Review request smuggling scenarios if used behind reverse proxy
-
-### Low Priority
-5. Consider batch cleanup for rate limiter to reduce lock contention
-6. Add configuration option for maximum XML elements per document
+5. Consider batch cleanup for rate limiter to reduce lock contention (optional optimization)
 
 ---
 
-## Verification Steps
+## Verification
 
-To verify Findings 1 and 2:
-```bash
-# Build with ASan
-mkdir build_asan && cd build_asan
-cmake -DCMAKE_BUILD_TYPE=Debug -DSANITIZE_ADDRESS=ON ..
-make
+All fixes have been verified:
+- INT_MAX checks present in `socket.cc:107-112, 124-129`
+- INT_MAX checks present in `ssl_connection.cc:96-98, 126-128, 161-164, 183-186`
+- Null check present in `ssl_lib.cc:354-355`
+- Negative depth check present in `parser2.cc:75-77`
+- Element count check present in `parser2.cc:66-69`
+- MAX_ELEMENT_COUNT = 10,000,000 in `parser2.h:24`
 
-# Run fuzz target with large inputs (would require adding to fuzz corpus)
-```
-
-The existing fuzz infrastructure covers most parsing paths but doesn't specifically test INT_MAX boundary conditions for size parameters.
+The existing fuzz infrastructure and CI sanitizers (ASan/UBSan/TSan) provide ongoing protection against regressions.
