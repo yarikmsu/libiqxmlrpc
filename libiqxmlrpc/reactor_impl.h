@@ -227,7 +227,14 @@ void Reactor<Lock>::invoke_event_handler( const Reactor_base::HandlerState& hs )
   bool terminate = false;
 
   Event_handler* handler = find_handler(hs.fd);
-  assert(handler);
+
+  // SECURITY: Replace assert with runtime check to prevent null dereference
+  // in Release builds. This can happen during single-threaded iteration:
+  // when invoke_event_handler() calls unregister_handler() for one event,
+  // a subsequent iteration may find the same handler already removed.
+  if (!handler) {
+    return;  // Handler already unregistered, skip this event
+  }
 
   if( handler->catch_in_reactor() )
     invoke_servers_handler( handler, hs, terminate );
