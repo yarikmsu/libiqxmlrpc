@@ -2,6 +2,7 @@
 //  Copyright (C) 2011 Anton Dedov
 //  Copyright (C) 2019-2026 Yaroslav Gorbunov
 
+#include <limits>
 #include <openssl/err.h>
 #include "ssl_connection.h"
 
@@ -89,6 +90,13 @@ void ssl::Connection::shutdown()
 
 size_t ssl::Connection::send( const char* data, size_t len )
 {
+  // SECURITY: Prevent integer truncation when casting size_t to int.
+  // On 64-bit systems, len > INT_MAX would wrap to negative/small value,
+  // causing undefined behavior in the OpenSSL call.
+  if (len > static_cast<size_t>(std::numeric_limits<int>::max())) {
+    throw exception("SSL::send: buffer size exceeds INT_MAX");
+  }
+
   // Handle partial writes by retrying until all data is sent.
   // In blocking mode, SSL_write typically writes all data or fails,
   // but this loop provides robustness if SSL_MODE_ENABLE_PARTIAL_WRITE
@@ -112,6 +120,13 @@ size_t ssl::Connection::send( const char* data, size_t len )
 
 size_t ssl::Connection::recv( char* buf, size_t len )
 {
+  // SECURITY: Prevent integer truncation when casting size_t to int.
+  // On 64-bit systems, len > INT_MAX would wrap to negative/small value,
+  // causing undefined behavior in the OpenSSL call.
+  if (len > static_cast<size_t>(std::numeric_limits<int>::max())) {
+    throw exception("SSL::recv: buffer size exceeds INT_MAX");
+  }
+
   int ret = SSL_read( ssl, buf, static_cast<int>(len) );
 
   if( ret <= 0 )
@@ -141,6 +156,13 @@ inline bool ssl::Connection::shutdown_sent()
 
 ssl::SslIoResult ssl::Connection::try_ssl_read( char* buf, size_t len, size_t& bytes_read )
 {
+  // SECURITY: Prevent integer truncation when casting size_t to int.
+  // Returns ERROR for oversized buffers to maintain non-throwing semantics.
+  if (len > static_cast<size_t>(std::numeric_limits<int>::max())) {
+    bytes_read = 0;
+    return SslIoResult::ERROR;
+  }
+
   bytes_read = 0;
   int ret = SSL_read( ssl, buf, static_cast<int>(len) );
 
@@ -156,6 +178,13 @@ ssl::SslIoResult ssl::Connection::try_ssl_read( char* buf, size_t len, size_t& b
 
 ssl::SslIoResult ssl::Connection::try_ssl_write( const char* buf, size_t len, size_t& bytes_written )
 {
+  // SECURITY: Prevent integer truncation when casting size_t to int.
+  // Returns ERROR for oversized buffers to maintain non-throwing semantics.
+  if (len > static_cast<size_t>(std::numeric_limits<int>::max())) {
+    bytes_written = 0;
+    return SslIoResult::ERROR;
+  }
+
   bytes_written = 0;
   int ret = SSL_write( ssl, buf, static_cast<int>(len) );
 
