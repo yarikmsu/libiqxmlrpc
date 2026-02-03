@@ -86,6 +86,20 @@ BOOST_AUTO_TEST_CASE(hostname_with_crlf_throws)
     BOOST_CHECK_THROW(Inet_addr("host\r\nname", 80), network_error);
 }
 
+BOOST_AUTO_TEST_CASE(hostname_with_null_byte_throws)
+{
+    // SECURITY: Null bytes in hostname would truncate at C API boundary
+    // (gethostbyname sees only up to first null), causing mismatch
+    std::string hostname_with_null("evil.com");
+    hostname_with_null += '\0';
+    hostname_with_null += "good.com";
+    BOOST_CHECK_THROW(Inet_addr(hostname_with_null, 80), network_error);
+
+    // Also test null byte at start and middle
+    std::string null_at_start("\0hostname", 9);
+    BOOST_CHECK_THROW(Inet_addr(null_at_start, 80), network_error);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE(inet_addr_port_tests)
