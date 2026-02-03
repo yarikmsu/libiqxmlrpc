@@ -87,8 +87,14 @@ struct Inet_addr::Impl {
 Inet_addr::Impl::Impl( const std::string& h, int p ):
   sa(), sa_init_flag(), host(h), port(p)
 {
+  // SECURITY: Reject hostnames with control characters that could cause issues:
+  // - CRLF: Could enable header injection in protocols that use this hostname
+  // - Null bytes: Would truncate hostname at C API boundary (gethostbyname sees
+  //   only up to the first null), causing mismatch between stored and resolved name
   if (h.find_first_of("\n\r") != std::string::npos)
     throw network_error("Hostname must not contain CR LF characters", false);
+  if (h.find('\0') != std::string::npos)
+    throw network_error("Hostname must not contain null bytes", false);
 }
 
 Inet_addr::Impl::Impl( int p ):
