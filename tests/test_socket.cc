@@ -338,21 +338,29 @@ BOOST_AUTO_TEST_CASE(send_recv_normal_sizes_work)
     client_sock.connect(server_addr);
     Socket accepted = server_sock.accept();
 
-    // Test with a reasonable size (TCP may fragment larger buffers)
+    // Test with a reasonable size
     std::string data(1024, 'X');
-    size_t sent = client_sock.send(data.data(), data.size());
-    BOOST_CHECK_EQUAL(sent, 1024u);
 
-    // Receive in a loop since TCP doesn't guarantee single recv() gets all data
+    // Send in a loop - TCP may not send all bytes in one call
+    size_t total_sent = 0;
+    while (total_sent < data.size()) {
+        size_t sent = client_sock.send(data.data() + total_sent,
+                                       data.size() - total_sent);
+        BOOST_CHECK_GT(sent, 0u);
+        total_sent += sent;
+    }
+    BOOST_CHECK_EQUAL(total_sent, 1024u);
+
+    // Receive in a loop - TCP may not receive all bytes in one call
     std::vector<char> buf(2048);
     size_t total_received = 0;
-    while (total_received < 1024) {
+    while (total_received < total_sent) {
         size_t received = accepted.recv(buf.data() + total_received,
                                         buf.size() - total_received);
         BOOST_CHECK_GT(received, 0u);
         total_received += received;
     }
-    BOOST_CHECK_EQUAL(total_received, 1024u);
+    BOOST_CHECK_EQUAL(total_received, total_sent);
 
     client_sock.close();
     accepted.close();
