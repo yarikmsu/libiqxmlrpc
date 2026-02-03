@@ -106,6 +106,93 @@ BOOST_AUTO_TEST_CASE(inet_addr_operations)
 BOOST_AUTO_TEST_SUITE_END()
 
 //=============================================================================
+// Reactor Null Handler Safety Tests
+//
+// Tests for the null handler check in invoke_event_handler().
+// Security fix: CWE-476 NULL Pointer Dereference
+// The assert(handler) was replaced with a runtime check because assert
+// compiles away in Release builds.
+//=============================================================================
+
+BOOST_AUTO_TEST_SUITE(reactor_null_handler_tests)
+
+// Test: Rapid connection/disconnection stress test
+// This exercises the code path where handlers may be unregistered
+// while events are still pending in the reactor's event list.
+BOOST_FIXTURE_TEST_CASE(rapid_connect_disconnect_stress, IntegrationFixture)
+{
+  start_server(4, 160);  // 4 threads, unique port
+
+  std::atomic<int> success_count(0);
+  std::atomic<int> attempt_count(0);
+
+  // Create many short-lived connections rapidly
+  // This increases the chance of handlers being unregistered
+  // while events are pending
+  std::vector<std::thread> threads;
+  threads.reserve(20);
+
+  for (int i = 0; i < 20; ++i) {
+    threads.emplace_back([this, &success_count, &attempt_count]() {
+      for (int j = 0; j < 5; ++j) {
+        ++attempt_count;
+        try {
+          // Create a client, make one request, let it go out of scope
+          auto client = create_client();
+          client->set_timeout(2);  // Short timeout
+          Response r = client->execute("echo", Value(42));
+          if (!r.is_fault()) {
+            ++success_count;
+          }
+        } catch (...) {
+          // Connection errors are acceptable - we're stress testing
+          (void)0;
+        }
+      }
+    });
+  }
+
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  // Most requests should succeed (some may fail due to timing)
+  // Key assertion: server didn't crash due to null handler dereference
+  BOOST_CHECK_GT(success_count.load(), 50);  // At least 50% success
+  BOOST_TEST_MESSAGE("Rapid connect/disconnect: " << success_count.load()
+                     << "/" << attempt_count.load() << " succeeded");
+}
+
+// Test: Connection termination during request
+// Exercises the path where a handler terminates and is unregistered
+BOOST_FIXTURE_TEST_CASE(connection_termination_handling, IntegrationFixture)
+{
+  start_server(2, 161);
+
+  // Make requests that cause the connection to close
+  // This exercises unregister_handler() during event processing
+  for (int i = 0; i < 10; ++i) {
+    try {
+      auto client = create_client();
+      client->set_keep_alive(false);  // Connection closes after response
+      Response r = client->execute("echo", Value(i));
+      BOOST_CHECK(!r.is_fault());
+    } catch (...) {
+      // Acceptable - connection may have closed
+      (void)0;
+    }
+  }
+
+  // Server should still be healthy
+  auto client = create_client();
+  Response r = client->execute("echo", Value("final"));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), "final");
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+//=============================================================================
 // Reactor Mask Tests
 //
 // These tests validate the reactor's event mask handling, specifically
