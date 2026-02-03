@@ -19,9 +19,9 @@ public:
   static constexpr int MAX_PARSE_DEPTH = 32;
 
   //! Maximum allowed XML element count (DoS protection).
-  //! Prevents "wide" XML attacks with millions of sibling elements.
-  //! 100,000 elements is far more than any legitimate XML-RPC call needs.
-  static constexpr int MAX_ELEMENT_COUNT = 100000;
+  //! Prevents "wide" XML attacks with excessive elements.
+  //! 10 million supports large batch operations (e.g., 25K lines × 30 params × 4 elements).
+  static constexpr int MAX_ELEMENT_COUNT = 10000000;
 
   BuilderBase(Parser&, bool expect_text = false);
   virtual ~BuilderBase() = default;
