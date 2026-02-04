@@ -16,6 +16,7 @@
 #include <memory>
 #include <atomic>
 #include <string>
+#include <thread>
 #include <boost/program_options.hpp>
 
 #include "libiqxmlrpc/libiqxmlrpc.h"
@@ -26,24 +27,17 @@
 
 namespace {
 
-// Global server pointer for signal handler
-std::atomic<iqxmlrpc::Server*> g_server{nullptr};
-
-// RAII guard to ensure g_server is cleared on all exit paths (including exceptions)
-struct ServerGuard {
-  explicit ServerGuard(iqxmlrpc::Server* s) { g_server.store(s); }
-  ~ServerGuard() { g_server.store(nullptr); }
-  ServerGuard(const ServerGuard&) = delete;
-  ServerGuard& operator=(const ServerGuard&) = delete;
-};
+// Global shutdown flag - set by signal handler, polled by main thread
+// Using sig_atomic_t for guaranteed async-signal-safe access
+volatile std::sig_atomic_t g_shutdown_requested = 0;
 
 // Signal handler for graceful shutdown
-// Note: Only async-signal-safe operations here (no std::cerr/cout)
+// IMPORTANT: Only async-signal-safe operations here.
+// We do NOT call server->set_exit_flag() because it internally calls
+// interrupt() which acquires a mutex - not async-signal-safe.
+// Instead, we set a flag and let the main thread handle shutdown.
 void signal_handler(int /*sig*/) {
-  iqxmlrpc::Server* server = g_server.load();
-  if (server) {
-    server->set_exit_flag();
-  }
+  g_shutdown_requested = 1;
 }
 
 /**
@@ -163,8 +157,7 @@ int main(int argc, char** argv) {
     // Register methods
     register_benchmark_methods(server);
 
-    // Set up signal handler with RAII guard (ensures cleanup on exception)
-    ServerGuard server_guard(&server);
+    // Set up signal handlers BEFORE starting server
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
 
@@ -182,10 +175,21 @@ int main(int argc, char** argv) {
       std::cout << "\nPress Ctrl+C to stop...\n\n";
     }
 
-    // Run server (blocks until exit flag set)
-    server.work();
+    // Run server in a separate thread so main thread can poll for signals
+    // This avoids calling set_exit_flag() from signal handler (not async-signal-safe)
+    std::thread server_thread([&server]() {
+      server.work();
+    });
 
-    // ServerGuard destructor clears g_server automatically
+    // Poll for shutdown signal (async-signal-safe flag set by signal handler)
+    while (!g_shutdown_requested) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+
+    // Call set_exit_flag from main thread (safe, not in signal context)
+    server.set_exit_flag();
+    server_thread.join();
+
     std::cout << "Server stopped.\n";
     return 0;
 
