@@ -77,11 +77,8 @@ void Https_server_connection::finish()
 
 void Https_server_connection::terminate_idle()
 {
-  // Atomically check if still idle to prevent TOCTOU race:
-  // Connection may have received data between timeout check and termination
-  if (!try_claim_for_termination()) {
-    return;  // Connection is no longer idle, don't terminate
-  }
+  // Caller (Server::check_idle_timeouts) already called try_claim_for_termination()
+  // to atomically verify idle state. No need to check again here.
   // Use reg_shutdown to properly close SSL connection
   reg_shutdown();
   finish();

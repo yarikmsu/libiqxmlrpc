@@ -176,7 +176,12 @@ void Server::set_auth_plugin( const Auth_Plugin_base& ap )
 
 void Server::set_idle_timeout(std::chrono::milliseconds timeout)
 {
-  impl->idle_timeout_ms = timeout.count();
+  // Note: Only connections opened AFTER this call will be tracked for idle timeout.
+  // Existing connections are not retroactively added to the tracking set.
+  // Call this method before starting the server for consistent behavior.
+  // Use release ordering to synchronize with acquire loads in register_connection()
+  // and check_idle_timeouts().
+  impl->idle_timeout_ms.store(timeout.count(), std::memory_order_release);
 }
 
 std::chrono::milliseconds Server::get_idle_timeout() const
@@ -186,6 +191,14 @@ std::chrono::milliseconds Server::get_idle_timeout() const
 
 void Server::register_connection(Server_connection* conn)
 {
+  // PERFORMANCE: Only track connections when idle timeout is enabled.
+  // Connection tracking requires mutex lock on every connection open/close,
+  // which creates significant contention under high load. Skip when not needed.
+  // Use acquire to synchronize with set_idle_timeout() store, ensuring
+  // connections opened after set_idle_timeout() see the updated value.
+  if (impl->idle_timeout_ms.load(std::memory_order_acquire) <= 0)
+    return;
+
   std::lock_guard<std::mutex> lock(impl->connections_mutex);
   impl->connections.insert(conn);
 }
@@ -198,6 +211,11 @@ void Server::unregister_connection(Server_connection* conn)
     fw->release(conn->get_peer_addr());
   }
 
+  // SAFETY: Always remove from connections set to prevent dangling pointers.
+  // Even if idle_timeout is currently disabled, this connection might have been
+  // registered when it was enabled. Skipping removal would leave a dangling
+  // pointer that causes UAF if timeout is later re-enabled.
+  // Note: erase() is safe even if conn is not in the set (no-op).
   std::lock_guard<std::mutex> lock(impl->connections_mutex);
   impl->connections.erase(conn);
 }
@@ -319,7 +337,8 @@ void Server::set_firewall( iqnet::Firewall_base* _firewall )
 
 void Server::check_idle_timeouts()
 {
-  const auto timeout_ms = impl->idle_timeout_ms.load();
+  // Use acquire to synchronize with release store in set_idle_timeout()
+  const auto timeout_ms = impl->idle_timeout_ms.load(std::memory_order_acquire);
   if (timeout_ms <= 0)
     return;
 
@@ -336,12 +355,16 @@ void Server::check_idle_timeouts()
                  });
   }
 
-  // Terminate expired connections (outside lock)
+  // Terminate expired connections (outside lock).
+  // Use try_claim_for_termination() to prevent TOCTOU race: a connection
+  // that was idle during the scan above may have received data since then.
   for (auto* conn : expired)
   {
-    log_err_msg("Connection idle timeout expired for " +
-                conn->get_peer_addr().get_host_name());
-    conn->terminate_idle();
+    if (conn->try_claim_for_termination()) {
+      log_err_msg("Connection idle timeout expired for " +
+                  conn->get_peer_addr().get_host_name());
+      conn->terminate_idle();
+    }
   }
 }
 

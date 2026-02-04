@@ -182,3 +182,9 @@ add_custom_target(interop-test
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Running interoperability tests against Python XML-RPC server..."
 )
+
+# Standalone benchmark server for RPS testing (separate - run with ./benchmark-server)
+# Usage: ./benchmark-server --port 8080 --numthreads 4
+# Then run: python3 scripts/rps_benchmark.py --port 8080
+add_executable(benchmark-server benchmark_server.cc)
+target_link_libraries(benchmark-server iqxmlrpc ${Boost_LIBRARIES} ${LIBXML2_LIBRARIES})

@@ -179,6 +179,60 @@ BOOST_FIXTURE_TEST_CASE(connection_no_timeout_during_method_execution, Integrati
   BOOST_CHECK_EQUAL(r.value().get_string(), "done");
 }
 
+BOOST_FIXTURE_TEST_CASE(connection_idle_timeout_disable_after_enable, IntegrationFixture)
+{
+  start_server(1, 16);
+
+  // Step 1: Enable idle timeout - connections will be tracked via mutex path
+  server_->set_idle_timeout(std::chrono::milliseconds(5000));
+  BOOST_CHECK_EQUAL(server_->get_idle_timeout().count(), 5000);
+
+  {
+    // Create client with keep_alive=false so each request creates a new connection
+    // This ensures register_connection/unregister_connection are called per request
+    auto client = create_client();
+    client->set_keep_alive(false);
+
+    // These connections exercise the mutex tracking path (timeout enabled)
+    for (int i = 0; i < 3; ++i) {
+      Response r = client->execute("echo", Value(i));
+      BOOST_CHECK(!r.is_fault());
+      BOOST_CHECK_EQUAL(r.value().get_int(), i);
+    }
+  }
+
+  // Step 2: Disable idle timeout - new connections use early-return optimization
+  server_->set_idle_timeout(std::chrono::milliseconds(0));
+  BOOST_CHECK_EQUAL(server_->get_idle_timeout().count(), 0);
+
+  {
+    // Create NEW client after disabling timeout
+    // This exercises the early-return optimization in register/unregister_connection
+    auto client2 = create_client();
+    client2->set_keep_alive(false);
+
+    // These connections exercise the early-return path (timeout disabled)
+    for (int i = 10; i < 15; ++i) {
+      Response r = client2->execute("echo", Value(i));
+      BOOST_CHECK(!r.is_fault());
+      BOOST_CHECK_EQUAL(r.value().get_int(), i);
+    }
+  }
+
+  // Step 3: Re-enable timeout to verify we can switch back to tracking
+  server_->set_idle_timeout(std::chrono::milliseconds(1000));
+  BOOST_CHECK_EQUAL(server_->get_idle_timeout().count(), 1000);
+
+  {
+    auto client3 = create_client();
+    client3->set_keep_alive(false);
+
+    Response final_response = client3->execute("echo", Value("final"));
+    BOOST_CHECK(!final_response.is_fault());
+    BOOST_CHECK_EQUAL(final_response.value().get_string(), "final");
+  }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 //=============================================================================
