@@ -12,6 +12,7 @@ Requirements: Python 3.6+ (uses standard library only)
 """
 
 import argparse
+import http.client
 import json
 import sys
 import threading
@@ -19,6 +20,51 @@ import time
 import xmlrpc.client
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, NamedTuple
+
+
+class KeepAliveTransport(xmlrpc.client.Transport):
+    """
+    HTTP Transport with keep-alive connection reuse.
+
+    Standard xmlrpc.client.Transport creates a new connection per request.
+    This transport maintains a persistent connection for the lifetime of
+    the transport object, significantly reducing connection overhead.
+    """
+
+    def __init__(self, host: str, port: int):
+        super().__init__()
+        self._host = host
+        self._port = port
+        self._conn = None
+
+    def make_connection(self, host):
+        """Return a persistent HTTP connection."""
+        if self._conn is None:
+            self._conn = http.client.HTTPConnection(
+                self._host, self._port,
+                timeout=30
+            )
+        return self._conn
+
+    def send_content(self, connection, request_body):
+        """Send content with keep-alive header."""
+        connection.putheader("Connection", "keep-alive")
+        super().send_content(connection, request_body)
+
+    def close(self):
+        """Close the persistent connection."""
+        if self._conn:
+            self._conn.close()
+            self._conn = None
+
+    def single_request(self, host, handler, request_body, verbose=False):
+        """Override to handle connection errors and reconnect."""
+        try:
+            return super().single_request(host, handler, request_body, verbose)
+        except (http.client.RemoteDisconnected, ConnectionError, OSError):
+            # Server closed connection, reconnect
+            self.close()
+            return super().single_request(host, handler, request_body, verbose)
 
 
 class BenchmarkResult(NamedTuple):
@@ -77,20 +123,27 @@ def run_benchmark(
         """Worker thread that makes RPC calls and measures latency."""
         nonlocal errors
         local_latencies: List[float] = []
-        proxy = xmlrpc.client.ServerProxy(url)
 
-        for _ in range(requests_per_worker):
-            try:
-                start = time.perf_counter_ns()
-                getattr(proxy, method)(payload)
-                end = time.perf_counter_ns()
-                if not is_warmup:
-                    local_latencies.append(end - start)
-            except Exception as e:
-                with errors_lock:
-                    errors += 1
-                if not is_warmup and errors <= 3:
-                    print(f"Error: {e}", file=sys.stderr)
+        # Use keep-alive transport for connection reuse within this worker
+        transport = KeepAliveTransport(host, port)
+        proxy = xmlrpc.client.ServerProxy(url, transport=transport)
+
+        try:
+            for _ in range(requests_per_worker):
+                try:
+                    start = time.perf_counter_ns()
+                    getattr(proxy, method)(payload)
+                    end = time.perf_counter_ns()
+                    if not is_warmup:
+                        local_latencies.append(end - start)
+                except Exception as e:
+                    with errors_lock:
+                        errors += 1
+                        should_log = not is_warmup and errors <= 3
+                    if should_log:
+                        print(f"Error: {type(e).__name__}: {e}", file=sys.stderr)
+        finally:
+            transport.close()
 
         return local_latencies
 
@@ -101,8 +154,9 @@ def run_benchmark(
             list(executor.map(lambda _: worker(warmup_per_client, is_warmup=True),
                               range(num_clients)))
 
-    # Reset errors after warmup
-    errors = 0
+    # Reset errors after warmup (use lock for thread safety consistency)
+    with errors_lock:
+        errors = 0
 
     # Calculate requests per client
     requests_per_client = num_requests // num_clients
