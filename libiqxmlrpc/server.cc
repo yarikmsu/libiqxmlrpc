@@ -207,10 +207,11 @@ void Server::unregister_connection(Server_connection* conn)
     fw->release(conn->get_peer_addr());
   }
 
-  // PERFORMANCE: Only track connections when idle timeout is enabled.
-  if (impl->idle_timeout_ms.load(std::memory_order_relaxed) <= 0)
-    return;
-
+  // SAFETY: Always remove from connections set to prevent dangling pointers.
+  // Even if idle_timeout is currently disabled, this connection might have been
+  // registered when it was enabled. Skipping removal would leave a dangling
+  // pointer that causes UAF if timeout is later re-enabled.
+  // Note: erase() is safe even if conn is not in the set (no-op).
   std::lock_guard<std::mutex> lock(impl->connections_mutex);
   impl->connections.erase(conn);
 }
