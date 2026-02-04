@@ -176,6 +176,9 @@ void Server::set_auth_plugin( const Auth_Plugin_base& ap )
 
 void Server::set_idle_timeout(std::chrono::milliseconds timeout)
 {
+  // Note: Only connections opened AFTER this call will be tracked for idle timeout.
+  // Existing connections are not retroactively added to the tracking set.
+  // Call this method before starting the server for consistent behavior.
   impl->idle_timeout_ms = timeout.count();
 }
 
@@ -186,6 +189,12 @@ std::chrono::milliseconds Server::get_idle_timeout() const
 
 void Server::register_connection(Server_connection* conn)
 {
+  // PERFORMANCE: Only track connections when idle timeout is enabled.
+  // Connection tracking requires mutex lock on every connection open/close,
+  // which creates significant contention under high load. Skip when not needed.
+  if (impl->idle_timeout_ms.load(std::memory_order_relaxed) <= 0)
+    return;
+
   std::lock_guard<std::mutex> lock(impl->connections_mutex);
   impl->connections.insert(conn);
 }
@@ -197,6 +206,10 @@ void Server::unregister_connection(Server_connection* conn)
   if (fw) {
     fw->release(conn->get_peer_addr());
   }
+
+  // PERFORMANCE: Only track connections when idle timeout is enabled.
+  if (impl->idle_timeout_ms.load(std::memory_order_relaxed) <= 0)
+    return;
 
   std::lock_guard<std::mutex> lock(impl->connections_mutex);
   impl->connections.erase(conn);
