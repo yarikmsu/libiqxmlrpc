@@ -161,6 +161,12 @@ int main(int argc, char** argv) {
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
 
+    // SECURITY: Warn when binding to all interfaces (no authentication)
+    if (config.bind_addr == "0.0.0.0") {
+      std::cerr << "WARNING: Binding to all interfaces with no authentication.\n";
+      std::cerr << "         Only use in trusted networks.\n\n";
+    }
+
     if (!config.quiet) {
       std::cout << "=== libiqxmlrpc Benchmark Server ===\n";
       std::cout << "Bind:        " << config.bind_addr << "\n";

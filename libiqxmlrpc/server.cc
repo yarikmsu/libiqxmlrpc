@@ -179,7 +179,9 @@ void Server::set_idle_timeout(std::chrono::milliseconds timeout)
   // Note: Only connections opened AFTER this call will be tracked for idle timeout.
   // Existing connections are not retroactively added to the tracking set.
   // Call this method before starting the server for consistent behavior.
-  impl->idle_timeout_ms = timeout.count();
+  // Use release ordering to synchronize with acquire loads in register_connection()
+  // and check_idle_timeouts().
+  impl->idle_timeout_ms.store(timeout.count(), std::memory_order_release);
 }
 
 std::chrono::milliseconds Server::get_idle_timeout() const
@@ -335,7 +337,8 @@ void Server::set_firewall( iqnet::Firewall_base* _firewall )
 
 void Server::check_idle_timeouts()
 {
-  const auto timeout_ms = impl->idle_timeout_ms.load();
+  // Use acquire to synchronize with release store in set_idle_timeout()
+  const auto timeout_ms = impl->idle_timeout_ms.load(std::memory_order_acquire);
   if (timeout_ms <= 0)
     return;
 
@@ -352,12 +355,16 @@ void Server::check_idle_timeouts()
                  });
   }
 
-  // Terminate expired connections (outside lock)
+  // Terminate expired connections (outside lock).
+  // Use try_claim_for_termination() to prevent TOCTOU race: a connection
+  // that was idle during the scan above may have received data since then.
   for (auto* conn : expired)
   {
-    log_err_msg("Connection idle timeout expired for " +
-                conn->get_peer_addr().get_host_name());
-    conn->terminate_idle();
+    if (conn->try_claim_for_termination()) {
+      log_err_msg("Connection idle timeout expired for " +
+                  conn->get_peer_addr().get_host_name());
+      conn->terminate_idle();
+    }
   }
 }
 
