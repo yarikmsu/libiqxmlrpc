@@ -192,7 +192,9 @@ void Server::register_connection(Server_connection* conn)
   // PERFORMANCE: Only track connections when idle timeout is enabled.
   // Connection tracking requires mutex lock on every connection open/close,
   // which creates significant contention under high load. Skip when not needed.
-  if (impl->idle_timeout_ms.load(std::memory_order_relaxed) <= 0)
+  // Use acquire to synchronize with set_idle_timeout() store, ensuring
+  // connections opened after set_idle_timeout() see the updated value.
+  if (impl->idle_timeout_ms.load(std::memory_order_acquire) <= 0)
     return;
 
   std::lock_guard<std::mutex> lock(impl->connections_mutex);
