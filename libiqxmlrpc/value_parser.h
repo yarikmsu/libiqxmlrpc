@@ -40,6 +40,10 @@ private:
   void
   do_visit_text(const std::string&) override;
 
+  //! Move version for efficient text handling.
+  void
+  do_visit_text(std::string&&) override;
+
   StateMachine state_;
 };
 

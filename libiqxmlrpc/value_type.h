@@ -116,6 +116,10 @@ protected:
 
 public:
   explicit Scalar( const T& t ): Value_type(ScalarTypeTag<T>::value), value_(t) {}
+  //! Move constructor for efficient construction from rvalues (e.g., parsed text).
+  //! Marked noexcept when T's move is noexcept (enables vector optimizations).
+  explicit Scalar( T&& t ) noexcept(std::is_nothrow_move_constructible_v<T>)
+    : Value_type(ScalarTypeTag<T>::value), value_(std::move(t)) {}
   Scalar<T>* clone() const override { return new Scalar<T>(value_); }
 
   void apply_visitor(Value_type_visitor&) const override;

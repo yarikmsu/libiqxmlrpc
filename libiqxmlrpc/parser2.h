@@ -35,6 +35,10 @@ public:
   void
   visit_text(const std::string&);
 
+  //! Move version for efficiency when text data is a temporary.
+  void
+  visit_text(std::string&&);
+
   bool
   expects_text() const
   {
@@ -80,6 +84,10 @@ protected:
 
   virtual void
   do_visit_text(const std::string&);
+
+  //! Move version for efficient text handling. Default forwards to const-ref version.
+  virtual void
+  do_visit_text(std::string&&);
 
   Parser& parser_;
   int depth_;
