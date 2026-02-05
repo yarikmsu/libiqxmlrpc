@@ -35,6 +35,10 @@ public:
   const std::string& get_name()   const { return name; }
   const Param_list&  get_params() const { return params; }
 
+  //! Move params out of the request. After this, get_params() returns empty.
+  //! The request should not be used after calling this method.
+  [[nodiscard]] Param_list take_params() { return std::move(params); }
+
 private:
   std::string name;
   Param_list  params;

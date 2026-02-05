@@ -285,7 +285,8 @@ void Server::schedule_execute( http::Packet* pkt, Server_connection* conn )
 
     executor = impl->exec_factory->create( meth, this, conn );
     executor->set_interceptors(impl->interceptors.get());
-    executor->execute( req->get_params() );
+    // PERFORMANCE: Move params to avoid cloning all Values
+    executor->execute( req->take_params() );
   }
   catch( const iqxmlrpc::http::Error_response& e )
   {

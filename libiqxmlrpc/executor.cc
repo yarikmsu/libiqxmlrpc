@@ -242,6 +242,14 @@ void Pool_executor::execute( const Param_list& params_ )
 }
 
 
+void Pool_executor::execute( Param_list&& params_ )
+{
+  // PERFORMANCE: Move params to avoid cloning all Values
+  params = std::move(params_);
+  pool->register_executor( this );
+}
+
+
 void Pool_executor::process_actual_execution()
 {
   try {

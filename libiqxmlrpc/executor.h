@@ -66,6 +66,11 @@ public:
   //! Start method execution.
   virtual void execute( const Param_list& params ) = 0;
 
+  //! Start method execution (move version for efficiency).
+  //! Default forwards to const-ref version. Pool_executor overrides to move params.
+  //! Serial_executor uses default since it processes immediately (no storage needed).
+  virtual void execute( Param_list&& params ) { execute(params); }
+
 protected:
   void schedule_response( const Response& );
   void interrupt_server();
@@ -122,6 +127,7 @@ public:
   Pool_executor& operator=(const Pool_executor&) = delete;
 
   void execute( const Param_list& ) override;
+  void execute( Param_list&& ) override;
   void process_actual_execution();
 };
 
