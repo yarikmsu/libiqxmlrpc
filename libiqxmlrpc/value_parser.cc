@@ -80,7 +80,8 @@ private:
         throw XML_RPC_violation(parser_.context());
       }
 
-      proxy_->insert(name_, std::make_unique<Value>(value_.release()));
+      // PERFORMANCE: Use rvalue overload to move instead of clone
+      proxy_->insert(name_, Value(value_.release()));
       state_.set_state(NONE);
     }
   }
@@ -127,7 +128,8 @@ private:
       if (!tmp) {
         tmp = std::make_unique<String>("");
       }
-      proxy_->push_back(std::make_unique<Value>(tmp.release()));
+      // PERFORMANCE: Use rvalue overload to move instead of clone
+      proxy_->push_back(Value(tmp.release()));
     }
   }
 
