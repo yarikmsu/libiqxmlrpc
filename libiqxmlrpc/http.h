@@ -198,6 +198,8 @@ protected:
 
 public:
   Packet( http::Header* header, const std::string& content );
+  //! Move-enabled constructor for efficient response creation.
+  Packet( http::Header* header, std::string&& content );
   virtual ~Packet();
 
   //! Sets header option "connection: {keep-alive|close}".

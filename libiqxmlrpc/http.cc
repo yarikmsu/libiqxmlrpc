@@ -652,6 +652,13 @@ Packet::Packet( Header* h, const std::string& co ):
   header_->set_content_length(content_.length());
 }
 
+Packet::Packet( Header* h, std::string&& co ):
+  header_(h),
+  content_(std::move(co))
+{
+  header_->set_content_length(content_.length());
+}
+
 Packet::~Packet() = default;
 
 void Packet::set_keep_alive( bool keep_alive )
