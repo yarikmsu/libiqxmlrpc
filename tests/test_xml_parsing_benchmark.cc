@@ -748,6 +748,83 @@ void benchmark_type_checking() {
 }
 
 // ============================================================================
+// Section 11: Value Copy vs Move (Regression Guard)
+// ============================================================================
+// This section tests the difference between copy and move semantics for Value.
+// The key insight: Value's copy constructor clones (v.value->clone()), while
+// the move constructor just transfers the pointer.
+//
+// The parse_response_array_* and parse_response_struct_* benchmarks above
+// are the primary regression guards for the move semantics optimization in
+// value_parser.cc. This section provides additional micro-benchmarks.
+
+void benchmark_value_copy_vs_move() {
+  section("Value Copy vs Move (Regression Guard)");
+
+  const size_t ITERS = 100000;
+
+  // Create a complex value to make copy cost visible
+  Struct complex_struct;
+  for (int i = 0; i < 20; ++i) {
+    complex_struct.insert("field" + std::to_string(i),
+                          "value_" + std::to_string(i) + "_with_some_data");
+  }
+  Value complex_val(complex_struct);
+
+  // Benchmark: Copy a complex Value (triggers clone())
+  PERF_BENCHMARK("value_copy_complex", ITERS, {
+    Value copy(complex_val);  // Copy constructor: v.value->clone()
+    do_not_optimize(&copy);
+  });
+
+  // Benchmark: Move a complex Value (just pointer transfer)
+  PERF_BENCHMARK("value_move_complex", ITERS, {
+    Value temp(complex_struct);  // Create a temp to move from
+    Value moved(std::move(temp));  // Move constructor: pointer transfer
+    do_not_optimize(&moved);
+  });
+
+  // Array with copy insertion (const Value& overload)
+  PERF_BENCHMARK("array_push_back_copy", ITERS / 10, {
+    Array arr;
+    for (int j = 0; j < 50; ++j) {
+      Value v(j);
+      arr.push_back(v);  // const Value& -> new Value(v) -> clone
+    }
+    do_not_optimize(&arr);
+  });
+
+  // Array with move insertion (Value&& overload)
+  PERF_BENCHMARK("array_push_back_move", ITERS / 10, {
+    Array arr;
+    for (int j = 0; j < 50; ++j) {
+      arr.push_back(Value(j));  // Value&& -> new Value(std::move(v))
+    }
+    do_not_optimize(&arr);
+  });
+
+  // Struct with copy insertion
+  PERF_BENCHMARK("struct_insert_copy", ITERS / 10, {
+    Struct s;
+    for (int j = 0; j < 50; ++j) {
+      Value v("value" + std::to_string(j));
+      s.insert("field" + std::to_string(j), v);  // const Value& -> clone
+    }
+    do_not_optimize(&s);
+  });
+
+  // Struct with move insertion
+  PERF_BENCHMARK("struct_insert_move", ITERS / 10, {
+    Struct s;
+    for (int j = 0; j < 50; ++j) {
+      s.insert("field" + std::to_string(j),
+               Value("value" + std::to_string(j)));  // Value&& -> move
+    }
+    do_not_optimize(&s);
+  });
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 
@@ -766,6 +843,7 @@ int main() {
   benchmark_value_allocation();
   benchmark_container_access();
   benchmark_type_checking();
+  benchmark_value_copy_vs_move();
 
   std::cout << "\n============================================================\n";
   return 0;
