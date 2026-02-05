@@ -147,6 +147,34 @@ BOOST_AUTO_TEST_CASE(request_roundtrip)
     BOOST_CHECK_EQUAL(parsed->get_params()[2].get_bool(), true);
 }
 
+BOOST_AUTO_TEST_CASE(request_take_params_moves)
+{
+    // Test that take_params() moves params out of request
+    Param_list params;
+    params.emplace_back(42);
+    params.emplace_back("hello");
+
+    Struct s;
+    s.insert("key", Value("value"));
+    params.emplace_back(s);
+
+    Request req("test.method", params);
+    BOOST_CHECK_EQUAL(req.get_params().size(), 3u);
+
+    // take_params() should move the params out
+    Param_list taken = req.take_params();
+
+    // Taken params should have the values
+    BOOST_CHECK_EQUAL(taken.size(), 3u);
+    BOOST_CHECK_EQUAL(taken[0].get_int(), 42);
+    BOOST_CHECK_EQUAL(taken[1].get_string(), "hello");
+    BOOST_CHECK(taken[2].is_struct());
+    BOOST_CHECK_EQUAL(taken[2]["key"].get_string(), "value");
+
+    // Original request params should now be empty (moved-from state)
+    BOOST_CHECK(req.get_params().empty());
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE(response_tests)
