@@ -53,6 +53,7 @@ Note: Benchmark CI detects performance regressions >20% by comparing PR against 
 | Coding standards | `docs/CODING_STANDARDS.md` |
 | Testing & coverage | `docs/COVERAGE_GUIDE.md` |
 | Performance rules | `docs/PERFORMANCE_GUIDE.md` |
+| Optimization history | `docs/PERFORMANCE_OPTIMIZATION_LOG.md` |
 | SSL/HTTPS testing | `docs/SSL_TESTING.md` |
 | Debugging tips | `docs/DEBUGGING.md` |
 | Coverity Scan setup | `docs/COVERITY_SETUP.md` |
