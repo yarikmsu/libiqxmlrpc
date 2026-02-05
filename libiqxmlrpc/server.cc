@@ -321,7 +321,7 @@ void Server::schedule_response(
 {
   std::unique_ptr<Executor> executor_to_delete(exec);
   std::string resp_str = dump_response(resp);
-  auto *packet = new http::Packet(new http::Response_header(), resp_str);
+  auto *packet = new http::Packet(new http::Response_header(), std::move(resp_str));
   conn->schedule_response( packet );
 }
 
