@@ -99,6 +99,12 @@ BuilderBase::visit_text(const std::string& text)
 }
 
 void
+BuilderBase::visit_text(std::string&& text)
+{
+  do_visit_text(std::move(text));
+}
+
+void
 BuilderBase::do_visit_element_end(const std::string&)
 {
 }
@@ -110,6 +116,13 @@ BuilderBase::do_visit_text(const std::string&)
     // proper handler was not implemented
     throw XML_RPC_violation(parser_.context());
   }
+}
+
+void
+BuilderBase::do_visit_text(std::string&& text)
+{
+  // Default: forward to const-ref version
+  do_visit_text(static_cast<const std::string&>(text));
 }
 
 //
@@ -275,6 +288,8 @@ Parser::parse(BuilderBase& builder)
       builder.visit_element_end(impl_->tag_name());
 
     } else if (p.is_text && builder.expects_text()) {
+      // PERFORMANCE: get_data() returns by value (temporary rvalue) -
+      // the move overload of visit_text is selected automatically.
       builder.visit_text(get_data());
     }
 

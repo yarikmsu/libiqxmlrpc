@@ -288,6 +288,56 @@ ValueBuilder::do_visit_text(const std::string& text)
   }
 }
 
+void
+ValueBuilder::do_visit_text(std::string&& text)
+{
+  // PERFORMANCE: Move version avoids copying text for String values.
+  // For other types (int, double, etc.), the text is only used for parsing.
+  // NOLINTNEXTLINE(bugprone-branch-clone) - branches create different types
+  switch (state_.get_state()) {
+  case VALUE:
+    want_exit();
+    [[fallthrough]];
+  case STRING:
+    // PERFORMANCE: Move the string to avoid copying
+    // NOLINTNEXTLINE(modernize-make-unique) performance-critical parsing path
+    retval.reset(new String(std::move(text)));
+    break;
+
+  case INT:
+    // NOLINTNEXTLINE(modernize-make-unique) performance-critical parsing path
+    retval.reset(new Int(num_conv::from_string<int>(text)));
+    break;
+
+  case INT64:
+    // NOLINTNEXTLINE(modernize-make-unique) performance-critical parsing path
+    retval.reset(new Int64(num_conv::from_string<int64_t>(text)));
+    break;
+
+  case BOOL:
+    // NOLINTNEXTLINE(modernize-make-unique) performance-critical parsing path
+    retval.reset(new Bool(num_conv::from_string<int>(text) != 0));
+    break;
+
+  case DOUBLE:
+    // NOLINTNEXTLINE(modernize-make-unique) performance-critical parsing path
+    retval.reset(new Double(num_conv::string_to_double(text)));
+    break;
+
+  case BINARY:
+    retval.reset(Binary_data::from_base64(text));
+    break;
+
+  case TIME:
+    // NOLINTNEXTLINE(modernize-make-unique) performance-critical parsing path
+    retval.reset(new Date_time(text));
+    break;
+
+  default:
+    throw XML_RPC_violation(parser_.context());
+  }
+}
+
 } // namespace iqxmlrpc
 
 // vim:sw=2:ts=2:et:
