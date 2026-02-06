@@ -635,7 +635,7 @@ std::string Response_header::current_date()
     return fallback();
   }
 
-  if (now == s_cached_time) {
+  if (now <= s_cached_time) {
     return s_cached_date;
   }
 
