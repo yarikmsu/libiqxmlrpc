@@ -13,6 +13,8 @@ namespace iqxmlrpc {
 
 namespace {
 
+// Construct std::string from allocated xmlChar*, then free the xml memory.
+// Use for libxml2 functions that return allocated strings (e.g., xmlGetNodePath).
 inline std::string
 to_string(xmlChar* s)
 {
@@ -144,7 +146,13 @@ public:
 #define XML_PARSE_HUGE 0
 #endif
     reader = xmlReaderForMemory(buf2, sz, nullptr, nullptr, XML_PARSE_NONET | XML_PARSE_HUGE);
-    xmlTextReaderSetParserProp(reader, XML_PARSER_SUBST_ENTITIES, 0); // No XXE
+    if (!reader) {
+      throw Parse_error("Failed to create XML reader");
+    }
+    if (xmlTextReaderSetParserProp(reader, XML_PARSER_SUBST_ENTITIES, 0) < 0) {
+      xmlFreeTextReader(reader);
+      throw Parse_error("Failed to disable XML entity substitution (XXE protection)");
+    }
   }
 
   Impl(const Impl&) = delete;
@@ -226,7 +234,12 @@ public:
   std::string
   tag_name()
   {
-    std::string rv = to_string(xmlTextReaderName(reader));
+    // ConstName returns a dictionary-interned pointer, valid for the reader's lifetime.
+    const xmlChar* name = xmlTextReaderConstName(reader);
+    if (!name) {
+      throw Parse_error("xmlTextReaderConstName returned NULL on element node");
+    }
+    std::string rv(reinterpret_cast<const char*>(name));
 
     // Strip namespace prefix (e.g., "ns:element" -> "element")
     // Only strip if there's content after the colon (guards against "element:")
@@ -250,7 +263,16 @@ public:
         throw XML_RPC_violation(err);
       }
     }
-    return to_string(xmlTextReaderValue(reader));
+    // ConstValue returns an internal buffer pointer, valid until next xmlTextReaderRead().
+    if (curr.is_text) {
+      const xmlChar* val = xmlTextReaderConstValue(reader);
+      if (!val) {
+        throw Parse_error("xmlTextReaderConstValue returned NULL on text node");
+      }
+      return std::string(reinterpret_cast<const char*>(val));
+    }
+    // element_end: no text value expected, return empty string
+    return std::string();
   }
 
   std::string
