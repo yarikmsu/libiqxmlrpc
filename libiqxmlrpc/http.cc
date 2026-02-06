@@ -610,18 +610,56 @@ Response_header::Response_header( int c, const std::string& p ):
 
 std::string Response_header::current_date()
 {
-  // Use strftime directly instead of boost::posix_time + locale/facet
-  // This avoids expensive std::locale construction (~10μs -> ~100ns)
+  // Cache the formatted date string. The IMF-fixdate format (RFC 9110,
+  // Section 5.6.7) has second-level resolution, so the string is identical
+  // within the same wall-clock second. We use strftime directly (not
+  // boost::posix_time) to avoid expensive std::locale construction.
+  static std::mutex s_mutex;
+  static bool s_cache_valid{false};
+  static std::time_t s_cached_time{};
+  static std::string s_cached_date;
+
+  std::lock_guard<std::mutex> lock(s_mutex);
   std::time_t now = std::time(nullptr);
+
+  // Fallback for time/formatting failures: return cached value or epoch string.
+  auto fallback = [&]() -> std::string {
+    if (s_cached_date.empty())
+      s_cached_date = "Thu, 01 Jan 1970 00:00:00 GMT";
+    return s_cached_date;
+  };
+
+  if (now == static_cast<time_t>(-1)) {
+    return fallback();
+  }
+
+  if (s_cache_valid && now == s_cached_time) {
+    return s_cached_date;
+  }
+
   std::tm gmt{};
 #ifdef _WIN32
-  gmtime_s(&gmt, &now);
+  bool gmt_ok = (gmtime_s(&gmt, &now) == 0);
 #else
-  gmtime_r(&now, &gmt);
+  bool gmt_ok = (gmtime_r(&now, &gmt) != nullptr);
 #endif
-  char buf[30];  // "Fri, 10 Jan 2026 12:30:45 GMT" = 29 chars + null
+  if (!gmt_ok) {
+    return fallback();
+  }
+
+  // "Fri, 10 Jan 2026 12:30:45 GMT" = 29 chars + null (4-digit year).
+  // 5+ digit years exceed the buffer; strftime returns 0, hitting fallback.
+  char buf[30];
   size_t len = std::strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S GMT", &gmt);
-  return std::string(buf, len);
+
+  if (len == 0) {
+    return fallback();
+  }
+
+  s_cached_date.assign(buf, len);
+  s_cached_time = now;
+  s_cache_valid = true;
+  return s_cached_date;
 }
 
 std::string Response_header::dump_head() const
