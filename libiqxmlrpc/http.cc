@@ -17,6 +17,7 @@
 #include <cstring>
 #include <ctime>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <sstream>
@@ -610,18 +611,54 @@ Response_header::Response_header( int c, const std::string& p ):
 
 std::string Response_header::current_date()
 {
-  // Use strftime directly instead of boost::posix_time + locale/facet
-  // This avoids expensive std::locale construction (~10μs -> ~100ns)
+  // Cache the formatted date string. The HTTP-date format (RFC 9110,
+  // Section 5.6.7) has second-level granularity, so the formatted string is
+  // identical within the same second. We use strftime directly (not
+  // boost::posix_time) to avoid expensive std::locale construction.
+  static std::mutex s_mutex;
+  static std::time_t s_cached_time{std::numeric_limits<time_t>::min()};
+  static std::string s_cached_date;
+
   std::time_t now = std::time(nullptr);
+  std::lock_guard<std::mutex> lock(s_mutex);
+
+  // Fallback for time/formatting failures: return cached value or epoch string.
+  auto fallback = [&]() -> std::string {
+    if (!s_cached_date.empty())
+      return s_cached_date;
+    s_cached_date = "Thu, 01 Jan 1970 00:00:00 GMT";
+    s_cached_time = std::numeric_limits<time_t>::min();
+    return s_cached_date;
+  };
+
+  if (now == static_cast<time_t>(-1)) {
+    return fallback();
+  }
+
+  if (now == s_cached_time) {
+    return s_cached_date;
+  }
+
   std::tm gmt{};
 #ifdef _WIN32
-  gmtime_s(&gmt, &now);
+  bool gmt_ok = (gmtime_s(&gmt, &now) == 0);
 #else
-  gmtime_r(&now, &gmt);
+  bool gmt_ok = (gmtime_r(&now, &gmt) != nullptr);
 #endif
-  char buf[30];  // "Fri, 10 Jan 2026 12:30:45 GMT" = 29 chars + null
+  if (!gmt_ok) {
+    return fallback();
+  }
+
+  char buf[30];  // "Fri, 10 Jan 2026 12:30:45 GMT" = 29 chars + null (4-digit year)
   size_t len = std::strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S GMT", &gmt);
-  return std::string(buf, len);
+
+  if (len == 0) {
+    return fallback();
+  }
+
+  s_cached_date.assign(buf, len);
+  s_cached_time = now;
+  return s_cached_date;
 }
 
 std::string Response_header::dump_head() const
