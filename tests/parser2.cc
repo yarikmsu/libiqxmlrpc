@@ -562,4 +562,56 @@ BOOST_AUTO_TEST_CASE(test_max_parse_depth_constant)
   BOOST_CHECK_EQUAL(BuilderBase::MAX_PARSE_DEPTH, 32); // Current default
 }
 
+//
+// xmlTextReaderConst* optimization tests (PR #216)
+// These tests exercise the code paths changed when switching from
+// xmlTextReaderName/Value to xmlTextReaderConstName/ConstValue.
+//
+
+BOOST_AUTO_TEST_CASE(test_parse_namespaced_elements)
+{
+  // xmlTextReaderConstName returns the full qualified name including prefix.
+  // tag_name() strips the namespace prefix via find(':') + erase().
+  // Verify this works correctly with the ConstName API.
+
+  // Single namespace prefix (declared via xmlns)
+  Value v1 = parse_value("<ns:int xmlns:ns='urn:test'>42</ns:int>");
+  BOOST_CHECK_EQUAL(v1.get_int(), 42);
+
+  // Nested elements with namespace prefixes
+  Value v2 = parse_value(
+    "<ns:struct xmlns:ns='urn:test'>"
+      "<ns:member><ns:name>key</ns:name><ns:value><ns:string>val</ns:string></ns:value></ns:member>"
+    "</ns:struct>");
+  BOOST_CHECK(v2.is_struct());
+  BOOST_CHECK_EQUAL(v2["key"].get_string(), "val");
+}
+
+BOOST_AUTO_TEST_CASE(test_parse_text_content_varieties)
+{
+  // Exercise xmlTextReaderConstValue with content types not covered by test_parse_scalar.
+
+  // XML entities (decoded by libxml2 before ConstValue returns)
+  BOOST_CHECK_EQUAL(parse_value("<string>a &amp; b &lt; c</string>").get_string(), "a & b < c");
+
+  // Multi-byte UTF-8
+  BOOST_CHECK_EQUAL(parse_value("<string>\xC3\xA9\xC3\xA0\xC3\xBC</string>").get_string(), "\xC3\xA9\xC3\xA0\xC3\xBC");
+}
+
+BOOST_AUTO_TEST_CASE(test_parse_empty_input_throws)
+{
+  // Empty string creates a valid XML reader (xmlReaderForMemory returns
+  // non-NULL), but parsing fails because there's no valid XML content.
+  BOOST_CHECK_THROW(parse_value(""), Parse_error);
+}
+
+BOOST_AUTO_TEST_CASE(test_parse_large_text_content)
+{
+  // Exercise xmlTextReaderConstValue with larger text content.
+  // The internal buffer pointer must remain valid until we copy to std::string.
+  std::string large_text(10000, 'x');
+  std::string xml = "<string>" + large_text + "</string>";
+  BOOST_CHECK_EQUAL(parse_value(xml).get_string(), large_text);
+}
+
 // vim:ts=2:sw=2:et
