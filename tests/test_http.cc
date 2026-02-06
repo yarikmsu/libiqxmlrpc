@@ -1,5 +1,8 @@
 #define BOOST_TEST_MODULE http_test
+#include <atomic>
 #include <memory>
+#include <thread>
+#include <vector>
 #include <boost/test/test_tools.hpp>
 #include <boost/test/unit_test.hpp>
 #include "libiqxmlrpc/http.h"
@@ -542,6 +545,66 @@ BOOST_AUTO_TEST_CASE(response_header_date_format)
     // Date should be in RFC format: "Thu, 01 Jan 2026 00:00:00 GMT"
     BOOST_CHECK(dump.find("date:") != std::string::npos);
     BOOST_CHECK(dump.find("GMT") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(response_header_date_caching)
+{
+    // Two responses created within the same second must produce identical
+    // Date headers. Guards against cache corruption in current_date().
+    auto extract_date = [](const std::string& dump) {
+        size_t pos = dump.find("date: ");
+        BOOST_REQUIRE_MESSAGE(pos != std::string::npos, "Date header not found");
+        size_t end = dump.find("\r\n", pos);
+        BOOST_REQUIRE_MESSAGE(end != std::string::npos, "No CRLF after date header");
+        return dump.substr(pos + 6, end - pos - 6);
+    };
+
+    // Retry once if we land on a second boundary
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        Response_header hdr1(200, "OK");
+        Response_header hdr2(200, "OK");
+
+        std::string date1 = extract_date(hdr1.dump());
+        std::string date2 = extract_date(hdr2.dump());
+        if (date1 == date2) {
+            BOOST_REQUIRE(!date1.empty());
+            return;
+        }
+    }
+    BOOST_FAIL("Could not get two responses in the same second after 2 attempts");
+}
+
+BOOST_AUTO_TEST_CASE(response_header_date_concurrent)
+{
+    // Verify current_date() cache is safe under concurrent access.
+    // Multiple threads create Response_headers simultaneously; all dates
+    // must not be corrupted (must still contain "date: " and "GMT" substrings).
+    constexpr int NUM_THREADS = 4;
+    constexpr int ITERS = 500;
+    std::atomic<bool> go{false};
+    std::atomic<int> valid{0};
+
+    auto worker = [&]() {
+        while (!go.load(std::memory_order_acquire)) {}
+        for (int i = 0; i < ITERS; ++i) {
+            Response_header hdr(200, "OK");
+            std::string dump = hdr.dump();
+            if (dump.find("date: ") != std::string::npos &&
+                dump.find("GMT") != std::string::npos) {
+                valid.fetch_add(1, std::memory_order_relaxed);
+            }
+        }
+    };
+
+    std::vector<std::thread> threads;
+    threads.reserve(NUM_THREADS);
+    for (int i = 0; i < NUM_THREADS; ++i)
+        threads.emplace_back(worker);
+
+    go.store(true, std::memory_order_release);
+    for (auto& t : threads) t.join();
+
+    BOOST_CHECK_EQUAL(valid.load(), NUM_THREADS * ITERS);
 }
 
 BOOST_AUTO_TEST_CASE(request_header_with_query_string)
