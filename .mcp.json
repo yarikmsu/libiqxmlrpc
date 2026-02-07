@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "github": {
+      "type": "stdio",
+      "command": "gh",
+      "args": [
+        "extension",
+        "exec",
+        "github-mcp-server"
+      ],
+      "env": {}
+    },
+    "context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ],
+      "env": {}
+    }
+  }
+}

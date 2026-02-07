@@ -1,0 +1,101 @@
+---
+# Libiqxmlrpc code style
+# Matches existing codebase conventions:
+# - 2-space indentation
+# - Allman braces for function definitions, K&R for everything else
+# - Return type on its own line for top-level function definitions
+# - Constructor initializers: colon at end of line, one per line
+
+Language: Cpp
+Standard: c++17
+
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never
+ColumnLimit: 100
+
+# Brace style: functions get Allman, everything else gets K&R (attached)
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: false
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterFunction: true
+  AfterNamespace: false
+  AfterStruct: false
+  AfterUnion: false
+  AfterExternBlock: false
+  BeforeCatch: false
+  BeforeElse: false
+  BeforeLambdaBody: false
+  IndentBraces: false
+  SplitEmptyFunction: true
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: true
+
+# Return type on its own line for top-level definitions (matches existing style)
+AlwaysBreakAfterReturnType: TopLevelDefinitions
+
+# Constructor initializer lists: break after colon, one initializer per line
+BreakConstructorInitializers: AfterColon
+SpaceBeforeCtorInitializerColon: false
+ConstructorInitializerIndentWidth: 2
+PackConstructorInitializers: Never
+
+# Indentation
+AccessModifierOffset: -2
+IndentCaseLabels: true
+NamespaceIndentation: None
+IndentPPDirectives: None
+
+# Alignment
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignOperands: true
+AlignTrailingComments: true
+
+# Line breaks
+AllowShortBlocksOnASingleLine: Empty
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortLambdasOnASingleLine: Inline
+BinPackArguments: true
+BinPackParameters: true
+
+# Spaces
+SpaceAfterCStyleCast: false
+SpaceAfterLogicalNot: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens: ControlStatements
+SpaceInEmptyBlock: false
+SpaceInEmptyParentheses: false
+SpacesInAngles: false
+SpacesInCStyleCastParentheses: false
+SpacesInContainerLiterals: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+
+# Includes — preserve existing grouping and order
+SortIncludes: false
+IncludeBlocks: Preserve
+
+# Pointer/reference alignment
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+# Penalty tuning
+PenaltyBreakBeforeFirstCallParameter: 19
+PenaltyBreakComment: 300
+PenaltyBreakFirstLessLess: 120
+PenaltyBreakString: 1000
+PenaltyExcessCharacter: 1000000
+PenaltyReturnTypeOnItsOwnLine: 0
+
+# Misc
+FixNamespaceComments: false
+MaxEmptyLinesToKeep: 2
+ReflowComments: true
+...
