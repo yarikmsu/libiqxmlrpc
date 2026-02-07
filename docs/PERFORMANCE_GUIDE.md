@@ -115,12 +115,12 @@ The script:
 | Exception-free SSL I/O | ~850x per event | #62 |
 | TCP_NODELAY enabled | 40-400ms latency | #45 |
 | Copy-on-write handler list | 617x-5788x snapshot | #88 |
+| Lock-free thread pool queue | Eliminates mutex contention | — |
 
 ## Remaining Opportunities
 
 | Priority | Area | Recommendation |
 |----------|------|----------------|
-| Medium | Queue contention | Lock-free queue for thread pool |
 | Low | Vectored I/O | `writev` for header+body |
 | Low | String allocations | `std::string_view` in parser |
 

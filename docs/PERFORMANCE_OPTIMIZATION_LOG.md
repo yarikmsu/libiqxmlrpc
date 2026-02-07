@@ -164,7 +164,80 @@ The key insight is that `Value(tmp.release())` creates a temporary (rvalue) whic
 
 ## Future Optimization Opportunities
 
-### High Impact, High Effort
+### Recommended Path to +30% RPS (Without Replacing libxml2)
+
+Profiling shows 100% of CPU is inside libxml2: 77% parsing, 23% serialization. Two
+optimizations stack to an estimated +30-35% RPS improvement while keeping libxml2 for parsing.
+
+#### 1. Custom XML Serializer (+22-25% RPS)
+
+Replace `XmlBuilder` (libxml2 `xmlTextWriter`) with direct `std::string` building for response
+and request serialization. Keep libxml2 for parsing only.
+
+**Why it works:** XML-RPC output has a fixed vocabulary of ~18 tags. Generating it requires only
+`std::string::append()` for tags and a simple escape function for 3 characters (`<`, `>`, `&`).
+The full `xmlTextWriter` API is pure overhead:
+
+- `xmlEncodeSpecialChars` — 65% of serialization CPU (~15% total) — replaced by a trivial scan
+- `xmlStrlen` — 28% of serialization CPU (~6.5% total) — eliminated (we already know `std::string::size()`)
+- `xmlTextWriterWriteRawLen` — 7% of serialization CPU (~1.6% total) — replaced by `append()`
+
+**Approach:**
+
+- New `FastXmlWriter` class: `std::string` with `reserve(256)`, direct `append()` for tags
+- New `Value_type_to_xml` visitor (or template specialization) targeting `FastXmlWriter`
+- Custom `escape_xml()` scanning only for `<`, `>`, `&` in string content
+- `std::to_chars` for int/double (matches existing codebase patterns)
+- `dump_response()` / `dump_request()` select `FastXmlWriter` instead of `XmlBuilder`
+
+**Amdahl's law:** Serialization 5x faster → 23% CPU becomes ~5% → total 81.6/100 → **+22.5% RPS**
+
+**Risk:** Low. Existing roundtrip tests in `test_request_response.cc` (1377 lines) validate
+output correctness. `XmlBuilder` remains available as fallback.
+
+#### 2. Reader Pooling with Rotation (+6-8% RPS, additive)
+
+Re-attempt thread-local `xmlTextReader` caching with a use counter: discard and recreate the
+reader every N parses (e.g., 10,000) to bound `xmlDict` memory growth.
+
+**Why it works:** Reuses the interned string dictionary (`xmlDict`) across parses, getting hash
+hits on the ~20 repeated XML-RPC tag names. Previously measured at +8% on parse microbenchmarks.
+
+**Why rotation solves the memory problem:**
+
+- Normal traffic: ~20 unique tags → steady state at ~500 bytes, never grows
+- Adversarial input: 10,000 × ~25 bytes/entry = 250KB worst case, then reader is discarded
+- The original attempt (reverted) had *unbounded* growth; rotation makes it O(N) bounded
+
+**Approach:**
+
+- `thread_local CachedReader` struct with use counter in `parser2.cc`
+- `Impl` constructor: try `xmlReaderNewMemory()` on cached reader, fallback to `xmlReaderForMemory()`
+- Increment counter on each use; when counter reaches N, set cached reader to null
+- Destructor returns reader to TLS cache (or frees if counter expired)
+- Re-apply XXE protection unconditionally (`xmlCtxtReset()` resets `replaceEntities` to 0)
+
+**Amdahl's law:** Stacked on serializer: parsing 77/1.08 = 71.3 + serialization 4.6 = 75.9/100 → **+31.8% RPS**
+
+**Risk:** Medium. `xmlDict` behavior is well-understood from prior attempt. Needs memory bound
+test to verify rotation works correctly.
+
+#### Combined Projection
+
+| Optimization | Mechanism | Est. Impact | Effort | Risk |
+|---|---|---|---|---|
+| Custom serializer | Bypass libxml2 `xmlTextWriter` | +22-25% | Medium (~150 LOC) | Low |
+| Reader pooling w/ rotation | Reuse `xmlTextReader`, discard every N uses | +6-8% | Medium (~50 LOC) | Medium |
+| **Combined** | | **+30-35%** | | |
+
+**Recommended order:** Custom serializer first (larger impact, lower risk, verifiable with
+existing roundtrip tests), then reader pooling (measured independently against new baseline).
+
+---
+
+### Other Opportunities
+
+#### High Impact, High Effort
 
 | Optimization | Est. Impact | Effort | Risk |
 |--------------|-------------|--------|------|
@@ -181,32 +254,13 @@ The key insight is that `Value(tmp.release())` creates a temporary (rvalue) whic
 - libxml2 provides better XML validation
 - libxml2 handles edge cases (DTD, namespaces) that simpler parsers may not
 
----
-
-### Medium Impact, Medium Effort
+#### Low Impact
 
 | Optimization | Est. Impact | Effort | Risk |
 |--------------|-------------|--------|------|
-| Response caching | Varies | Medium | Low |
-| Parser context pooling | +8% parse | Abandoned | xmlDict growth (see above) |
-| Custom string escaping | +5% | Medium | Medium |
-
-**Response caching:**
-- Cache serialized XML for repeated responses
-- Best for methods that return the same value frequently
-
-**Parser context pooling:**
-- Abandoned due to unbounded `xmlDict` growth (see "Attempted But Abandoned" above)
-- Viable only with periodic reader rotation (discard after N uses)
-
----
-
-### Low Impact, Low Effort
-
-| Optimization | Est. Impact | Effort | Risk |
-|--------------|-------------|--------|------|
-| String length hints | +1-2% | Low | Low |
-| Avoid unnecessary copies | Done | - | - |
+| Response caching | Varies by workload | Medium | Low |
+| Vectored I/O (`writev`) | <2% | Low | Low |
+| `string_view` in parser | <2% | Low | Low |
 
 ---
 
