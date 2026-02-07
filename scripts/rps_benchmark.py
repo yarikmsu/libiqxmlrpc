@@ -303,7 +303,14 @@ Examples:
         sys.exit(1)
 
     # Define payloads
-    small_payload = "x" * 100           # ~100 bytes
+    # Realistic smallest production payload: struct with auth + nested array
+    small_payload = {
+        "Username": "user",
+        "Password": "12345678",
+        "Server": "SERVER",
+        "Method": "Method_API",
+        "Params": [87654321],
+    }
     large_payload = "x" * (1024 * 1024)  # ~1MB
 
     # Determine request counts
