@@ -148,6 +148,20 @@ The key insight is that `Value(tmp.release())` creates a temporary (rvalue) whic
 
 ---
 
+### Thread-Local xmlTextReader Pooling
+
+**Hypothesis:** Cache one `xmlTextReader` per thread using `thread_local` storage. Reinitialize with `xmlReaderNewMemory()` instead of creating/destroying per parse. Preserves the interned string dictionary (`xmlDict`) across parses for hash hits on repeated tag names.
+
+**Implementation:** `CachedReader` struct in anonymous namespace, `Impl` constructor tries `xmlReaderNewMemory()` first with fallback to `xmlReaderForMemory()`. Destructor returns reader to TLS cache. XXE protection re-applied unconditionally.
+
+**Result:** +8% parse improvement on small payloads (C++ microbenchmark). No measurable RPS improvement (within noise).
+
+**Reason abandoned:** libxml2's `xmlDict` accumulates interned strings permanently across parses. `xmlCtxtReset()` does not clear the dictionary, and libxml2 provides no `xmlDictReset()` API — only `xmlDictFree()`, which destroys the reader. On long-lived server threads processing untrusted input, an attacker can send requests with unique element names to grow the dictionary without bound (~25 bytes per entry). While XML-RPC's fixed vocabulary (~20 tags) means normal traffic reaches steady state, the unbounded growth under adversarial input is a behavioral regression from the previous per-parse `xmlFreeTextReader()` approach.
+
+**Possible future approach:** Discard and recreate the cached reader after N uses (e.g., 10,000) to bound dictionary growth while preserving most of the pooling benefit.
+
+---
+
 ## Future Optimization Opportunities
 
 ### High Impact, High Effort
@@ -174,7 +188,7 @@ The key insight is that `Value(tmp.release())` creates a temporary (rvalue) whic
 | Optimization | Est. Impact | Effort | Risk |
 |--------------|-------------|--------|------|
 | Response caching | Varies | Medium | Low |
-| Parser context pooling | +5-10% | Medium | Low |
+| Parser context pooling | +8% parse | Abandoned | xmlDict growth (see above) |
 | Custom string escaping | +5% | Medium | Medium |
 
 **Response caching:**
@@ -182,8 +196,8 @@ The key insight is that `Value(tmp.release())` creates a temporary (rvalue) whic
 - Best for methods that return the same value frequently
 
 **Parser context pooling:**
-- Reuse `xmlTextReader` instances instead of creating new ones
-- Saves initialization overhead
+- Abandoned due to unbounded `xmlDict` growth (see "Attempted But Abandoned" above)
+- Viable only with periodic reader rotation (discard after N uses)
 
 ---
 

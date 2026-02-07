@@ -124,9 +124,35 @@ The script:
 | Low | Vectored I/O | `writev` for header+body |
 | Low | String allocations | `std::string_view` in parser |
 
+## RPS Benchmarking
+
+For end-to-end throughput measurement, use the RPS benchmark script:
+
+```bash
+# Start benchmark server
+./build_release/tests/benchmark-server --port 8091 --numthreads 4
+
+# Run RPS benchmark (in another terminal)
+python3 scripts/rps_benchmark.py --port 8091 --requests 5000 --clients 4
+```
+
+### Realistic Payloads
+
+Always use realistic production payloads for benchmarks. The `rps_benchmark.py` uses a struct
+matching the smallest real-world request pattern (auth credentials, server, method, params array).
+Synthetic string payloads (e.g., `"x" * 100`) do not reflect actual XML-RPC parsing costs.
+
+### C++ Microbenchmarks vs RPS
+
+- **C++ microbenchmarks** (`make perf-test`) isolate specific operations (parse, serialize). Variance: ±3%.
+- **RPS benchmarks** measure end-to-end throughput including HTTP, dispatch, network. Variance: ±10%.
+- Use C++ microbenchmarks for parser-level improvements; RPS for server-level changes.
+- Always run 3+ iterations and average results.
+
 ## Benchmarking Tools
 
 - **Built-in**: `make perf-test` (Boost.Test benchmarks)
+- **RPS**: `python3 scripts/rps_benchmark.py` (end-to-end throughput)
 - **Memory**: Valgrind/ASan for allocation tracking
 - **CPU**: `perf` on Linux, Instruments on macOS
 - **HTTP load**: `wrk` or `wrk2`
