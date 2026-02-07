@@ -114,12 +114,12 @@ The script:
 | Single-pass HTTP parsing | 2.9x-3.3x | #54 |
 | Exception-free SSL I/O | ~850x per event | #62 |
 | TCP_NODELAY enabled | 40-400ms latency | #45 |
+| Copy-on-write handler list | 617x-5788x snapshot | #88 |
 
 ## Remaining Opportunities
 
 | Priority | Area | Recommendation |
 |----------|------|----------------|
-| Medium | Handler list copy | Copy-on-write for high connection counts |
 | Medium | Queue contention | Lock-free queue for thread pool |
 | Low | Vectored I/O | `writev` for header+body |
 | Low | String allocations | `std::string_view` in parser |
