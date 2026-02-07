@@ -114,15 +114,17 @@ The script:
 | Single-pass HTTP parsing | 2.9x-3.3x | #54 |
 | Exception-free SSL I/O | ~850x per event | #62 |
 | TCP_NODELAY enabled | 40-400ms latency | #45 |
+| Copy-on-write handler list | 617x-5788x snapshot | #88 |
+| Lock-free thread pool queue | Eliminates mutex contention | — |
 
 ## Remaining Opportunities
 
 | Priority | Area | Recommendation |
 |----------|------|----------------|
-| Medium | Handler list copy | Copy-on-write for high connection counts |
-| Medium | Queue contention | Lock-free queue for thread pool |
-| Low | Vectored I/O | `writev` for header+body |
-| Low | String allocations | `std::string_view` in parser |
+| Medium | Serialization | Custom XML writer bypassing libxml2 `xmlTextWriter` |
+| Medium | Parse overhead | Reader pooling with rotation (discard every N uses) |
+
+See `docs/PERFORMANCE_OPTIMIZATION_LOG.md` § "Recommended Path to +30% RPS" for details.
 
 ## RPS Benchmarking
 
