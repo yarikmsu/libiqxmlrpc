@@ -259,8 +259,12 @@ existing roundtrip tests), then reader pooling (measured independently against n
 | Optimization | Est. Impact | Effort | Risk |
 |--------------|-------------|--------|------|
 | Response caching | Varies by workload | Medium | Low |
-| Vectored I/O (`writev`) | <2% | Low | Low |
-| `string_view` in parser | <2% | Low | Low |
+
+Note: `writev` for header+body (<2%) and `string_view` in parser (<2%) were removed.
+`writev` saves one concatenation of a ~200-byte header — negligible. `string_view` was
+already applied in HTTP parsing and number conversion; the XML parser copies from libxml2
+`const xmlChar*` pointers that are invalidated on each `xmlTextReaderRead()`, making
+`string_view` inapplicable there.
 
 ---
 

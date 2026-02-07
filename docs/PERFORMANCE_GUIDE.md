@@ -121,8 +121,10 @@ The script:
 
 | Priority | Area | Recommendation |
 |----------|------|----------------|
-| Low | Vectored I/O | `writev` for header+body |
-| Low | String allocations | `std::string_view` in parser |
+| Medium | Serialization | Custom XML writer bypassing libxml2 `xmlTextWriter` |
+| Medium | Parse overhead | Reader pooling with rotation (discard every N uses) |
+
+See `docs/PERFORMANCE_OPTIMIZATION_LOG.md` § "Recommended Path to +30% RPS" for details.
 
 ## RPS Benchmarking
 
