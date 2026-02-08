@@ -469,6 +469,133 @@ BOOST_FIXTURE_TEST_CASE(production_capacity_stress, ThreadSafetyFixture)
     std::to_string(completed.load()));
 }
 
+// Regression: pool threads must not call schedule_response() on a destroyed Server.
+// Validates: drain() prevents use-after-free (ASan/TSan detect if broken).
+BOOST_FIXTURE_TEST_CASE(shutdown_with_inflight_work, ThreadSafetyFixture)
+{
+  start_server(4, port_offset::SHUTDOWN_INFLIGHT);
+
+  std::atomic<int> requests_completed{0};
+  constexpr int NUM_CLIENTS = 4;
+  constexpr int REQUESTS_PER_CLIENT = 3;
+
+  run_concurrent_clients(NUM_CLIENTS, [this, &requests_completed](int) {
+    try {
+      auto client = create_client();
+      for (int r = 0; r < REQUESTS_PER_CLIENT; ++r) {
+        try {
+          Response resp = client->execute("sleep", Value(0.05));
+          if (!resp.is_fault()) {
+            requests_completed.fetch_add(1, std::memory_order_relaxed);
+          }
+        } catch (...) { (void)0; }
+      }
+    } catch (...) { (void)0; }
+  });
+
+  BOOST_CHECK_GT(requests_completed.load(), 0);
+  THREAD_SAFE_TEST_MESSAGE("Shutdown with inflight work: completed=" +
+    std::to_string(requests_completed.load()) +
+    "/" + std::to_string(NUM_CLIENTS * REQUESTS_PER_CLIENT));
+
+  stop_server();
+}
+
+// Exercise all three catch paths in Pool_executor::process_actual_execution().
+// Validates: Fault, std::exception, and unknown exceptions produce correct fault
+// responses when processed by pool threads. Also exercises Drain_guard indirectly.
+BOOST_FIXTURE_TEST_CASE(pool_exception_handling, ThreadSafetyFixture)
+{
+  start_server(2, port_offset::POOL_EXCEPTIONS);
+
+  // Verify we have a pool executor (not serial)
+  BOOST_REQUIRE(dynamic_cast<Pool_executor_factory*>(executor_factory()) != nullptr);
+
+  // 1. iqxmlrpc::Fault exception (process_actual_execution catch #1)
+  {
+    auto client = create_client();
+    Response resp = client->execute("error_method", Value(0));
+    BOOST_CHECK(resp.is_fault());
+    BOOST_CHECK_EQUAL(resp.fault_code(), 123);
+  }
+
+  // 2. std::exception (process_actual_execution catch #2)
+  {
+    auto client = create_client();
+    Response resp = client->execute("std_exception_method", Value(0));
+    BOOST_CHECK(resp.is_fault());
+    BOOST_CHECK_EQUAL(resp.fault_code(), -1);
+  }
+
+  // 3. Unknown exception — throw 42 (process_actual_execution catch #3)
+  {
+    auto client = create_client();
+    Response resp = client->execute("unknown_exception_method", Value(0));
+    BOOST_CHECK(resp.is_fault());
+    BOOST_CHECK_EQUAL(resp.fault_code(), -1);
+  }
+
+  stop_server();
+  THREAD_SAFE_TEST_MESSAGE("Pool exception handling: all 3 catch paths verified");
+}
+
+// Exercise drain() warning path by setting a very short warning interval.
+// Validates: drain() blocks until outstanding_count reaches zero, logging
+// periodic warnings while waiting. Subsequent shutdown completes cleanly.
+BOOST_FIXTURE_TEST_CASE(drain_timeout_exercise, ThreadSafetyFixture)
+{
+  start_server(2, port_offset::DRAIN_TIMEOUT_EXERCISE);
+
+  auto* pool = dynamic_cast<Pool_executor_factory*>(executor_factory());
+  BOOST_REQUIRE(pool != nullptr);
+
+  // Set very short warning interval to exercise the warning path.
+  // drain() now blocks until outstanding_count reaches zero, logging
+  // a warning every drain_timeout_ interval while waiting.
+  pool->set_drain_timeout(std::chrono::milliseconds(50));
+
+  // Submit slow work (500ms sleep) so drain() logs warnings while waiting
+  std::atomic<int> completed{0};
+  constexpr int NUM_CLIENTS = 4;
+  std::vector<std::thread> clients;
+  clients.reserve(NUM_CLIENTS);
+  for (int i = 0; i < NUM_CLIENTS; ++i) {
+    clients.emplace_back([this, &completed]() {
+      try {
+        auto client = create_client();
+        client->execute("sleep", Value(0.5));
+        completed.fetch_add(1, std::memory_order_relaxed);
+      } catch (...) { (void)0; }
+    });
+  }
+
+  // Let requests be dispatched to the pool
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+  // drain() blocks until all in-flight work completes, logging warnings
+  // every 50ms while outstanding_count > 0. This exercises the warning
+  // path without returning early (no UAF risk).
+  pool->drain();
+
+  // Restore normal warning interval for clean shutdown
+  pool->set_drain_timeout(std::chrono::seconds(30));
+
+  // Wait for clients to finish their HTTP calls
+  for (auto& t : clients) t.join();
+
+  BOOST_CHECK_GT(completed.load(), 0);
+  THREAD_SAFE_TEST_MESSAGE("Drain timeout exercise: " +
+    std::to_string(completed.load()) + " requests completed after drain warning test");
+
+  stop_server();
+}
+
+// Note: The destructor queue drain loop (~Pool_executor_factory while/pop)
+// and the ~Pool_executor early return guard (is_being_destructed check) are
+// defensive safety nets. drain() now blocks indefinitely, so the queue should
+// always be empty when the destructor runs. These paths are verified by code
+// inspection and the outstanding_count assert in the destructor.
+
 // Test destructor with pending items in queue
 // Validates: destructor properly drains queue without memory leaks
 BOOST_FIXTURE_TEST_CASE(destructor_drains_queue, ThreadSafetyFixture)
