@@ -95,6 +95,8 @@ Server::Server(
 
 Server::~Server()
 {
+  // Wait for in-flight pool executors to finish before destroying Server state.
+  impl->exec_factory->drain();
   delete impl;
 }
 
