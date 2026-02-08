@@ -55,6 +55,9 @@ namespace port_offset {
   constexpr int ADD_THREADS = 3;
   constexpr int CAPACITY_1024 = 4;
   constexpr int DESTRUCTOR_DRAIN = 5;
+  constexpr int SHUTDOWN_INFLIGHT = 6;
+  constexpr int POOL_EXCEPTIONS = 7;
+  constexpr int DRAIN_TIMEOUT_EXERCISE = 8;
 }
 
 // ============================================================================

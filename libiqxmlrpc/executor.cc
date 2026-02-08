@@ -9,6 +9,8 @@
 #include "server.h"
 #include "util.h"
 
+#include <cassert>
+#include <cstdio>
 #include <memory>
 
 using namespace iqxmlrpc;
@@ -97,9 +99,7 @@ void Pool_executor_factory::Pool_thread::operator ()()
       if (pool_ptr->is_being_destructed())
         return;
 
-      // Wait for work or shutdown using condition variable with predicate.
-      // The predicate re-checks on spurious wakeups and prevents lost
-      // wakeups when notify arrives between the check and the wait.
+      // Wait for work or shutdown.
       std::unique_lock<std::mutex> lk(pool_ptr->wait_mutex);
       pool_ptr->wait_cond.wait(lk, [pool_ptr] {
         return pool_ptr->pending_count.load(std::memory_order_acquire) > 0
@@ -110,10 +110,24 @@ void Pool_executor_factory::Pool_thread::operator ()()
         return;
     }
 
-    // Successfully dequeued - decrement pending count
+    // Successfully dequeued - decrement pending count.
+    // Relaxed: pending_count is a wake-up hint, not a synchronization barrier.
     pool_ptr->pending_count.fetch_sub(1, std::memory_order_relaxed);
 
-    // Execute the work (no lock held)
+    // RAII guard: decrement outstanding_count even if execution throws,
+    // then wake drain() waiter when count reaches zero.
+    struct Drain_guard {
+      Pool_executor_factory* p;
+      ~Drain_guard() {
+        if (p->outstanding_count.fetch_sub(1, std::memory_order_release) == 1) {
+          std::lock_guard<std::mutex> lk(p->drain_mutex);
+          p->drain_cond.notify_one();
+        }
+      }
+    } drain_guard{pool_ptr};
+
+    // process_actual_execution() calls schedule_response(), which deletes
+    // the executor. Do not use executor after this call.
     executor->process_actual_execution();
   }
 }
@@ -127,7 +141,11 @@ Pool_executor_factory::Pool_executor_factory(unsigned numthreads):
   wait_mutex(),
   wait_cond(),
   pending_count(0),
-  in_destructor(false)
+  in_destructor(false),
+  drain_timeout_(DEFAULT_DRAIN_TIMEOUT),
+  outstanding_count(0),
+  drain_mutex(),
+  drain_cond()
 {
   add_threads(numthreads);
 }
@@ -142,13 +160,20 @@ Pool_executor_factory::~Pool_executor_factory()
     }
   }
 
-  // pool contains unique_ptr<Pool_thread>, auto-cleaned when vector destructs
-
-  // Drain remaining items from lock-free queue (single-threaded after join)
+  // Drain remaining items from lock-free queue (single-threaded after join).
   Pool_executor* remaining = nullptr;
   while (req_queue.pop(remaining)) {
+    outstanding_count.fetch_sub(1, std::memory_order_relaxed);
     delete remaining;
   }
+  auto final_count = outstanding_count.load(std::memory_order_relaxed);
+  if (final_count != 0) {
+    (void)std::fprintf(stderr,
+      "iqxmlrpc: BUG: ~Pool_executor_factory outstanding_count=%zu "
+      "(expected 0)\n", final_count);
+  }
+  assert(final_count == 0
+         && "outstanding_count leak: increment without matching decrement");
 }
 
 
@@ -179,7 +204,10 @@ void Pool_executor_factory::add_threads( unsigned num )
 
 void Pool_executor_factory::register_executor( Pool_executor* executor )
 {
-  // Lock-free enqueue
+  // Increment outstanding BEFORE push so drain() never observes a transient zero.
+  // Decremented by Drain_guard (after execution) or ~Pool_executor_factory
+  // (queued-but-unexecuted items during shutdown).
+  outstanding_count.fetch_add(1, std::memory_order_release);
   while (!req_queue.push(executor)) {
     std::this_thread::yield();  // Queue full - rare with proper sizing
   }
@@ -212,6 +240,26 @@ bool Pool_executor_factory::is_being_destructed()
 }
 
 
+void Pool_executor_factory::drain()
+{
+  std::unique_lock<std::mutex> lk(drain_mutex);
+  auto total_waited = std::chrono::milliseconds(0);
+  while (outstanding_count.load(std::memory_order_acquire) != 0) {
+    bool completed = drain_cond.wait_for(lk, drain_timeout_, [this] {
+      return outstanding_count.load(std::memory_order_acquire) == 0;
+    });
+    if (!completed) {
+      total_waited += drain_timeout_;
+      (void)std::fprintf(stderr,
+        "iqxmlrpc: WARNING: drain() still waiting (outstanding_count=%zu, "
+        "total_wait=%lldms)\n",
+        outstanding_count.load(std::memory_order_relaxed),
+        static_cast<long long>(total_waited.count()));
+    }
+  }
+}
+
+
 // ----------------------------------------------------------------------------
 Pool_executor::Pool_executor(
     Pool_executor_factory* p, Method* m, Server* s, Server_connection* c
@@ -225,12 +273,19 @@ Pool_executor::Pool_executor(
 
 Pool_executor::~Pool_executor()
 {
+  if (pool->is_being_destructed())
+    return;  // Pool is shutting down — Server is already destroyed, interrupt_server() would be UAF
+
   try {
     interrupt_server();
-  } catch (...) { // NOLINT(bugprone-empty-catch)
-    // Suppress exceptions: destructors are implicitly noexcept (C++11).
-    // interrupt_server() may throw network_error if the interrupter
-    // socket is already closed during shutdown.
+  } catch (const std::exception& e) {
+    (void)std::fprintf(stderr,
+      "iqxmlrpc: WARNING: ~Pool_executor::interrupt_server() failed: %s\n",
+      e.what());
+  } catch (...) {
+    (void)std::fprintf(stderr,
+      "iqxmlrpc: WARNING: ~Pool_executor::interrupt_server() failed "
+      "(unknown exception)\n");
   }
 }
 
@@ -244,7 +299,6 @@ void Pool_executor::execute( const Param_list& params_ )
 
 void Pool_executor::execute( Param_list&& params_ )
 {
-  // PERFORMANCE: Move params to avoid cloning all Values
   params = std::move(params_);
   pool->register_executor( this );
 }
