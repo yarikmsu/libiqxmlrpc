@@ -539,9 +539,9 @@ BOOST_FIXTURE_TEST_CASE(pool_exception_handling, ThreadSafetyFixture)
   THREAD_SAFE_TEST_MESSAGE("Pool exception handling: all 3 catch paths verified");
 }
 
-// Exercise drain() timeout warning path by setting a very short timeout.
-// Validates: drain() returns after timeout when outstanding_count > 0,
-// and subsequent normal shutdown completes cleanly.
+// Exercise drain() warning path by setting a very short warning interval.
+// Validates: drain() blocks until outstanding_count reaches zero, logging
+// periodic warnings while waiting. Subsequent shutdown completes cleanly.
 BOOST_FIXTURE_TEST_CASE(drain_timeout_exercise, ThreadSafetyFixture)
 {
   start_server(2, port_offset::DRAIN_TIMEOUT_EXERCISE);
@@ -573,7 +573,7 @@ BOOST_FIXTURE_TEST_CASE(drain_timeout_exercise, ThreadSafetyFixture)
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   // drain() blocks until all in-flight work completes, logging warnings
-  // every 1ms while outstanding_count > 0. This exercises the warning
+  // every 50ms while outstanding_count > 0. This exercises the warning
   // path without returning early (no UAF risk).
   pool->drain();
 
@@ -590,11 +590,11 @@ BOOST_FIXTURE_TEST_CASE(drain_timeout_exercise, ThreadSafetyFixture)
   stop_server();
 }
 
-// Note: The destructor queue drain loop (executor.cc:165-166) and the
-// ~Pool_executor early return guard (executor.cc:272) are defensive safety
-// nets. drain() now blocks indefinitely, so the queue should always be empty
-// when the destructor runs. These paths are verified by code inspection
-// and the outstanding_count assert in the destructor.
+// Note: The destructor queue drain loop (~Pool_executor_factory while/pop)
+// and the ~Pool_executor early return guard (is_being_destructed check) are
+// defensive safety nets. drain() now blocks indefinitely, so the queue should
+// always be empty when the destructor runs. These paths are verified by code
+// inspection and the outstanding_count assert in the destructor.
 
 // Test destructor with pending items in queue
 // Validates: destructor properly drains queue without memory leaks

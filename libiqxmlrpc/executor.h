@@ -137,7 +137,6 @@ public:
 class LIBIQXMLRPC_API Pool_executor_factory: public Executor_factory_base {
   class Pool_thread;
   friend class Pool_thread;
-  friend class Pool_executor;
 
   std::vector<std::thread>  threads;
   std::vector<std::unique_ptr<Pool_thread>> pool;
@@ -179,9 +178,10 @@ public:
   //! drain() calls. Not thread-safe with concurrent drain().
   void set_drain_timeout(std::chrono::milliseconds t) { drain_timeout_ = t; }
 
-private:
   //! Returns true if the pool factory is being destroyed.
   bool is_being_destructed();
+
+private:
   void destruction_started();
 };
 

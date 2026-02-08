@@ -243,14 +243,19 @@ bool Pool_executor_factory::is_being_destructed()
 void Pool_executor_factory::drain()
 {
   std::unique_lock<std::mutex> lk(drain_mutex);
+  auto total_waited = std::chrono::milliseconds(0);
   while (outstanding_count.load(std::memory_order_acquire) != 0) {
     bool completed = drain_cond.wait_for(lk, drain_timeout_, [this] {
       return outstanding_count.load(std::memory_order_acquire) == 0;
     });
     if (!completed) {
+      total_waited += std::chrono::duration_cast<std::chrono::milliseconds>(
+        drain_timeout_);
       std::fprintf(stderr,
-        "iqxmlrpc: WARNING: drain() still waiting (outstanding_count=%zu)\n",
-        outstanding_count.load(std::memory_order_relaxed));
+        "iqxmlrpc: WARNING: drain() still waiting (outstanding_count=%zu, "
+        "total_wait=%lldms)\n",
+        outstanding_count.load(std::memory_order_relaxed),
+        static_cast<long long>(total_waited.count()));
     }
   }
 }
@@ -274,10 +279,14 @@ Pool_executor::~Pool_executor()
 
   try {
     interrupt_server();
-  } catch (...) { // NOLINT(bugprone-empty-catch)
-    // Suppress exceptions: destructors are implicitly noexcept (C++11).
-    // interrupt_server() may throw network_error if the interrupter
-    // socket is already closed during shutdown.
+  } catch (const std::exception& e) {
+    std::fprintf(stderr,
+      "iqxmlrpc: WARNING: ~Pool_executor::interrupt_server() failed: %s\n",
+      e.what());
+  } catch (...) {
+    std::fprintf(stderr,
+      "iqxmlrpc: WARNING: ~Pool_executor::interrupt_server() failed "
+      "(unknown exception)\n");
   }
 }
 
