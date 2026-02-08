@@ -9,6 +9,7 @@
 #include "method.h"
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <memory>
 #include <mutex>
@@ -66,9 +67,7 @@ public:
   //! Start method execution.
   virtual void execute( const Param_list& params ) = 0;
 
-  //! Start method execution (move version for efficiency).
-  //! Default forwards to const-ref version. Pool_executor overrides to move params.
-  //! Serial_executor uses default since it processes immediately (no storage needed).
+  //! Start method execution (move overload). Default forwards to const-ref version.
   virtual void execute( Param_list&& params ) { execute(params); }
 
 protected:
@@ -89,6 +88,9 @@ public:
   ) = 0;
 
   virtual iqnet::Reactor_base* create_reactor() = 0;
+
+  //! Wait for all in-flight executors to complete. No-op for serial execution.
+  virtual void drain() {}
 };
 
 
@@ -150,20 +152,33 @@ class LIBIQXMLRPC_API Pool_executor_factory: public Executor_factory_base {
 
   std::atomic<bool> in_destructor;
 
+  // In-flight executor tracking for drain().
+  // drain() blocks until outstanding_count reaches zero, logging a warning
+  // every drain_timeout_ interval. Default 30s; typical requests complete in <1s.
+  static constexpr std::chrono::seconds DEFAULT_DRAIN_TIMEOUT{30};
+  std::chrono::milliseconds drain_timeout_{DEFAULT_DRAIN_TIMEOUT};
+  std::atomic<size_t>     outstanding_count{0};
+  std::mutex              drain_mutex;
+  std::condition_variable drain_cond;
+
 public:
   explicit Pool_executor_factory(unsigned num_threads);
   ~Pool_executor_factory() override;
 
   Executor* create( Method* m, Server* s, Server_connection* c ) override;
   iqnet::Reactor_base* create_reactor() override;
+  void drain() override;
 
   //! Add some threads to the pool.
   void add_threads(unsigned num);
 
   void register_executor( Pool_executor* );
 
-private:
-  // Pool_thread interface
+  //! Set drain timeout. Must be called before server starts or between
+  //! drain() calls. Not thread-safe with concurrent drain().
+  void set_drain_timeout(std::chrono::milliseconds t) { drain_timeout_ = t; }
+
+  //! Returns true if the pool factory is being destroyed.
   bool is_being_destructed();
 
 private:
