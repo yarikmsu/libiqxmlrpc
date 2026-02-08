@@ -154,8 +154,8 @@ class LIBIQXMLRPC_API Pool_executor_factory: public Executor_factory_base {
   std::atomic<bool> in_destructor;
 
   // In-flight executor tracking for drain().
-  // Default 30s is generous; typical in-flight requests complete in <1s.
-  // On timeout, drain() logs a warning and returns — destruction proceeds.
+  // drain() blocks until outstanding_count reaches zero, logging a warning
+  // every drain_timeout_ interval. Default 30s; typical requests complete in <1s.
   static constexpr std::chrono::seconds DEFAULT_DRAIN_TIMEOUT{30};
   std::chrono::milliseconds drain_timeout_{DEFAULT_DRAIN_TIMEOUT};
   std::atomic<size_t>     outstanding_count{0};

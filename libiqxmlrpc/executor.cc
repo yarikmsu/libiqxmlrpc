@@ -243,13 +243,15 @@ bool Pool_executor_factory::is_being_destructed()
 void Pool_executor_factory::drain()
 {
   std::unique_lock<std::mutex> lk(drain_mutex);
-  bool drained = drain_cond.wait_for(lk, drain_timeout_, [this] {
-    return outstanding_count.load(std::memory_order_acquire) == 0;
-  });
-  if (!drained) {
-    std::fprintf(stderr,
-      "iqxmlrpc: WARNING: drain() timed out (outstanding_count=%zu)\n",
-      outstanding_count.load(std::memory_order_relaxed));
+  while (outstanding_count.load(std::memory_order_acquire) != 0) {
+    bool completed = drain_cond.wait_for(lk, drain_timeout_, [this] {
+      return outstanding_count.load(std::memory_order_acquire) == 0;
+    });
+    if (!completed) {
+      std::fprintf(stderr,
+        "iqxmlrpc: WARNING: drain() still waiting (outstanding_count=%zu)\n",
+        outstanding_count.load(std::memory_order_relaxed));
+    }
   }
 }
 

@@ -549,10 +549,12 @@ BOOST_FIXTURE_TEST_CASE(drain_timeout_exercise, ThreadSafetyFixture)
   auto* pool = dynamic_cast<Pool_executor_factory*>(executor_factory());
   BOOST_REQUIRE(pool != nullptr);
 
-  // Set very short drain timeout to trigger the timeout warning path
-  pool->set_drain_timeout(std::chrono::milliseconds(1));
+  // Set very short warning interval to exercise the warning path.
+  // drain() now blocks until outstanding_count reaches zero, logging
+  // a warning every drain_timeout_ interval while waiting.
+  pool->set_drain_timeout(std::chrono::milliseconds(50));
 
-  // Submit slow work that won't complete in 1ms
+  // Submit slow work (500ms sleep) so drain() logs warnings while waiting
   std::atomic<int> completed{0};
   constexpr int NUM_CLIENTS = 4;
   std::vector<std::thread> clients;
@@ -570,31 +572,29 @@ BOOST_FIXTURE_TEST_CASE(drain_timeout_exercise, ThreadSafetyFixture)
   // Let requests be dispatched to the pool
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-  // Directly call drain() — it will timeout after 1ms because
-  // outstanding_count > 0 (workers are sleeping for 500ms).
-  // This exercises the drain() timeout warning path (executor.cc:249-252).
+  // drain() blocks until all in-flight work completes, logging warnings
+  // every 1ms while outstanding_count > 0. This exercises the warning
+  // path without returning early (no UAF risk).
   pool->drain();
-  // drain() timed out but server is still alive — no UAF.
 
-  // Restore normal timeout so ~Server()'s drain() succeeds
+  // Restore normal warning interval for clean shutdown
   pool->set_drain_timeout(std::chrono::seconds(30));
 
-  // Wait for clients to finish their requests
+  // Wait for clients to finish their HTTP calls
   for (auto& t : clients) t.join();
 
   BOOST_CHECK_GT(completed.load(), 0);
   THREAD_SAFE_TEST_MESSAGE("Drain timeout exercise: " +
-    std::to_string(completed.load()) + " requests completed after timeout test");
+    std::to_string(completed.load()) + " requests completed after drain warning test");
 
   stop_server();
 }
 
 // Note: The destructor queue drain loop (executor.cc:165-166) and the
-// ~Pool_executor early return guard (executor.cc:270) are defensive safety
-// nets that fire only when drain() times out with items still in the queue.
-// Testing these through the integration API would require triggering the
-// very UAF this mechanism prevents. These paths are verified by code
-// inspection and the outstanding_count assert in the destructor.
+// ~Pool_executor early return guard (executor.cc:272) are defensive safety
+// nets. drain() now blocks indefinitely, so the queue should always be empty
+// when the destructor runs. These paths are verified by code inspection
+// and the outstanding_count assert in the destructor.
 
 // Test destructor with pending items in queue
 // Validates: destructor properly drains queue without memory leaks
