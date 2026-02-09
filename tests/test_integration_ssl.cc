@@ -34,11 +34,11 @@ using namespace iqxmlrpc_test;
 BOOST_AUTO_TEST_SUITE(ssl_tests)
 
 // Test SSL context with client-only mode (no certificates needed)
-// This covers ssl_lib.cc line 104 (SSL_get_ex_new_index in init_library)
+// This covers SSL_get_ex_new_index() in init_library() (ssl_lib.cc)
 BOOST_AUTO_TEST_CASE(ssl_client_only_context)
 {
   // client_only() doesn't require certificates
-  // This still triggers init_library() which includes line 104
+  // This still triggers init_library() which calls SSL_get_ex_new_index()
   SslContextGuard guard(iqnet::ssl::Ctx::client_only());
 
   BOOST_REQUIRE(guard.get() != nullptr);
@@ -82,7 +82,8 @@ BOOST_AUTO_TEST_CASE(ssl_server_only_context)
   BOOST_REQUIRE(guard->context() != nullptr);
 }
 
-// Test ConnectionVerifier setup - covers ssl_lib.cc lines 140, 258
+// Test ConnectionVerifier setup - covers iqxmlrpc_SSL_verify() callback
+// and SSL_set_ex_data() in prepare_verify() (ssl_lib.cc)
 BOOST_AUTO_TEST_CASE(ssl_verifier_setup)
 {
   SKIP_IF_NO_CERTS();
@@ -134,8 +135,8 @@ BOOST_FIXTURE_TEST_CASE(https_basic_communication, HttpsIntegrationFixture)
 
 // Test that TLS handshake invokes verifier callback
 // This test actually performs a TLS handshake and covers:
-// - ssl_lib.cc line 140 (iqxmlrpc_SSL_verify callback)
-// - ssl_lib.cc line 258 (SSL_set_ex_data in prepare_verify)
+// - iqxmlrpc_SSL_verify() callback (ssl_lib.cc)
+// - SSL_set_ex_data() in prepare_verify() (ssl_lib.cc)
 BOOST_FIXTURE_TEST_CASE(https_handshake_triggers_verify, HttpsIntegrationFixture)
 {
   BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
@@ -156,7 +157,7 @@ BOOST_FIXTURE_TEST_CASE(https_handshake_triggers_verify, HttpsIntegrationFixture
 }
 
 // Test that cert_finger_sha256 produces valid fingerprints during verification
-// This validates the null check fix in ssl_lib.cc:227
+// This validates the null check in cert_finger_sha256() (ssl_lib.cc)
 BOOST_FIXTURE_TEST_CASE(ssl_cert_fingerprint_valid, HttpsIntegrationFixture)
 {
   BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
@@ -175,12 +176,10 @@ BOOST_FIXTURE_TEST_CASE(ssl_cert_fingerprint_valid, HttpsIntegrationFixture)
   BOOST_CHECK_GT(client_verifier.get_call_count(), 0);
 
   // Verify fingerprint is non-empty
-  // Note: SHA256 = 32 bytes, but since the function uses non-zero-padded hex
-  // (e.g., 0x05 becomes "5" not "05"), length varies between 32-64 chars
+  // SHA256 = 32 bytes = 64 hex characters (zero-padded %02x format)
   std::string fp = client_verifier.fingerprint();
   BOOST_CHECK(!fp.empty());
-  BOOST_CHECK_GE(fp.length(), 32u);  // At least 32 chars (all single digit hex)
-  BOOST_CHECK_LE(fp.length(), 64u);  // At most 64 chars (all double digit hex)
+  BOOST_CHECK_EQUAL(fp.length(), 64u);
 }
 
 // Test that fingerprint function handles multiple HTTPS requests correctly
@@ -204,21 +203,21 @@ BOOST_FIXTURE_TEST_CASE(ssl_cert_fingerprint_stability, HttpsIntegrationFixture)
 // good coverage of the tunnel code path (https_client.cc) using inline proxy
 // patterns with SslFactoryTestProxyGuard from test_integration_common.h.
 
-// Test verify_client() with require_certificate=true (covers lines 234-238, 246-247)
-// This test verifies the API works and that prepare_verify() is called with correct flags
+// Test verify_client() with require_certificate=true
+// Covers verify_client() and the require_client_cert branch in prepare_verify() (ssl_lib.cc)
 BOOST_FIXTURE_TEST_CASE(ssl_verify_client_required, HttpsIntegrationFixture)
 {
   BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
     "Failed to set up SSL context with embedded certificates");
 
-  // Set up server to require client certificates - covers lines 234-238
+  // Set up server to require client certificates - covers verify_client()
   TrackingVerifier server_verifier;
   get_context()->verify_client(REQUIRE_CLIENT_CERT, &server_verifier);
 
   start_server(211);
 
   // Attempt connection without client certificate
-  // This triggers prepare_verify() with server=true and require_client_cert=true (line 246-247)
+  // This triggers prepare_verify() with server=true and require_client_cert=true
   auto client = create_client();
 
   // Connection behavior varies by OpenSSL version/configuration.
@@ -236,23 +235,23 @@ BOOST_FIXTURE_TEST_CASE(ssl_verify_client_required, HttpsIntegrationFixture)
   BOOST_CHECK(connection_failed || server_verifier.get_call_count() > 0);
 }
 
-// Test load_verify_locations() with CA file (covers line 279)
+// Test load_verify_locations() with CA file
 BOOST_AUTO_TEST_CASE(ssl_load_verify_locations)
 {
   SslContextGuard guard(iqnet::ssl::Ctx::client_only());
 
-  // Test with both parameters empty (should return false - line 276)
+  // Test with both parameters empty (should return false — both-empty guard)
   bool result_empty = guard->load_verify_locations("", "");
   BOOST_CHECK(!result_empty);
 
-  // Test loading from a certificate file (using test cert as CA) - covers line 279
+  // Test loading from a certificate file (using test cert as CA)
   if (ssl_certs_available()) {
     bool result = guard->load_verify_locations("../tests/data/cert.pem", "");
     BOOST_CHECK(result);
   }
 }
 
-// Test use_default_verify_paths() (covers line 285)
+// Test use_default_verify_paths()
 BOOST_AUTO_TEST_CASE(ssl_use_default_verify_paths)
 {
   SslContextGuard guard(iqnet::ssl::Ctx::client_only());
@@ -262,7 +261,8 @@ BOOST_AUTO_TEST_CASE(ssl_use_default_verify_paths)
   guard->use_default_verify_paths();
 }
 
-// Test hostname verification setup (covers lines 289-298)
+// Test hostname verification setup — covers set_hostname_verification()
+// and set_expected_hostname() (ssl_lib.cc)
 // Note: Actual hostname verification during connection is tested in
 // https_hostname_verification integration test
 BOOST_AUTO_TEST_CASE(ssl_hostname_verification_setup)
@@ -275,25 +275,259 @@ BOOST_AUTO_TEST_CASE(ssl_hostname_verification_setup)
   guard->set_hostname_verification(false);
 }
 
-// Integration test: hostname verification in actual HTTPS connection
-// This is the end-to-end test that verifies prepare_hostname_verify() works (lines 301-314)
+// Test hostname_verification_enabled() accessor returns correct state
+BOOST_AUTO_TEST_CASE(ssl_hostname_verification_enabled_accessor)
+{
+  SslContextGuard guard(iqnet::ssl::Ctx::client_only());
+
+  // Default is enabled (security-first default)
+  BOOST_CHECK(guard->hostname_verification_enabled());
+
+  guard->set_hostname_verification(false);
+  BOOST_CHECK(!guard->hostname_verification_enabled());
+}
+
+// Integration test: hostname verification using per-connection API (thread-safe)
 BOOST_FIXTURE_TEST_CASE(https_hostname_verification, HttpsIntegrationFixture)
 {
   BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
     "Failed to set up SSL context with embedded certificates");
 
-  // Enable hostname verification with expected hostname
+  // Enable hostname verification at Ctx level (verification flag)
   get_context()->set_hostname_verification(true);
-  get_context()->set_expected_hostname("localhost");
 
   start_server(210);
   auto client = create_client();
+
+  // Use per-connection API instead of Ctx-level set_expected_hostname()
+  client->set_expected_hostname("localhost");
 
   // This should succeed since we're connecting to localhost
   Response r = client->execute("echo", Value("hostname test"));
 
   BOOST_CHECK(!r.is_fault());
   BOOST_CHECK_EQUAL(r.value().get_string(), "hostname test");
+}
+
+// Integration test: legacy Ctx-level hostname API still works (backward compat)
+BOOST_FIXTURE_TEST_CASE(https_hostname_verification_legacy, HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to set up SSL context with embedded certificates");
+
+  // Use the legacy Ctx-level API
+  get_context()->set_hostname_verification(true);
+  get_context()->set_expected_hostname("localhost");
+
+  start_server(212);
+  auto client = create_client();
+
+  Response r = client->execute("echo", Value("legacy hostname test"));
+
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), "legacy hostname test");
+}
+
+// Verifier that respects OpenSSL's verification result.
+// Unlike TrackingVerifier (which accepts all), this returns preverified_ok
+// so that hostname mismatches cause actual TLS failures.
+class StrictVerifier : public iqnet::ssl::ConnectionVerifier {
+  mutable std::atomic<int> call_count_{0};
+
+  int do_verify(bool preverified_ok, X509_STORE_CTX*) const override {
+    ++call_count_;
+    return preverified_ok ? 1 : 0;
+  }
+
+public:
+  int get_call_count() const { return call_count_.load(); }
+};
+
+// Single-threaded negative test: wrong hostname must be rejected.
+// This proves hostname verification actually enforces mismatches,
+// independent of the concurrent test (which is noisier for CI debugging).
+BOOST_FIXTURE_TEST_CASE(https_hostname_mismatch_rejected, HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to set up SSL context with embedded certificates");
+
+  get_context()->set_hostname_verification(true);
+  get_context()->load_verify_locations(temp_cert_path_);
+
+  StrictVerifier strict_verifier;
+  get_context()->verify_server(&strict_verifier);
+
+  start_server(214);
+  auto client = create_client();
+
+  // Set a hostname that does NOT match the cert's CN ("localhost")
+  client->set_expected_hostname("wrong.example.com");
+
+  BOOST_CHECK_THROW(
+    client->execute("echo", Value("should fail")),
+    std::exception);
+}
+
+// Legacy Ctx-level negative test: wrong hostname via Ctx API must be rejected.
+// This validates the hardened Ctx::prepare_hostname_verify() properly applies
+// X509_VERIFY_PARAM_set1_host() through the legacy fallback path.
+BOOST_FIXTURE_TEST_CASE(https_hostname_mismatch_rejected_legacy, HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to set up SSL context with embedded certificates");
+
+  get_context()->set_hostname_verification(true);
+  get_context()->set_expected_hostname("wrong.example.com");
+  get_context()->load_verify_locations(temp_cert_path_);
+
+  StrictVerifier strict_verifier;
+  get_context()->verify_server(&strict_verifier);
+
+  start_server(217);
+  auto client = create_client();
+
+  // Do NOT call client->set_expected_hostname() — use legacy Ctx-level path
+  BOOST_CHECK_THROW(
+    client->execute("echo", Value("should fail")),
+    std::exception);
+}
+
+// Concurrent test: prove per-connection hostname isolation.
+// This is the core regression test for the TOCTOU race on shared SSL
+// hostname state (CWE-367). See docs/SECURITY_FINDINGS_2026.md #3.
+//
+// Strategy: even-numbered threads use "localhost" (correct for our test cert)
+// and should SUCCEED. Odd-numbered threads use "wrong.example.com" (incorrect)
+// and should FAIL with a hostname mismatch. If hostnames cross-contaminate,
+// an even thread could fail or an odd thread could succeed.
+//
+// Uses StrictVerifier (respects preverified_ok) instead of TrackingVerifier
+// (accepts all). With the self-signed cert loaded as trusted CA,
+// chain validation passes but hostname mismatches are enforced.
+BOOST_FIXTURE_TEST_CASE(concurrent_hostname_different_clients, HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to set up SSL context with embedded certificates");
+
+  get_context()->set_hostname_verification(true);
+
+  // Load our self-signed cert as the trusted CA so chain validation passes
+  // but hostname verification is still enforced
+  get_context()->load_verify_locations(temp_cert_path_);
+
+  // StrictVerifier returns preverified_ok as-is (unlike TrackingVerifier
+  // which always accepts). Combined with verify_server(), SSL_VERIFY_PEER
+  // is enabled so OpenSSL enforces hostname mismatches.
+  StrictVerifier strict_verifier;
+  get_context()->verify_server(&strict_verifier);
+
+  start_server(213);
+
+  constexpr int NUM_THREADS = 4;
+  constexpr int REQUESTS_PER_THREAD = 3;
+  std::atomic<int> correct_success{0};   // even threads that succeeded (expected)
+  std::atomic<int> correct_failure{0};   // odd threads that failed (expected)
+  std::atomic<int> wrong_success{0};     // odd threads that succeeded (BUG!)
+  std::atomic<int> wrong_failure{0};     // even threads that failed (BUG!)
+  std::vector<std::thread> threads;
+
+  for (int t = 0; t < NUM_THREADS; ++t) {
+    threads.emplace_back([&, t]() {
+      bool use_correct_hostname = (t % 2 == 0);
+      for (int i = 0; i < REQUESTS_PER_THREAD; ++i) {
+        try {
+          auto client = create_client();
+          client->set_expected_hostname(
+            use_correct_hostname ? "localhost" : "wrong.example.com");
+          client->set_keep_alive(false);
+
+          std::string msg = "thread" + std::to_string(t) + "_req" + std::to_string(i);
+          Response r = client->execute("echo", Value(msg));
+
+          if (!r.is_fault() && r.value().get_string() == msg) {
+            if (use_correct_hostname)
+              ++correct_success;
+            else
+              ++wrong_success;  // This would indicate hostname cross-contamination
+          }
+        } catch (const std::exception& e) {
+          if (use_correct_hostname) {
+            ++wrong_failure;    // This would indicate hostname cross-contamination
+            BOOST_TEST_MESSAGE("Unexpected failure for correct hostname: " << e.what());
+          } else {
+            ++correct_failure;
+          }
+        }
+      }
+    });
+  }
+
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  int even_threads = (NUM_THREADS + 1) / 2;  // threads 0, 2
+  int odd_threads = NUM_THREADS / 2;          // threads 1, 3
+
+  // Even threads ("localhost") should all succeed
+  BOOST_CHECK_EQUAL(correct_success.load(), even_threads * REQUESTS_PER_THREAD);
+  BOOST_CHECK_EQUAL(wrong_failure.load(), 0);
+
+  // Odd threads ("wrong.example.com") should all fail with hostname mismatch
+  BOOST_CHECK_EQUAL(correct_failure.load(), odd_threads * REQUESTS_PER_THREAD);
+  BOOST_CHECK_EQUAL(wrong_success.load(), 0);
+}
+
+// Test: SNI-only path when hostname is set but verification is disabled.
+// Covers the !hostname_verification_enabled() branch in
+// prepare_hostname_for_connect() — SSL_set_tlsext_host_name() is called
+// but X509_VERIFY_PARAM hostname check is skipped.
+BOOST_FIXTURE_TEST_CASE(https_per_conn_hostname_sni_only, HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to set up SSL context with embedded certificates");
+
+  // Disable hostname verification at Ctx level
+  get_context()->set_hostname_verification(false);
+
+  start_server(215);
+  auto client = create_client();
+
+  // Set per-connection hostname — only SNI will be applied since
+  // hostname_verification_enabled() returns false
+  client->set_expected_hostname("localhost");
+
+  Response r = client->execute("echo", Value("sni only test"));
+
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), "sni only test");
+}
+
+// Test: Proxy path exercises Https_proxy_client_connection::set_ssl_expected_hostname()
+// override via Client::get_connection() → Connector::create_connection().
+// Note: Only the hostname storage on the proxy object is exercised here;
+// the internal forwarding in do_process_session() is NOT reached because
+// the CONNECT tunnel fails (HTTPS server rejects plain-text CONNECT data).
+BOOST_FIXTURE_TEST_CASE(https_proxy_hostname_forwarding, HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to set up SSL context with embedded certificates");
+
+  start_server(216);
+  auto client = create_client();
+
+  // Point proxy at the HTTPS server itself (which doesn't understand
+  // plain-text CONNECT requests). This exercises the code path:
+  //   Client::get_connection() → proxy_ctr->set_expected_hostname()
+  //   → Connector::create_connection() → c->set_ssl_expected_hostname()
+  client->set_proxy(iqnet::Inet_addr("127.0.0.1", port()));
+  client->set_expected_hostname("localhost");
+
+  // The execute() fails because the HTTPS server rejects the plain-text
+  // CONNECT request, but set_ssl_expected_hostname() was already called
+  BOOST_CHECK_THROW(
+    client->execute("echo", Value("proxy test")),
+    std::exception);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -42,6 +42,10 @@ public:
   Https_proxy_client_connection(const Https_proxy_client_connection&) = delete;
   Https_proxy_client_connection& operator=(const Https_proxy_client_connection&) = delete;
 
+  void set_ssl_expected_hostname(const std::string& hostname) override {
+    expected_hostname_ = hostname;
+  }
+
   void handle_input( bool& ) override;
   void handle_output( bool& ) override;
 
@@ -57,6 +61,7 @@ protected:
   size_t out_str_offset;  // Offset tracking instead of string.erase() for performance
 
 private:
+  std::string expected_hostname_;
 #ifdef IQXMLRPC_TESTING
   SslConnectionFactory ssl_factory_{};  //!< Optional factory for testing
 #endif // IQXMLRPC_TESTING
@@ -79,6 +84,10 @@ public:
 
   Https_client_connection(const Https_client_connection&) = delete;
   Https_client_connection& operator=(const Https_client_connection&) = delete;
+
+  void set_ssl_expected_hostname(const std::string& hostname) override {
+    iqnet::ssl::Connection::set_expected_hostname(hostname);
+  }
 
   void post_connect() override
   {

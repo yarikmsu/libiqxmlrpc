@@ -313,6 +313,12 @@ Ctx::set_expected_hostname(const std::string& hostname)
   impl_->expected_hostname = hostname;
 }
 
+bool
+Ctx::hostname_verification_enabled() const
+{
+  return impl_->hostname_verification;
+}
+
 void
 Ctx::prepare_hostname_verify(SSL* ssl)
 {
@@ -321,12 +327,13 @@ Ctx::prepare_hostname_verify(SSL* ssl)
   }
 
   X509_VERIFY_PARAM* param = SSL_get0_param(ssl);
-  if (!param) {
-    return;  // Cannot configure hostname verification without param
-  }
+  if (!param)
+    throw ssl::exception("Failed to get SSL verify parameters");
+
   X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
-  X509_VERIFY_PARAM_set1_host(param, impl_->expected_hostname.c_str(),
-                              impl_->expected_hostname.length());
+  if (!X509_VERIFY_PARAM_set1_host(param, impl_->expected_hostname.c_str(),
+                                   impl_->expected_hostname.length()))
+    throw ssl::exception("Failed to set hostname for verification");
 }
 
 void
@@ -340,7 +347,8 @@ Ctx::prepare_sni(SSL* ssl)
   // This tells the server which hostname we're connecting to, enabling:
   // - Virtual hosting (multiple sites on one IP)
   // - Correct certificate selection on the server side
-  SSL_set_tlsext_host_name(ssl, impl_->expected_hostname.c_str());
+  if (!SSL_set_tlsext_host_name(ssl, impl_->expected_hostname.c_str()))
+    throw ssl::exception("Failed to set SNI hostname");
 }
 
 // ----------------------------------------------------------------------------

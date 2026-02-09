@@ -117,12 +117,19 @@ public:
   */
   void set_hostname_verification(bool enable);
 
-  //! Set the expected hostname for verification.
-  /*! Call this before connecting to set the hostname to verify against.
-      Must be called per-connection if hostnames differ.
+  //! Set the expected hostname for verification (Ctx-level).
+  /*! \warning For concurrent multi-host use, prefer
+      ssl::Connection::set_expected_hostname() (transport layer) or
+      Client_base::set_expected_hostname() (client API) which set the
+      hostname per-connection to avoid race conditions. This Ctx-level
+      setter is safe only when all client connections target the same
+      host, or when used from a single thread.
       \param hostname The expected server hostname
   */
   void set_expected_hostname(const std::string& hostname);
+
+  //! Check if hostname verification is enabled.
+  bool hostname_verification_enabled() const;
 
   //! Prepare hostname verification on SSL connection (internal use).
   void prepare_hostname_verify(SSL* ssl);

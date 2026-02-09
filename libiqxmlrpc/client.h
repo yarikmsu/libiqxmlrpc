@@ -63,8 +63,19 @@ public:
 
   void set_xheaders(const XHeaders& xheaders);
 
+  //! Set expected hostname for SSL certificate verification.
+  /*! Each client instance stores its own hostname, avoiding the shared-state
+      race in Ctx::set_expected_hostname(). Each connection will verify
+      the server certificate against this hostname independently
+      (when Ctx-level hostname verification is enabled via
+      Ctx::set_hostname_verification(true)).
+      \param hostname The expected server hostname (e.g. "example.com")
+  */
+  void set_expected_hostname(const std::string& hostname);
+
 protected:
   int timeout() const;
+  const std::string& expected_hostname() const;
 
 private:
   virtual void do_set_proxy( const iqnet::Inet_addr& ) = 0;
@@ -107,9 +118,12 @@ private:
 
   Client_connection* get_connection() override
   {
-    if (proxy_ctr)
+    if (proxy_ctr) {
+      proxy_ctr->set_expected_hostname(expected_hostname());
       return proxy_ctr->connect(timeout());
+    }
 
+    ctr.set_expected_hostname(expected_hostname());
     return ctr.connect(timeout());
   }
 

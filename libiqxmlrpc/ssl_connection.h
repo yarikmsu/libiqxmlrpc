@@ -11,6 +11,7 @@
 #include "ssl_lib.h"
 
 #include <cstdint>
+#include <string>
 #include <openssl/ssl.h>
 
 namespace iqnet {
@@ -29,6 +30,13 @@ public:
   Connection(const Connection&) = delete;
   Connection& operator=(const Connection&) = delete;
 
+  //! Set expected hostname for per-connection SSL hostname verification.
+  /*! Each connection stores its own hostname, avoiding the shared-state
+      race in Ctx::set_expected_hostname(). Set before post_connect()
+      when multiple clients connect to different hosts concurrently.
+  */
+  void set_expected_hostname(const std::string& hostname) { expected_hostname_ = hostname; }
+
   void shutdown();
   size_t send( const char*, size_t ) override;
   size_t recv( char*, size_t ) override;
@@ -43,6 +51,20 @@ protected:
   virtual void ssl_accept();
   //! Performs SSL connecting
   virtual void ssl_connect();
+
+  //! One-time setup for SSL accept (verify callback).
+  /*! Call once before the handshake begins. In blocking mode, ssl_accept()
+      calls this internally. In non-blocking mode, call from reg_accept()
+      so that try_ssl_accept_nonblock() retries don't re-read shared Ctx state. */
+  void prepare_for_ssl_accept();
+
+  //! One-time setup for SSL connect (verify callback + hostname/SNI).
+  /*! Uses the per-connection hostname if set via set_expected_hostname(),
+      otherwise falls back to the Ctx-level hostname.
+      Call once before the handshake begins. In blocking mode, ssl_connect()
+      calls this internally. In non-blocking mode, call from reg_connect()
+      so that try_ssl_connect_nonblock() retries don't re-read shared Ctx state. */
+  void prepare_for_ssl_connect();
 
   bool shutdown_recved();
   bool shutdown_sent();
@@ -73,6 +95,15 @@ protected:
 
   //! Non-throwing SSL shutdown (P3 optimization).
   SslIoResult try_ssl_shutdown_nonblock();
+
+private:
+  //! Apply SNI and hostname verification to the SSL object before handshake.
+  void prepare_hostname_for_connect();
+
+  //! Per-connection expected hostname for SNI and hostname verification.
+  /*! When non-empty, used instead of Ctx-level hostname (which is racy
+      under concurrent multi-host access). */
+  std::string expected_hostname_;
 };
 
 //! Server-side established SSL-connection based on reactive model
