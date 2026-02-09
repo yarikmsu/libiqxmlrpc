@@ -14,6 +14,7 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
+#include <atomic>
 #include <cerrno>
 #include <mutex>
 #include <cstdio>
@@ -173,7 +174,7 @@ struct Ctx::Impl {
   ConnectionVerifier* server_verifier;
   ConnectionVerifier* client_verifier;
   bool require_client_cert;
-  bool hostname_verification;  // SECURITY: Verify hostname against certificate
+  std::atomic<bool> hostname_verification;  // SECURITY: Verify hostname against certificate
   std::string expected_hostname;
 
   Impl():
