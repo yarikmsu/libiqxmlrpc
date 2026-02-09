@@ -49,7 +49,8 @@ Https_proxy_client_connection::Https_proxy_client_connection(
   resp_packet(nullptr),
   non_blocking(nb),
   out_str(),
-  out_str_offset(0)
+  out_str_offset(0),
+  expected_hostname_()
 {
   sock.set_non_blocking( nb );
 }
@@ -66,6 +67,8 @@ http::Packet* Https_proxy_client_connection::do_process_session( const std::stri
 #endif
 
   Https_client_connection https_conn(sock, non_blocking);
+  if (!expected_hostname_.empty())
+    https_conn.set_ssl_expected_hostname(expected_hostname_);
   https_conn.post_connect();
 
   return https_conn.do_process_session(s);

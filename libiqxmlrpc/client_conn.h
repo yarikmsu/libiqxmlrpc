@@ -4,6 +4,7 @@
 #ifndef IQXMLRPC_CLIENT_CONN_H
 #define IQXMLRPC_CLIENT_CONN_H
 
+#include <string>
 #include <vector>
 #include "connection.h"
 #include "http.h"
@@ -24,6 +25,9 @@ public:
   Client_connection& operator=(const Client_connection&) = delete;
 
   void set_options(const Client_options& o) { options = &o; }
+
+  //! Set expected hostname for SSL hostname verification (no-op for non-SSL).
+  virtual void set_ssl_expected_hostname(const std::string&) {}
 
   Response process_session(const Request&, const XHeaders& xheaders = XHeaders());
 

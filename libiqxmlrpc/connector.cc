@@ -41,7 +41,8 @@ struct Connect_processor: public Event_handler {
 };
 
 Connector_base::Connector_base( const iqnet::Inet_addr& peer ):
-  peer_addr(peer)
+  peer_addr(peer),
+  expected_hostname_()
 {
 }
 

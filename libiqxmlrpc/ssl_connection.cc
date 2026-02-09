@@ -4,6 +4,7 @@
 
 #include <limits>
 #include <openssl/err.h>
+#include <openssl/x509v3.h>
 #include "ssl_connection.h"
 
 using namespace iqnet;
@@ -11,7 +12,8 @@ using namespace iqnet;
 ssl::Connection::Connection( const Socket& s ):
   iqnet::Connection( s ),
   ssl_ctx( ssl::ctx ),
-  ssl(nullptr)
+  ssl(nullptr),
+  expected_hostname_()
 {
   if( !ssl_ctx )
     throw ssl::not_initialized();
@@ -44,9 +46,22 @@ void ssl::Connection::post_connect()
 }
 
 
-void ssl::Connection::ssl_accept()
+void ssl::Connection::prepare_for_ssl_accept()
 {
   ssl_ctx->prepare_verify(ssl, true);
+}
+
+
+void ssl::Connection::prepare_for_ssl_connect()
+{
+  ssl_ctx->prepare_verify(ssl, false);
+  prepare_hostname_for_connect();
+}
+
+
+void ssl::Connection::ssl_accept()
+{
+  prepare_for_ssl_accept();
   int ret = SSL_accept( ssl );
 
   if( ret != 1 )
@@ -54,11 +69,32 @@ void ssl::Connection::ssl_accept()
 }
 
 
+void ssl::Connection::prepare_hostname_for_connect()
+{
+  if (!expected_hostname_.empty()) {
+    if (!SSL_set_tlsext_host_name(ssl, expected_hostname_.c_str()))
+      throw ssl::exception("Failed to set SNI hostname");
+    if (ssl_ctx->hostname_verification_enabled()) {
+      X509_VERIFY_PARAM* param = SSL_get0_param(ssl);
+      if (!param)
+        throw ssl::exception("Failed to get SSL verify parameters");
+      X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
+      if (!X509_VERIFY_PARAM_set1_host(param, expected_hostname_.c_str(),
+                                       expected_hostname_.length()))
+        throw ssl::exception("Failed to set hostname for verification");
+    }
+  } else {
+    // Fallback: use Ctx-level shared hostname (not thread-safe when
+    // clients connect to different hosts concurrently)
+    ssl_ctx->prepare_sni(ssl);
+    ssl_ctx->prepare_hostname_verify(ssl);
+  }
+}
+
+
 void ssl::Connection::ssl_connect()
 {
-  ssl_ctx->prepare_verify(ssl, false);
-  ssl_ctx->prepare_sni(ssl);              // SECURITY: Set SNI for virtual hosting
-  ssl_ctx->prepare_hostname_verify(ssl);  // SECURITY: Enable hostname verification
+  prepare_for_ssl_connect();
   int ret = SSL_connect( ssl );
 
   if( ret != 1 )
@@ -200,7 +236,6 @@ ssl::SslIoResult ssl::Connection::try_ssl_write( const char* buf, size_t len, si
 
 ssl::SslIoResult ssl::Connection::try_ssl_accept_nonblock()
 {
-  ssl_ctx->prepare_verify(ssl, true);
   int ret = SSL_accept( ssl );
 
   if( ret == 1 ) {
@@ -214,9 +249,6 @@ ssl::SslIoResult ssl::Connection::try_ssl_accept_nonblock()
 
 ssl::SslIoResult ssl::Connection::try_ssl_connect_nonblock()
 {
-  ssl_ctx->prepare_verify(ssl, false);
-  ssl_ctx->prepare_sni(ssl);              // SECURITY: Set SNI for virtual hosting
-  ssl_ctx->prepare_hostname_verify(ssl);  // SECURITY: Enable hostname verification
   int ret = SSL_connect( ssl );
 
   if( ret == 1 ) {
@@ -428,6 +460,7 @@ bool ssl::Reaction_connection::reg_shutdown()
 
 void ssl::Reaction_connection::reg_accept()
 {
+  prepare_for_ssl_accept();
   state = ACCEPTING;
   reactor->register_handler( this, Reactor_base::INPUT );
 }
@@ -435,6 +468,7 @@ void ssl::Reaction_connection::reg_accept()
 
 void ssl::Reaction_connection::reg_connect()
 {
+  prepare_for_ssl_connect();
   state = CONNECTING;
   reactor->register_handler( this, Reactor_base::OUTPUT );
 }

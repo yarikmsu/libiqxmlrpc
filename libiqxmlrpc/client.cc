@@ -19,10 +19,12 @@ public:
     const std::string& vhost
   ):
     opts(addr, uri, vhost),
-    conn_cache() {}
+    conn_cache(),
+    expected_hostname() {}
 
   Client_options opts;
   std::unique_ptr<Client_connection> conn_cache;
+  std::string expected_hostname;
 };
 
 //
@@ -131,6 +133,16 @@ void Client_base::set_authinfo( const std::string& u, const std::string& p )
 void Client_base::set_xheaders( const XHeaders& xheaders)
 {
   impl_->opts.set_xheaders(xheaders);
+}
+
+void Client_base::set_expected_hostname( const std::string& hostname )
+{
+  impl_->expected_hostname = hostname;
+}
+
+const std::string& Client_base::expected_hostname() const
+{
+  return impl_->expected_hostname;
 }
 
 Response Client_base::execute(
