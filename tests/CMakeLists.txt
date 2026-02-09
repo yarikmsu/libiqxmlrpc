@@ -51,6 +51,7 @@ iqxmlrpc_test(crlf-injection-test test_crlf_injection.cc)
 iqxmlrpc_test(e1-e3-optimization-test test_e1_e3_optimization.cc)
 iqxmlrpc_test(num-conv-test test_num_conv.cc)
 iqxmlrpc_test(security-edge-cases-test test_security_edge_cases.cc)
+iqxmlrpc_test(ssl-hostname-test test_ssl_hostname.cc)
 
 # Thread safety tests
 # NOTE: These tests stress-test Boost.Lockfree which produces TSan false positives.

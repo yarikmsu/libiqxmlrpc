@@ -503,6 +503,35 @@ BOOST_FIXTURE_TEST_CASE(https_per_conn_hostname_sni_only, HttpsIntegrationFixtur
   BOOST_CHECK_EQUAL(r.value().get_string(), "sni only test");
 }
 
+// Negative proof: mismatched hostname with verification disabled should SUCCEED.
+// The existing https_per_conn_hostname_sni_only uses "localhost" (which matches
+// the cert), so it would pass even if verification were accidentally applied.
+// This test uses a WRONG hostname — proving X509_VERIFY_PARAM is truly not set
+// when hostname_verification_enabled() returns false.
+BOOST_FIXTURE_TEST_CASE(https_per_conn_mismatched_hostname_sni_only_succeeds, HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to set up SSL context with embedded certificates");
+
+  get_context()->set_hostname_verification(false);
+  get_context()->load_verify_locations(temp_cert_path_);
+
+  StrictVerifier strict_verifier;
+  get_context()->verify_server(&strict_verifier);
+
+  start_server(218);
+  auto client = create_client();
+
+  // Set a WRONG hostname — but since verification is disabled, only SNI is
+  // applied and the connection should succeed (cert CN=localhost, SNI=wrong)
+  client->set_expected_hostname("wrong.example.com");
+
+  Response r = client->execute("echo", Value("sni only wrong hostname"));
+
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), "sni only wrong hostname");
+}
+
 // Test: Proxy path exercises Https_proxy_client_connection::set_ssl_expected_hostname()
 // override via Client::get_connection() → Connector::create_connection().
 // Note: Only the hostname storage on the proxy object is exercised here;
