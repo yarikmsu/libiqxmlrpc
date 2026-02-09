@@ -180,7 +180,7 @@ BOOST_AUTO_TEST_CASE(ctx_hostname_verification_enabled_roundtrip)
 }
 
 // Test 7: Blocking ssl_connect() calls prepare_for_ssl_connect() before handshake.
-// Covers the blocking code path (ssl_connection.cc:97) used by non-reactor clients.
+// Covers the blocking code path in ssl::Connection::ssl_connect() used by non-reactor clients.
 // The reactor path goes through reg_connect() instead; this exercises the alternative.
 BOOST_AUTO_TEST_CASE(blocking_ssl_connect_calls_prepare)
 {
@@ -201,7 +201,7 @@ BOOST_AUTO_TEST_CASE(blocking_ssl_connect_calls_prepare)
 }
 
 // Test 8: Blocking ssl_accept() calls prepare_for_ssl_accept() before handshake.
-// Covers the blocking code path (ssl_connection.cc:64) used by non-reactor servers.
+// Covers the blocking code path in ssl::Connection::ssl_accept() used by non-reactor servers.
 BOOST_AUTO_TEST_CASE(blocking_ssl_accept_calls_prepare)
 {
   SslContextGuard ctx_guard(ssl::Ctx::client_only());
