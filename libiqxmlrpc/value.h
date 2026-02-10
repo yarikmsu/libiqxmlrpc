@@ -133,6 +133,11 @@ public:
 
   void apply_visitor(Value_type_visitor&) const;
 
+  //! \name Global value options
+  //! \note Thread safety: these must be set once at startup before any server
+  //!       threads are spawned. Concurrent mutation is defined behavior (no UB)
+  //!       but the flag+value pair is not logically atomic — see value.cc.
+  //! \{
   static void set_default_int(int);
   static Int* get_default_int();
   static void drop_default_int();
@@ -143,6 +148,7 @@ public:
 
   static void omit_string_tag_in_responses(bool);
   static bool omit_string_tag_in_responses();
+  //! \}
 
 private:
   template <class T> T* cast() const;

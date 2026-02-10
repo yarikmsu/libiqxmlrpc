@@ -2,7 +2,7 @@
 //  Copyright (C) 2014 Anton Dedov
 //  Copyright (C) 2019-2026 Yaroslav Gorbunov
 
-#include <optional>
+#include <atomic>
 #include <stdexcept>
 #include <utility>
 
@@ -18,49 +18,70 @@ Value::Bad_cast::Bad_cast():
 
 
 namespace ValueOptions {
-  std::optional<int> default_int;
-  std::optional<int64_t> default_int64;
-  bool omit_string_tag_in_responses = false;
+  // Atomic flag+value pairs replace std::optional<T> for data-race freedom (CWE-362).
+  // Each load/store is individually atomic (indivisible, default seq_cst ordering),
+  // but the flag and value are NOT logically atomic as a pair: a reader may
+  // transiently observe the flag from one writer and the value from another.
+  // Caller contract: these options must be set once at startup before any server
+  // threads are spawned. The library does not enforce this — it is the caller's
+  // responsibility. Given that contract, readers always get a value that was
+  // explicitly stored — never uninitialized or torn data.
+  // Do not weaken to relaxed ordering without reviewing all call sites.
+  std::atomic<bool> has_default_int{false};
+  std::atomic<int>  default_int_val{0};
+
+  std::atomic<bool>    has_default_int64{false};
+  std::atomic<int64_t> default_int64_val{0};
+
+  std::atomic<bool> omit_string_tag_in_responses{false};
 }
 
 void Value::set_default_int(int dint)
 {
-  ValueOptions::default_int = dint;
+  // Store value before flag so readers never see flag=true with stale value
+  ValueOptions::default_int_val.store(dint);
+  ValueOptions::has_default_int.store(true);
 }
 
 Int* Value::get_default_int()
 {
-  return ValueOptions::default_int ? new Int(*ValueOptions::default_int) : nullptr;
+  if (ValueOptions::has_default_int.load())
+    return new Int(ValueOptions::default_int_val.load());
+  return nullptr;
 }
 
 void Value::drop_default_int()
 {
-  ValueOptions::default_int.reset();
+  ValueOptions::has_default_int.store(false);
 }
 
 void Value::set_default_int64(int64_t dint)
 {
-  ValueOptions::default_int64 = dint;
+  // Store value before flag so readers never see flag=true with stale value
+  ValueOptions::default_int64_val.store(dint);
+  ValueOptions::has_default_int64.store(true);
 }
 
 Int64* Value::get_default_int64()
 {
-  return ValueOptions::default_int64 ? new Int64(*ValueOptions::default_int64) : nullptr;
+  if (ValueOptions::has_default_int64.load())
+    return new Int64(ValueOptions::default_int64_val.load());
+  return nullptr;
 }
 
 void Value::drop_default_int64()
 {
-  ValueOptions::default_int64.reset();
+  ValueOptions::has_default_int64.store(false);
 }
 
 void Value::omit_string_tag_in_responses(bool v)
 {
-  ValueOptions::omit_string_tag_in_responses = v;
+  ValueOptions::omit_string_tag_in_responses.store(v);
 }
 
 bool Value::omit_string_tag_in_responses()
 {
-  return ValueOptions::omit_string_tag_in_responses;
+  return ValueOptions::omit_string_tag_in_responses.load();
 }
 
 Value::Value( Value_type* v ):
