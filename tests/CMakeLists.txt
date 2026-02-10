@@ -53,7 +53,7 @@ iqxmlrpc_test(num-conv-test test_num_conv.cc)
 iqxmlrpc_test(security-edge-cases-test test_security_edge_cases.cc)
 iqxmlrpc_test(ssl-hostname-test test_ssl_hostname.cc)
 
-# Thread safety tests
+# Thread safety tests for Boost.Lockfree dispatcher queue
 # NOTE: These tests stress-test Boost.Lockfree which produces TSan false positives.
 # The tests validate correctness via data integrity checks, not TSan cleanliness.
 # Use label "lockfree_stress" to exclude from TSan CI runs via: ctest -LE lockfree_stress
@@ -61,6 +61,11 @@ iqxmlrpc_test(thread-safety-test test_thread_safety.cc methods.cc)
 set_tests_properties(thread-safety-test PROPERTIES
     TIMEOUT 180
     LABELS "lockfree_stress")
+
+# ValueOptions thread safety tests (separate binary for TSan coverage)
+# These test std::atomic globals, NOT Boost.Lockfree, so they run cleanly under TSan.
+iqxmlrpc_test(value-options-thread-safety-test test_value_options_thread_safety.cc)
+set_tests_properties(value-options-thread-safety-test PROPERTIES TIMEOUT 180)
 
 # Integration test (in-process server/client testing)
 # Split into multiple files for faster incremental compilation
