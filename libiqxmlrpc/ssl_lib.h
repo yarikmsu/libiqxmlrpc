@@ -79,6 +79,13 @@ public:
   static Ctx* server_only( const std::string& cert_path, const std::string& key_path );
   static Ctx* client_only();
 
+  //! Create a client SSL context with certificate verification enabled.
+  //! Loads the system CA store and enables SSL_VERIFY_PEER.
+  //! Connections will fail if the server certificate is not trusted.
+  //! The returned context has no cert/key and is for client connections only.
+  //! \throws ssl::exception if system CA store cannot be loaded.
+  static Ctx* client_verified();
+
   ~Ctx();
 
   SSL_CTX* context();
@@ -108,6 +115,15 @@ public:
       \return true on success, false on failure
   */
   bool use_default_verify_paths();
+
+  //! Enable peer certificate verification for outgoing (client) connections.
+  //! \note Only affects client-side connections. Server-side uses verify_client().
+  //! \note When a custom ConnectionVerifier is also set via verify_server(),
+  //!       setting verify_peer is harmless but redundant.
+  void set_verify_peer(bool enable);
+
+  //! Check if peer certificate verification is enabled.
+  bool verify_peer_enabled() const;
 
   //! Enable hostname verification for client connections.
   /*! SECURITY: Verifies that server certificate matches the expected hostname.

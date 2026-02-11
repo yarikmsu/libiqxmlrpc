@@ -559,4 +559,54 @@ BOOST_FIXTURE_TEST_CASE(https_proxy_hostname_forwarding, HttpsIntegrationFixture
     std::exception);
 }
 
+// =============================================================================
+// Client TLS Verification Tests (Finding #1: client_verified / set_verify_peer)
+// =============================================================================
+// Note: ssl::Connection captures the global ssl::ctx pointer at construction time.
+// Integration tests require a single context that works for both server and client
+// connections. Since client_verified() creates a context without cert/key (breaking
+// server accept), all integration tests use a client_server context with
+// set_verify_peer(true):
+//   - Positive tests: also call load_verify_locations() with the test cert
+//   - Negative tests: omit load_verify_locations() so chain validation fails
+
+// client_server context + set_verify_peer(true) + load_verify_locations -> succeeds
+// Tests the upgrade path where an existing context enables peer verification.
+BOOST_FIXTURE_TEST_CASE(https_set_verify_peer_with_trusted_ca, HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to set up SSL context with embedded certificates");
+
+  // Enable peer verification and load the self-signed cert as trusted CA
+  get_context()->set_verify_peer(true);
+  get_context()->load_verify_locations(temp_cert_path_);
+
+  start_server(220);
+  auto client = create_client();
+
+  Response r = client->execute("echo", Value("verified peer test"));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), "verified peer test");
+}
+
+// set_verify_peer(true) on client_server context without loading our test CA -> fails
+// The system CAs don't include our self-signed test certificate, so the
+// peer certificate chain validation fails even though the context has cert/key.
+BOOST_FIXTURE_TEST_CASE(https_set_verify_peer_rejects_untrusted_cert, HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to set up SSL context with embedded certificates");
+
+  // Enable peer verification but don't load our self-signed CA
+  // System CAs won't include our test certificate
+  get_context()->set_verify_peer(true);
+
+  start_server(221);
+  auto client = create_client();
+
+  BOOST_CHECK_THROW(
+    client->execute("echo", Value("should fail")),
+    std::exception);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

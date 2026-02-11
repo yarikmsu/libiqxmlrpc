@@ -174,6 +174,7 @@ struct Ctx::Impl {
   ConnectionVerifier* server_verifier;
   ConnectionVerifier* client_verifier;
   bool require_client_cert;
+  std::atomic<bool> verify_peer;  // SECURITY: When true, SSL_VERIFY_PEER is set on client connections even without a custom verifier
   std::atomic<bool> hostname_verification;  // SECURITY: Verify hostname against certificate
   std::string expected_hostname;
 
@@ -182,6 +183,7 @@ struct Ctx::Impl {
     server_verifier(nullptr),
     client_verifier(nullptr),
     require_client_cert(false),
+    verify_peer(false),
     hostname_verification(true),  // SECURITY: Default to verifying hostname
     expected_hostname()
   {
@@ -233,6 +235,16 @@ Ctx::Ctx():
 }
 
 
+Ctx* Ctx::client_verified()
+{
+  std::unique_ptr<Ctx> c(new Ctx);
+  if (!c->use_default_verify_paths())
+    throw ssl::exception("Failed to load system CA certificates");
+  c->set_verify_peer(true);
+  return c.release();
+}
+
+
 Ctx::~Ctx() = default;
 
 SSL_CTX*
@@ -258,7 +270,10 @@ void
 Ctx::prepare_verify(SSL* ssl, bool server)
 {
   ConnectionVerifier* v = server ? impl_->client_verifier : impl_->server_verifier;
-  int mode = v ? SSL_VERIFY_PEER : SSL_VERIFY_NONE;
+
+  // verify_peer only applies client-side; server-side uses verify_client() instead
+  bool need_verify = v || (!server && impl_->verify_peer);
+  int mode = need_verify ? SSL_VERIFY_PEER : SSL_VERIFY_NONE;
 
   if (server && impl_->require_client_cert)
     mode |= SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
@@ -300,6 +315,18 @@ bool
 Ctx::use_default_verify_paths()
 {
   return SSL_CTX_set_default_verify_paths(impl_->ctx) == 1;
+}
+
+void
+Ctx::set_verify_peer(bool enable)
+{
+  impl_->verify_peer = enable;
+}
+
+bool
+Ctx::verify_peer_enabled() const
+{
+  return impl_->verify_peer;
 }
 
 void

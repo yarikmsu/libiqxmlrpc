@@ -214,3 +214,113 @@ BOOST_AUTO_TEST_CASE(blocking_ssl_accept_calls_prepare)
 }
 
 BOOST_AUTO_TEST_SUITE_END()
+
+// =============================================================================
+// Tests for verify_peer / client_verified() API (Finding #1: Client TLS Verification)
+// =============================================================================
+
+BOOST_AUTO_TEST_SUITE(ssl_verify_peer_unit_tests)
+
+// client_verified() returns a non-null context with verify_peer enabled.
+BOOST_AUTO_TEST_CASE(client_verified_creates_verify_peer_context)
+{
+  SslContextGuard ctx_guard(ssl::Ctx::client_verified());
+
+  BOOST_REQUIRE(ctx_guard.get() != nullptr);
+  BOOST_CHECK(ctx_guard->verify_peer_enabled());
+}
+
+// client_only() defaults verify_peer to false (backward compatibility).
+BOOST_AUTO_TEST_CASE(client_only_verify_peer_defaults_false)
+{
+  SslContextGuard ctx_guard(ssl::Ctx::client_only());
+
+  BOOST_CHECK(!ctx_guard->verify_peer_enabled());
+}
+
+// set_verify_peer() roundtrip: toggle on, verify, toggle off, verify.
+BOOST_AUTO_TEST_CASE(set_verify_peer_roundtrip)
+{
+  SslContextGuard ctx_guard(ssl::Ctx::client_only());
+
+  BOOST_CHECK(!ctx_guard->verify_peer_enabled());
+
+  ctx_guard->set_verify_peer(true);
+  BOOST_CHECK(ctx_guard->verify_peer_enabled());
+
+  ctx_guard->set_verify_peer(false);
+  BOOST_CHECK(!ctx_guard->verify_peer_enabled());
+}
+
+// With verify_peer=true, prepare_verify() sets SSL_VERIFY_PEER on the SSL object.
+BOOST_AUTO_TEST_CASE(prepare_verify_sets_ssl_verify_peer)
+{
+  SslContextGuard ctx_guard(ssl::Ctx::client_only());
+  ctx_guard->set_verify_peer(true);
+
+  SocketGuard sg;
+  TestableConnection conn(sg.sock);
+
+  // prepare_verify(ssl, server=false) is called internally during connection setup.
+  // Call it directly here to inspect the resulting SSL verify mode.
+  ctx_guard->prepare_verify(conn.ssl_handle(), false);
+
+  int mode = SSL_get_verify_mode(conn.ssl_handle());
+  BOOST_CHECK(mode & SSL_VERIFY_PEER);
+}
+
+// With verify_peer=false (default), prepare_verify() sets SSL_VERIFY_NONE.
+BOOST_AUTO_TEST_CASE(prepare_verify_sets_ssl_verify_none_by_default)
+{
+  SslContextGuard ctx_guard(ssl::Ctx::client_only());
+
+  SocketGuard sg;
+  TestableConnection conn(sg.sock);
+
+  ctx_guard->prepare_verify(conn.ssl_handle(), false);
+
+  int mode = SSL_get_verify_mode(conn.ssl_handle());
+  BOOST_CHECK_EQUAL(mode, SSL_VERIFY_NONE);
+}
+
+// When both verify_peer and a custom verifier are set, the verifier's
+// callback is installed (verify_peer is redundant but harmless).
+BOOST_AUTO_TEST_CASE(custom_verifier_takes_precedence_over_verify_peer)
+{
+  SslContextGuard ctx_guard(ssl::Ctx::client_only());
+  ctx_guard->set_verify_peer(true);
+
+  TrackingVerifier verifier;
+  ctx_guard->verify_server(&verifier);
+
+  SocketGuard sg;
+  TestableConnection conn(sg.sock);
+
+  ctx_guard->prepare_verify(conn.ssl_handle(), false);
+
+  // Mode should be SSL_VERIFY_PEER regardless
+  int mode = SSL_get_verify_mode(conn.ssl_handle());
+  BOOST_CHECK(mode & SSL_VERIFY_PEER);
+
+  // The custom callback should be installed (not nullptr).
+  auto cb = SSL_get_verify_callback(conn.ssl_handle());
+  BOOST_CHECK(cb != nullptr);
+}
+
+// verify_peer flag only affects client-side connections (server=false).
+BOOST_AUTO_TEST_CASE(prepare_verify_ignores_verify_peer_for_server)
+{
+  SslContextGuard ctx_guard(ssl::Ctx::client_only());
+  ctx_guard->set_verify_peer(true);
+
+  SocketGuard sg;
+  TestableConnection conn(sg.sock);
+
+  // server=true: verify_peer should NOT apply
+  ctx_guard->prepare_verify(conn.ssl_handle(), true);
+
+  int mode = SSL_get_verify_mode(conn.ssl_handle());
+  BOOST_CHECK_EQUAL(mode, SSL_VERIFY_NONE);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
