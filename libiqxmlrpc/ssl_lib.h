@@ -83,6 +83,9 @@ public:
   //! Loads the system CA store and enables SSL_VERIFY_PEER.
   //! Connections will fail if the server certificate is not trusted.
   //! The returned context has no cert/key and is for client connections only.
+  //! \note For hostname verification (MITM protection), callers must also set
+  //!       the expected hostname via Client_base::set_expected_hostname() or
+  //!       ssl::Connection::set_expected_hostname() before connecting.
   //! \throws ssl::exception if system CA store cannot be loaded.
   static Ctx* client_verified();
 

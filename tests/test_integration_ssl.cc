@@ -579,7 +579,7 @@ BOOST_FIXTURE_TEST_CASE(https_set_verify_peer_with_trusted_ca, HttpsIntegrationF
 
   // Enable peer verification and load the self-signed cert as trusted CA
   get_context()->set_verify_peer(true);
-  get_context()->load_verify_locations(temp_cert_path_);
+  BOOST_REQUIRE(get_context()->load_verify_locations(temp_cert_path_));
 
   start_server(220);
   auto client = create_client();

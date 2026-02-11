@@ -229,7 +229,7 @@ BOOST_AUTO_TEST_CASE(wide_struct_stress)
   std::string xml = "<?xml version=\"1.0\"?><methodCall><methodName>test</methodName>"
                     "<params><param><value><struct>";
 
-  // Add 1000 members (well under MAX_ELEMENT_COUNT of 100,000)
+  // Add 1000 members (well under MAX_ELEMENT_COUNT of 10,000,000)
   for (int i = 0; i < 1000; ++i) {
     xml += "<member><name>m" + std::to_string(i) + "</name><value><i4>" +
            std::to_string(i) + "</i4></value></member>";
@@ -451,6 +451,50 @@ BOOST_AUTO_TEST_SUITE_END()
 // SSL Integer Truncation Tests
 // Tests for SSL read/write bounds checking (same as socket tests)
 //=============================================================================
+
+//=============================================================================
+// XML Parser Integer Truncation Tests
+// Tests for xmlReaderForMemory int size parameter bounds checking (CWE-197)
+//=============================================================================
+
+BOOST_AUTO_TEST_SUITE(security_parser_integer_truncation)
+
+// Test: Normal-sized XML still parses successfully (regression test)
+BOOST_AUTO_TEST_CASE(parser_normal_xml_still_works)
+{
+  std::string xml =
+    "<?xml version=\"1.0\"?>"
+    "<methodCall>"
+    "  <methodName>test.echo</methodName>"
+    "  <params>"
+    "    <param><value><string>hello</string></value></param>"
+    "  </params>"
+    "</methodCall>";
+
+  std::unique_ptr<Request> req;
+  BOOST_REQUIRE_NO_THROW(req.reset(parse_request(xml)));
+  BOOST_REQUIRE(req);
+
+  BOOST_CHECK_EQUAL(req->get_name(), "test.echo");
+  const Param_list& params = req->get_params();
+  BOOST_REQUIRE_EQUAL(params.size(), 1u);
+  BOOST_CHECK_EQUAL(std::string(params[0]), "hello");
+}
+
+// Test: Verify Parse_error carries correct XML-RPC fault code and message.
+// We can't allocate >2GB to trigger the guard, but we confirm the exception
+// that the guard throws has the right fault code for clients to handle.
+BOOST_AUTO_TEST_CASE(parser_oversized_error_type_and_message)
+{
+  Parse_error ex("XML payload exceeds maximum supported size");
+  BOOST_CHECK_EQUAL(ex.code(), -32700);
+
+  std::string msg = ex.what();
+  BOOST_CHECK(msg.find("XML payload exceeds maximum supported size") != std::string::npos);
+  BOOST_CHECK(msg.find("Parser error") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE(security_ssl_integer_truncation)
 
