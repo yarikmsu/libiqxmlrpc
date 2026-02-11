@@ -227,7 +227,7 @@ BOOST_AUTO_TEST_CASE(client_verified_creates_verify_peer_context)
   SslContextGuard ctx_guard(ssl::Ctx::client_verified());
 
   BOOST_REQUIRE(ctx_guard.get() != nullptr);
-  BOOST_CHECK(ctx_guard->verify_peer_enabled());
+  BOOST_REQUIRE(ctx_guard->verify_peer_enabled());
 }
 
 // client_only() defaults verify_peer to false (backward compatibility).
@@ -235,7 +235,7 @@ BOOST_AUTO_TEST_CASE(client_only_verify_peer_defaults_false)
 {
   SslContextGuard ctx_guard(ssl::Ctx::client_only());
 
-  BOOST_CHECK(!ctx_guard->verify_peer_enabled());
+  BOOST_REQUIRE(!ctx_guard->verify_peer_enabled());
 }
 
 // set_verify_peer() roundtrip: toggle on, verify, toggle off, verify.
@@ -266,7 +266,7 @@ BOOST_AUTO_TEST_CASE(prepare_verify_sets_ssl_verify_peer)
   ctx_guard->prepare_verify(conn.ssl_handle(), false);
 
   int mode = SSL_get_verify_mode(conn.ssl_handle());
-  BOOST_CHECK(mode & SSL_VERIFY_PEER);
+  BOOST_REQUIRE(mode & SSL_VERIFY_PEER);
 }
 
 // With verify_peer=false (default), prepare_verify() sets SSL_VERIFY_NONE.
@@ -300,7 +300,7 @@ BOOST_AUTO_TEST_CASE(custom_verifier_takes_precedence_over_verify_peer)
 
   // Mode should be SSL_VERIFY_PEER regardless
   int mode = SSL_get_verify_mode(conn.ssl_handle());
-  BOOST_CHECK(mode & SSL_VERIFY_PEER);
+  BOOST_REQUIRE(mode & SSL_VERIFY_PEER);
 
   // The custom callback should be installed (not nullptr).
   auto cb = SSL_get_verify_callback(conn.ssl_handle());

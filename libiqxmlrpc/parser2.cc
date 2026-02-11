@@ -3,6 +3,7 @@
 //  Copyright (C) 2019-2026 Yaroslav Gorbunov
 
 #include <algorithm>
+#include <limits>
 #include <stdexcept>
 #include <libxml/xmlreader.h>
 #include <libxml/xmlIO.h>
@@ -140,6 +141,12 @@ public:
     pushed_back(false),
     element_count(0)
   {
+    // SECURITY: Prevent integer truncation when casting size_t to int.
+    // xmlReaderForMemory takes int for buffer size; a >2GB payload would
+    // silently truncate, causing libxml2 to parse only a fragment.
+    if (str.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
+      throw Parse_error("XML payload exceeds maximum supported size");
+    }
     const char* buf2 = str.data();
     int sz = static_cast<int>(str.size());
 #if (LIBXML_VERSION < 20703)
