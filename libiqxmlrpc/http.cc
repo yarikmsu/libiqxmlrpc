@@ -118,6 +118,7 @@ namespace names {
   const char date[]           = "date";
   const char authorization[]  = "authorization";
   const char expect_continue[]= "expect";
+  const char transfer_encoding[] = "transfer-encoding";
 } // namespace names
 
 // SECURITY: Thread-safe static configuration for server version disclosure
@@ -196,6 +197,15 @@ void expect_continue(const std::string& val)
     throw Expectation_failed();
 }
 
+// SECURITY (CWE-444): Reject Transfer-Encoding to prevent HTTP request smuggling.
+// libiqxmlrpc uses Content-Length framing exclusively. Allowing Transfer-Encoding
+// creates CL.TE desynchronization (proxy interprets TE, backend interprets CL)
+// when deployed behind a reverse proxy.
+void reject_transfer_encoding(const std::string&)
+{
+  throw Http_header_error("Transfer-Encoding is not supported");
+}
+
 } // namespace validator
 
 
@@ -208,6 +218,7 @@ Header::Header(Verification_level lev):
   set_option_default(names::connection, "close");
   register_validator(names::content_length, validator::unsigned_number, HTTP_CHECK_WEAK);
   register_validator(names::expect_continue, validator::expect_continue, HTTP_CHECK_WEAK);
+  register_validator(names::transfer_encoding, validator::reject_transfer_encoding, HTTP_CHECK_WEAK);
   register_validator(names::content_type, validator::content_type, HTTP_CHECK_STRICT);
 }
 

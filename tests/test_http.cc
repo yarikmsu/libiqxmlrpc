@@ -1105,4 +1105,80 @@ BOOST_AUTO_TEST_CASE(request_header_host_port_low_port)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+// SECURITY (CWE-444): Transfer-Encoding rejection tests
+// Prevents HTTP request smuggling via CL.TE desynchronization
+BOOST_AUTO_TEST_SUITE(transfer_encoding_rejection_tests)
+
+BOOST_AUTO_TEST_CASE(request_with_transfer_encoding_chunked_throws)
+{
+    std::string raw_header = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 0\r\ntransfer-encoding: chunked";
+    BOOST_CHECK_THROW(Request_header(HTTP_CHECK_WEAK, raw_header), Http_header_error);
+}
+
+BOOST_AUTO_TEST_CASE(request_with_transfer_encoding_identity_throws)
+{
+    std::string raw_header = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 0\r\ntransfer-encoding: identity";
+    BOOST_CHECK_THROW(Request_header(HTTP_CHECK_WEAK, raw_header), Http_header_error);
+}
+
+BOOST_AUTO_TEST_CASE(response_with_transfer_encoding_throws)
+{
+    std::string raw_header = "HTTP/1.1 200 OK\r\ncontent-length: 0\r\ntransfer-encoding: chunked";
+    BOOST_CHECK_THROW(Response_header(HTTP_CHECK_WEAK, raw_header), Http_header_error);
+}
+
+BOOST_AUTO_TEST_CASE(transfer_encoding_case_insensitive_throws)
+{
+    // Parser normalizes header names to lowercase before validation, so "Transfer-Encoding"
+    // matches the "transfer-encoding" validator. This test confirms the normalization works.
+    std::string raw_header = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 0\r\nTransfer-Encoding: chunked";
+    BOOST_CHECK_THROW(Request_header(HTTP_CHECK_WEAK, raw_header), Http_header_error);
+}
+
+BOOST_AUTO_TEST_CASE(transfer_encoding_with_both_cl_and_te_throws)
+{
+    // CL.TE smuggling scenario: both headers present. Transfer-Encoding alone triggers
+    // rejection; the combination is tested to document the attack vector explicitly.
+    std::string raw_header = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 5\r\ntransfer-encoding: chunked";
+    BOOST_CHECK_THROW(Request_header(HTTP_CHECK_WEAK, raw_header), Http_header_error);
+}
+
+BOOST_AUTO_TEST_CASE(packet_reader_rejects_te_in_request)
+{
+    Packet_reader reader;
+    std::string raw = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 4\r\ntransfer-encoding: chunked\r\n\r\ntest";
+    BOOST_CHECK_THROW(reader.read_request(raw), Http_header_error);
+}
+
+BOOST_AUTO_TEST_CASE(request_with_te_only_no_content_length_throws)
+{
+    // TE-only request (no Content-Length): rejected even without a CL.TE conflict
+    std::string raw_header = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ntransfer-encoding: chunked";
+    BOOST_CHECK_THROW(Request_header(HTTP_CHECK_WEAK, raw_header), Http_header_error);
+}
+
+BOOST_AUTO_TEST_CASE(transfer_encoding_with_whitespace_in_value_throws)
+{
+    // OWS (optional whitespace) around header value must not bypass rejection
+    std::string raw_header = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 0\r\ntransfer-encoding:  chunked  ";
+    BOOST_CHECK_THROW(Request_header(HTTP_CHECK_WEAK, raw_header), Http_header_error);
+}
+
+BOOST_AUTO_TEST_CASE(transfer_encoding_rejected_at_strict_level)
+{
+    // Verify TE rejection fires at HTTP_CHECK_STRICT too (not just WEAK)
+    std::string raw_header = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-type: text/xml\r\ncontent-length: 0\r\ntransfer-encoding: chunked";
+    BOOST_CHECK_THROW(Request_header(HTTP_CHECK_STRICT, raw_header), Http_header_error);
+}
+
+BOOST_AUTO_TEST_CASE(packet_reader_rejects_te_in_response)
+{
+    // Packet_reader response path: symmetric with the request integration test
+    Packet_reader reader;
+    std::string raw = "HTTP/1.1 200 OK\r\ncontent-length: 4\r\ntransfer-encoding: chunked\r\n\r\ntest";
+    BOOST_CHECK_THROW(reader.read_response(raw, false), Http_header_error);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
 // vim:ts=2:sw=2:et
