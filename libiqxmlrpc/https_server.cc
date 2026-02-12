@@ -113,9 +113,8 @@ void Https_server_connection::recv_succeed( bool&, size_t, size_t real_len )
   }
   catch( const http::Error_response& e )
   {
-    // Close connection after sending HTTP error response
+    server->log_err_msg( std::string("Https: ") + e.what() );
     keep_alive = false;
-    // Packet payload is sufficient here; slicing is intentional.
     schedule_response( new http::Packet(e) );  // NOLINT(cppcoreguidelines-slicing)
   }
 }

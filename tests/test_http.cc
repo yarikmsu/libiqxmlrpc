@@ -1106,7 +1106,7 @@ BOOST_AUTO_TEST_CASE(request_header_host_port_low_port)
 BOOST_AUTO_TEST_SUITE_END()
 
 // SECURITY (CWE-444): Transfer-Encoding rejection tests
-// Prevents HTTP request smuggling via CL.TE desynchronization
+// Prevents HTTP request smuggling by rejecting TE header unconditionally
 BOOST_AUTO_TEST_SUITE(transfer_encoding_rejection_tests)
 
 BOOST_AUTO_TEST_CASE(request_with_transfer_encoding_chunked_throws)
@@ -1173,10 +1173,23 @@ BOOST_AUTO_TEST_CASE(transfer_encoding_rejected_at_strict_level)
 
 BOOST_AUTO_TEST_CASE(packet_reader_rejects_te_in_response)
 {
-    // Packet_reader response path: symmetric with the request integration test
     Packet_reader reader;
     std::string raw = "HTTP/1.1 200 OK\r\ncontent-length: 4\r\ntransfer-encoding: chunked\r\n\r\ntest";
     BOOST_CHECK_THROW(reader.read_response(raw, false), Http_header_error);
+}
+
+BOOST_AUTO_TEST_CASE(transfer_encoding_before_content_length_throws)
+{
+    // TE.CL order: Transfer-Encoding before Content-Length
+    std::string raw_header = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ntransfer-encoding: chunked\r\ncontent-length: 5";
+    BOOST_CHECK_THROW(Request_header(HTTP_CHECK_WEAK, raw_header), Http_header_error);
+}
+
+BOOST_AUTO_TEST_CASE(duplicate_transfer_encoding_headers_throws)
+{
+    // Duplicate TE headers must still be rejected
+    std::string raw_header = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 0\r\ntransfer-encoding: identity\r\ntransfer-encoding: chunked";
+    BOOST_CHECK_THROW(Request_header(HTTP_CHECK_WEAK, raw_header), Http_header_error);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
