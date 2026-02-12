@@ -107,6 +107,7 @@ public:
 
   void schedule_execute( http::Packet*, Server_connection* );
   void schedule_response( const Response&, Server_connection*, Executor* );
+  void schedule_response( const Response&, const ConnectionGuardPtr&, Executor* );
 
   void log_err_msg( const std::string& );
 

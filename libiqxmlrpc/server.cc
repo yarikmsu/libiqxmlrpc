@@ -328,6 +328,17 @@ void Server::schedule_response(
   conn->schedule_response( packet );
 }
 
+void Server::schedule_response(
+  const Response& resp, const ConnectionGuardPtr& guard, Executor* exec )
+{
+  std::unique_ptr<Executor> executor_to_delete(exec);
+  std::string resp_str = dump_response(resp);
+  auto *packet = new http::Packet(new http::Response_header(), std::move(resp_str));
+  if (!guard->try_schedule_response(packet)) {
+    log_err_msg("Response delivery failed (connection may have been closed)");
+  }
+}
+
 void Server::set_firewall( iqnet::Firewall_base* _firewall )
 {
   impl->firewall = _firewall;

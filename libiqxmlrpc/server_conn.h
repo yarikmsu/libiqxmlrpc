@@ -21,6 +21,27 @@ namespace iqnet
 namespace iqxmlrpc {
 
 class Server;
+class Server_connection;
+
+// SECURITY: Guard object for safe cross-thread connection access (CWE-416).
+// Outlives the connection via shared_ptr; mutex serializes deletion
+// vs. response delivery to prevent use-after-free.
+class LIBIQXMLRPC_API ConnectionGuard {
+public:
+  explicit ConnectionGuard(Server_connection* conn);
+
+  ConnectionGuard(const ConnectionGuard&) = delete;
+  ConnectionGuard& operator=(const ConnectionGuard&) = delete;
+
+  void invalidate();
+  bool try_schedule_response(http::Packet* packet);
+
+private:
+  mutable std::mutex mutex_;
+  Server_connection* conn_;
+};
+
+using ConnectionGuardPtr = std::shared_ptr<ConnectionGuard>;
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -45,6 +66,9 @@ public:
   Server_connection& operator=(const Server_connection&) = delete;
 
   const iqnet::Inet_addr& get_peer_addr() const { return peer_addr; }
+
+  //! Get the connection guard for safe cross-thread access.
+  ConnectionGuardPtr connection_guard() const { return conn_guard_; }
 
   void set_server( Server* s )
   {
@@ -86,7 +110,11 @@ protected:
 
   virtual void do_schedule_response() = 0;
 
+  //! Invalidate the connection guard before destroying the connection.
+  void invalidate_guard();
+
 private:
+  ConnectionGuardPtr conn_guard_;
   std::vector<char> read_buf_;
 
   // Mutex for idle state - provides defensive synchronization.

@@ -1,6 +1,7 @@
 //  Libiqxmlrpc - an object-oriented XML-RPC solution.
 //  Copyright (C) 2011 Anton Dedov
 
+#include <cstdio>
 #include <memory>
 
 #include "server_conn.h"
@@ -10,6 +11,52 @@
 
 using namespace iqxmlrpc;
 
+// ---------------------------------------------------------------------------
+// ConnectionGuard
+// ---------------------------------------------------------------------------
+
+ConnectionGuard::ConnectionGuard(Server_connection* conn)
+  : mutex_()
+  , conn_(conn)
+{
+}
+
+void ConnectionGuard::invalidate()
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  conn_ = nullptr;
+}
+
+bool ConnectionGuard::try_schedule_response(http::Packet* packet)
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (!conn_) {
+    delete packet;
+    return false;
+  }
+  try {
+    conn_->schedule_response(packet);
+    return true;
+  } catch (const std::exception& e) {
+    // Server_connection::schedule_response() wraps packet in unique_ptr
+    // immediately, so if it throws, the packet is freed during stack
+    // unwinding. Log and signal failure without killing the pool thread.
+    (void)std::fprintf(stderr,
+      "iqxmlrpc: WARNING: ConnectionGuard::try_schedule_response() failed: %s\n",
+      e.what());
+    return false;
+  } catch (...) {
+    (void)std::fprintf(stderr,
+      "iqxmlrpc: WARNING: ConnectionGuard::try_schedule_response() failed "
+      "(unknown exception)\n");
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Server_connection
+// ---------------------------------------------------------------------------
+
 Server_connection::Server_connection( const iqnet::Inet_addr& a ):
   peer_addr(a),
   server(nullptr),
@@ -17,6 +64,7 @@ Server_connection::Server_connection( const iqnet::Inet_addr& a ):
   response(),
   response_offset(0),
   keep_alive(false),
+  conn_guard_(std::make_shared<ConnectionGuard>(this)),
   read_buf_(65536, '\0'),
   idle_mutex_(),
   is_waiting_input_(false),
@@ -25,7 +73,19 @@ Server_connection::Server_connection( const iqnet::Inet_addr& a ):
 }
 
 
-Server_connection::~Server_connection() = default;
+Server_connection::~Server_connection()
+{
+  // Defense-in-depth: ensure guard is invalidated even if subclass
+  // forgot to call invalidate_guard() in finish().
+  if (conn_guard_)
+    conn_guard_->invalidate();
+}
+
+
+void Server_connection::invalidate_guard()
+{
+  conn_guard_->invalidate();
+}
 
 
 http::Packet* Server_connection::read_request( const std::string& s )

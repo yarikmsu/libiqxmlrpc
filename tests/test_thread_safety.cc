@@ -6,10 +6,12 @@
 #include <atomic>
 #include <chrono>
 #include <set>
+#include <sstream>
 #include <thread>
 #include <vector>
 
 #include "test_common.h"
+#include "libiqxmlrpc/server_conn.h"
 
 using namespace iqxmlrpc;
 using namespace iqnet;
@@ -263,6 +265,38 @@ BOOST_AUTO_TEST_CASE(single_item_handoff)
 }
 
 BOOST_AUTO_TEST_SUITE_END()
+
+// ============================================================================
+// Stub Server_connection for guard and integration tests
+// ============================================================================
+
+namespace {
+
+// Minimal concrete Server_connection for testing ConnectionGuard.
+// Only implements the pure virtual methods; does not need a real socket.
+class Stub_server_connection : public Server_connection {
+public:
+  std::atomic<int> schedule_count{0};
+  bool throw_on_schedule = false;
+  bool throw_non_std = false;
+
+  Stub_server_connection()
+    : Server_connection(iqnet::Inet_addr("127.0.0.1", 0))
+  {
+  }
+
+  void do_schedule_response() override {
+    if (throw_non_std)
+      throw 42;  // NOLINT: exercises catch(...) path
+    if (throw_on_schedule)
+      throw std::runtime_error("stub: forced schedule failure");
+    schedule_count.fetch_add(1, std::memory_order_relaxed);
+  }
+
+  void terminate_idle() override {}
+};
+
+} // anonymous namespace
 
 // ============================================================================
 // Suite 2: Pool_executor Integration Tests
@@ -590,6 +624,38 @@ BOOST_FIXTURE_TEST_CASE(drain_timeout_exercise, ThreadSafetyFixture)
   stop_server();
 }
 
+// Exercises the guard rejection path in the ConnectionGuardPtr overload
+// of Server::schedule_response(). Verifies: when a ConnectionGuard is
+// invalidated before schedule_response is called, the packet is safely
+// dropped and the server logs the rejection message.
+BOOST_FIXTURE_TEST_CASE(guard_rejects_late_response, ThreadSafetyFixture)
+{
+  start_server(2, port_offset::GUARD_REJECTION);
+
+  // Capture server log output
+  std::ostringstream log_stream;
+  server().log_errors(&log_stream);
+
+  // Create a stub connection and immediately invalidate its guard
+  auto conn = std::make_unique<Stub_server_connection>();
+  ConnectionGuardPtr guard = conn->connection_guard();
+  guard->invalidate();
+
+  // Call the guarded schedule_response overload directly.
+  // The guard is already invalidated, so try_schedule_response() returns false,
+  // the packet is deleted (no leak), and the rejection is logged.
+  Response resp(0, "should be dropped");
+  server().schedule_response(resp, guard, nullptr);
+
+  std::string logged = log_stream.str();
+  BOOST_CHECK_MESSAGE(
+    logged.find("Response delivery failed") != std::string::npos,
+    "Expected guard rejection log message, got: " + logged);
+
+  stop_server();
+  THREAD_SAFE_TEST_MESSAGE("Guard rejection path: log verified");
+}
+
 // Note: The destructor queue drain loop (~Pool_executor_factory while/pop)
 // and the ~Pool_executor early return guard (is_being_destructed check) are
 // defensive safety nets. drain() now blocks indefinitely, so the queue should
@@ -629,6 +695,141 @@ BOOST_FIXTURE_TEST_CASE(destructor_drains_queue, ThreadSafetyFixture)
   THREAD_SAFE_TEST_MESSAGE("Destructor drain: completed=" +
     std::to_string(completed.load()) + "/" +
     std::to_string(NUM_CLIENTS * REQUESTS_PER_CLIENT));
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+// ============================================================================
+// Suite 3: ConnectionGuard Unit Tests
+// Tests the ConnectionGuard pattern for safe cross-thread connection access
+// ============================================================================
+
+BOOST_AUTO_TEST_SUITE(connection_guard_tests)
+
+// Basic lifecycle: create guard, verify alive, invalidate, verify dead.
+BOOST_AUTO_TEST_CASE(guard_basic_lifecycle)
+{
+  auto conn = std::make_unique<Stub_server_connection>();
+  ConnectionGuardPtr guard = conn->connection_guard();
+  BOOST_REQUIRE(guard != nullptr);
+
+  // Guard is alive — try_schedule_response should succeed
+  auto* pkt = new http::Packet(new http::Response_header(), std::string("OK"));
+  BOOST_CHECK(guard->try_schedule_response(pkt));
+  BOOST_CHECK_EQUAL(conn->schedule_count.load(), 1);
+
+  // Invalidate the guard
+  guard->invalidate();
+
+  // Guard is dead — try_schedule_response should return false and delete the packet
+  auto* pkt2 = new http::Packet(new http::Response_header(), std::string("DROPPED"));
+  BOOST_CHECK(!guard->try_schedule_response(pkt2));
+  // schedule_count should still be 1 (packet was not delivered)
+  BOOST_CHECK_EQUAL(conn->schedule_count.load(), 1);
+}
+
+// Verify that try_schedule_response deletes the packet when guard is invalidated.
+BOOST_AUTO_TEST_CASE(guard_invalidated_drops_response)
+{
+  auto conn = std::make_unique<Stub_server_connection>();
+  ConnectionGuardPtr guard = conn->connection_guard();
+
+  guard->invalidate();
+
+  // Every call should return false and delete the packet (no leak under ASan)
+  for (int i = 0; i < 10; ++i) {
+    auto* pkt = new http::Packet(new http::Response_header(), std::string("X"));
+    BOOST_CHECK(!guard->try_schedule_response(pkt));
+  }
+  BOOST_CHECK_EQUAL(conn->schedule_count.load(), 0);
+}
+
+// Destructor defense-in-depth: guard is auto-invalidated when connection is destroyed.
+BOOST_AUTO_TEST_CASE(guard_survives_connection_destruction)
+{
+  ConnectionGuardPtr guard;
+  {
+    auto conn = std::make_unique<Stub_server_connection>();
+    guard = conn->connection_guard();
+    // conn destroyed here — guard should be auto-invalidated by ~Server_connection
+  }
+
+  // Guard outlives connection — must safely reject
+  auto* pkt = new http::Packet(new http::Response_header(), std::string("LATE"));
+  BOOST_CHECK(!guard->try_schedule_response(pkt));
+}
+
+// Stress test: concurrent invalidate + try_schedule_response from multiple threads.
+BOOST_AUTO_TEST_CASE(guard_concurrent_invalidate_and_response)
+{
+  constexpr int NUM_TRIALS = 100;
+  constexpr int THREADS_PER_TRIAL = 4;
+
+  for (int trial = 0; trial < NUM_TRIALS; ++trial) {
+    auto conn = std::make_unique<Stub_server_connection>();
+    ConnectionGuardPtr guard = conn->connection_guard();
+    std::atomic<bool> start{false};
+    std::atomic<int> delivered{0};
+    std::atomic<int> dropped{0};
+
+    std::vector<std::thread> threads;
+    threads.reserve(THREADS_PER_TRIAL + 1);
+
+    // Invalidator thread
+    threads.emplace_back([&guard, &start]() {
+      while (!start.load(std::memory_order_acquire)) {}
+      guard->invalidate();
+    });
+
+    // Response threads
+    for (int t = 0; t < THREADS_PER_TRIAL; ++t) {
+      threads.emplace_back([&guard, &start, &delivered, &dropped]() {
+        while (!start.load(std::memory_order_acquire)) {}
+        auto* pkt = new http::Packet(new http::Response_header(), std::string("R"));
+        if (guard->try_schedule_response(pkt)) {
+          delivered.fetch_add(1, std::memory_order_relaxed);
+        } else {
+          dropped.fetch_add(1, std::memory_order_relaxed);
+        }
+      });
+    }
+
+    // Release all threads simultaneously
+    start.store(true, std::memory_order_release);
+
+    for (auto& t : threads) t.join();
+
+    // Invariant: delivered + dropped == THREADS_PER_TRIAL
+    BOOST_CHECK_EQUAL(delivered.load() + dropped.load(), THREADS_PER_TRIAL);
+    // schedule_count must match delivered
+    BOOST_CHECK_EQUAL(conn->schedule_count.load(), delivered.load());
+  }
+}
+
+// Exception safety: if schedule_response throws std::exception, the guard
+// catches it, returns false, and does not propagate to the pool thread.
+BOOST_AUTO_TEST_CASE(guard_handles_schedule_exception)
+{
+  auto conn = std::make_unique<Stub_server_connection>();
+  conn->throw_on_schedule = true;
+  ConnectionGuardPtr guard = conn->connection_guard();
+
+  auto* pkt = new http::Packet(new http::Response_header(), std::string("X"));
+  // Must not throw; must return false
+  BOOST_CHECK(!guard->try_schedule_response(pkt));
+  BOOST_CHECK_EQUAL(conn->schedule_count.load(), 0);
+}
+
+// Same as above but for non-std::exception types (exercises catch(...) path).
+BOOST_AUTO_TEST_CASE(guard_handles_unknown_exception)
+{
+  auto conn = std::make_unique<Stub_server_connection>();
+  conn->throw_non_std = true;
+  ConnectionGuardPtr guard = conn->connection_guard();
+
+  auto* pkt = new http::Packet(new http::Response_header(), std::string("X"));
+  BOOST_CHECK(!guard->try_schedule_response(pkt));
+  BOOST_CHECK_EQUAL(conn->schedule_count.load(), 0);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

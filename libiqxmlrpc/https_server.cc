@@ -70,6 +70,7 @@ inline void Https_server_connection::my_reg_recv()
 
 void Https_server_connection::finish()
 {
+  invalidate_guard();
   server->unregister_connection(this);
   delete this;
 }
