@@ -28,6 +28,8 @@ namespace iqxmlrpc {
 class Server;
 class Server_connection;
 class Response;
+class ConnectionGuard;
+using ConnectionGuardPtr = std::shared_ptr<ConnectionGuard>;
 
 class Serial_executor_factory;
 class Pool_executor_factory;
@@ -57,6 +59,7 @@ protected:
 private:
   Server* server;
   Server_connection* conn;
+  ConnectionGuardPtr conn_guard_;
 
 public:
   Executor( Method*, Server*, Server_connection* );
@@ -73,6 +76,7 @@ public:
 protected:
   void schedule_response( const Response& );
   void interrupt_server();
+  void set_connection_guard(ConnectionGuardPtr g) { conn_guard_ = std::move(g); }
 };
 
 

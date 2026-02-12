@@ -79,6 +79,7 @@ void Http_server_connection::post_accept()
 
 void Http_server_connection::finish()
 {
+  invalidate_guard();
   server->unregister_connection(this);
   delete this;
 }

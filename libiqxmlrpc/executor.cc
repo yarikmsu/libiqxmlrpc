@@ -7,6 +7,7 @@
 #include "reactor_impl.h"
 #include "response.h"
 #include "server.h"
+#include "server_conn.h"
 #include "util.h"
 
 #include <cassert>
@@ -20,7 +21,8 @@ Executor::Executor( Method* m, Server* s, Server_connection* cb ):
   method(m),
   interceptors(nullptr),
   server(s),
-  conn(cb)
+  conn(cb),
+  conn_guard_()
 {
 }
 
@@ -30,7 +32,13 @@ Executor::~Executor() = default;
 
 void Executor::schedule_response( const Response& resp )
 {
-  server->schedule_response( resp, conn, this );
+  // Pool executors use the guard for safe cross-thread delivery;
+  // serial executors use the raw conn (same thread as reactor).
+  if (conn_guard_) {
+    server->schedule_response( resp, conn_guard_, this );
+  } else {
+    server->schedule_response( resp, conn, this );
+  }
 }
 
 
@@ -268,6 +276,8 @@ Pool_executor::Pool_executor(
     pool(p),
     params()
 {
+  if (c)
+    set_connection_guard(c->connection_guard());
 }
 
 

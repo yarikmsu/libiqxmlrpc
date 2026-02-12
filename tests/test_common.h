@@ -58,6 +58,7 @@ namespace port_offset {
   constexpr int SHUTDOWN_INFLIGHT = 6;
   constexpr int POOL_EXCEPTIONS = 7;
   constexpr int DRAIN_TIMEOUT_EXERCISE = 8;
+  constexpr int GUARD_REJECTION = 9;
 }
 
 // ============================================================================
