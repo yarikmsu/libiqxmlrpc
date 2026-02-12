@@ -76,6 +76,7 @@ public:
 protected:
   void schedule_response( const Response& );
   void interrupt_server();
+  void log_err_msg( const std::string& msg );
   void set_connection_guard(ConnectionGuardPtr g) { conn_guard_ = std::move(g); }
 };
 

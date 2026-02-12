@@ -23,6 +23,7 @@ void register_user_methods(iqxmlrpc::Server& s)
   register_method(s, "error_method", error_method);
   register_method(s, "std_exception_method", std_exception_method);
   register_method(s, "unknown_exception_method", unknown_exception_method);
+  register_method(s, "library_exception_method", library_exception_method);
   register_method(s, "trace", trace_method);
   register_method(s, "sleep", sleep_method);
   register_method<Get_file>(s, "get_file");
@@ -110,6 +111,15 @@ void unknown_exception_method(
 {
   THREAD_SAFE_TEST_MESSAGE("unknown_exception_method invoked.");
   throw 42;  // Throw a non-exception type
+}
+
+void library_exception_method(
+  iqxmlrpc::Method* /*m*/,
+  const iqxmlrpc::Param_list&,
+  iqxmlrpc::Value& /*retval*/ )
+{
+  THREAD_SAFE_TEST_MESSAGE("library_exception_method invoked.");
+  throw iqxmlrpc::Invalid_meth_params();
 }
 
 void Get_file::execute( 

@@ -17,6 +17,9 @@
 using namespace iqxmlrpc;
 typedef std::unique_lock<std::mutex> scoped_lock;
 
+// CWE-209: Generic fault message sent to clients in place of internal details.
+static constexpr char GENERIC_FAULT_MSG[] = "Internal server error";
+
 Executor::Executor( Method* m, Server* s, Server_connection* cb ):
   method(m),
   interceptors(nullptr),
@@ -45,6 +48,11 @@ void Executor::schedule_response( const Response& resp )
 void Executor::interrupt_server()
 {
   server->interrupt();
+}
+
+void Executor::log_err_msg( const std::string& msg )
+{
+  server->log_err_msg(msg);
 }
 
 // ----------------------------------------------------------------------------
@@ -323,15 +331,25 @@ void Pool_executor::process_actual_execution()
   }
   catch( const Fault& f )
   {
+    // Fault messages are application-controlled; safe to return as-is.
     schedule_response( Response( f.code(), f.what() ) );
+  }
+  catch( const iqxmlrpc::Exception& e )
+  {
+    // Library exceptions carry XML-RPC interop fault codes; safe to return.
+    log_err_msg( std::string("Pool_executor: ") + e.what() );
+    schedule_response( Response( e.code(), e.what() ) );
   }
   catch( const std::exception& e )
   {
-    schedule_response( Response( -1, e.what() ) );
+    // CWE-209: generic message to client, detail logged server-side.
+    log_err_msg( std::string("Pool_executor: ") + e.what() );
+    schedule_response( Response( -1, GENERIC_FAULT_MSG ) );
   }
   catch( ... )
   {
-    schedule_response( Response( -1, "Unknown Error" ) );
+    log_err_msg( "Pool_executor: Unknown exception" );
+    schedule_response( Response( -1, GENERIC_FAULT_MSG ) );
   }
 }
 

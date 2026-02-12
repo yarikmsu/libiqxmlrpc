@@ -22,6 +22,9 @@
 
 namespace iqxmlrpc {
 
+// CWE-209: Generic fault message sent to clients in place of internal details.
+static constexpr char GENERIC_FAULT_MSG[] = "Internal server error";
+
 class Server::Impl {
 public:
   Executor_factory_base* exec_factory;
@@ -54,6 +57,7 @@ public:
   // Mutex for acceptor - protects against race between set_firewall()
   // from main thread and work() from worker thread
   mutable std::mutex acceptor_mutex;
+  mutable std::mutex log_mutex;
 
   Impl(
     const iqnet::Inet_addr& addr,
@@ -76,7 +80,8 @@ public:
       idle_timeout_ms(0),
       connections(),
       connections_mutex(),
-      acceptor_mutex()
+      acceptor_mutex(),
+      log_mutex()
   {
   }
 
@@ -148,6 +153,7 @@ void Server::enable_introspection()
 
 void Server::log_errors( std::ostream* log_ )
 {
+  std::lock_guard<std::mutex> lock(impl->log_mutex);
   impl->log = log_;
 }
 
@@ -224,6 +230,7 @@ void Server::unregister_connection(Server_connection* conn)
 
 void Server::log_err_msg( const std::string& msg )
 {
+  std::lock_guard<std::mutex> lock(impl->log_mutex);
   if( impl->log )
     *impl->log << msg << '\n';
 }
@@ -300,20 +307,22 @@ void Server::schedule_execute( http::Packet* pkt, Server_connection* conn )
   }
   catch( const iqxmlrpc::Exception& e )
   {
+    // Library exceptions carry XML-RPC interop fault codes; safe to return.
     log_err_msg( std::string("Server: ") + e.what() );
     Response err_r( e.code(), e.what() );
     schedule_response( err_r, conn, executor );
   }
   catch( const std::exception& e )
   {
+    // CWE-209: generic message to client, detail logged server-side.
     log_err_msg( std::string("Server: ") + e.what() );
-    Response err_r( -32500 /*application error*/, e.what() );
+    Response err_r( -32500, GENERIC_FAULT_MSG );
     schedule_response( err_r, conn, executor );
   }
   catch( ... )
   {
     log_err_msg( "Server: Unknown exception" );
-    Response err_r( -32500  /*application error*/, "Unknown Error" );
+    Response err_r( -32500, GENERIC_FAULT_MSG );
     schedule_response( err_r, conn, executor );
   }
 }
