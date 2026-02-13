@@ -184,16 +184,16 @@ BOOST_AUTO_TEST_CASE(header_set_option)
     BOOST_CHECK(dump.find("x-custom-header: custom-value") != std::string::npos);
 }
 
-BOOST_AUTO_TEST_CASE(header_xheaders)
+BOOST_AUTO_TEST_CASE(header_custom_headers_roundtrip)
 {
     Response_header hdr;
     XHeaders xheaders;
     xheaders["x-test-1"] = "value1";
     xheaders["x-test-2"] = "value2";
-    hdr.set_xheaders(xheaders);
+    hdr.set_headers(xheaders);
 
     XHeaders retrieved;
-    hdr.get_xheaders(retrieved);
+    hdr.get_headers(retrieved);
     BOOST_CHECK(retrieved.find("x-test-1") != retrieved.end());
     BOOST_CHECK(retrieved.find("x-test-2") != retrieved.end());
 }
@@ -948,7 +948,7 @@ BOOST_AUTO_TEST_CASE(header_option_name_case_insensitive)
 BOOST_AUTO_TEST_SUITE_END()
 
 // Edge case tests for HTTP header functionality
-// (covers snprintf buffer limits, xheaders clearing, and header type tags)
+// (covers snprintf buffer limits, get_headers() clearing, and header type tags)
 BOOST_AUTO_TEST_SUITE(http_header_edge_cases)
 
 // Test snprintf fallback path for long phrases (>128 chars)
@@ -988,8 +988,8 @@ BOOST_AUTO_TEST_CASE(response_header_dump_exact_boundary)
     BOOST_CHECK(dump_overflow.find(overflow_phrase) != std::string::npos);
 }
 
-// Test get_xheaders clears existing entries before populating
-BOOST_AUTO_TEST_CASE(get_xheaders_clears_existing_entries)
+// Test get_headers clears existing entries before populating
+BOOST_AUTO_TEST_CASE(get_headers_clears_existing_entries)
 {
     Response_header hdr(200, "OK");
     hdr.set_option("x-new-header", "new-value");
@@ -997,7 +997,7 @@ BOOST_AUTO_TEST_CASE(get_xheaders_clears_existing_entries)
     XHeaders xheaders;
     xheaders["x-stale-header"] = "old-value";  // Pre-existing entry
 
-    hdr.get_xheaders(xheaders);
+    hdr.get_headers(xheaders);
 
     // Stale entry should be cleared (not present)
     BOOST_CHECK(xheaders.find("x-stale-header") == xheaders.end());
@@ -1006,7 +1006,7 @@ BOOST_AUTO_TEST_CASE(get_xheaders_clears_existing_entries)
     BOOST_CHECK_EQUAL(xheaders.find("x-new-header")->second, "new-value");
 }
 
-BOOST_AUTO_TEST_CASE(get_xheaders_clears_stale_not_in_header)
+BOOST_AUTO_TEST_CASE(get_headers_clears_stale_not_in_header)
 {
     Response_header hdr(200, "OK");
     // Header has no x-headers set
@@ -1014,9 +1014,9 @@ BOOST_AUTO_TEST_CASE(get_xheaders_clears_stale_not_in_header)
     XHeaders xheaders;
     xheaders["x-stale"] = "should-be-removed";
 
-    hdr.get_xheaders(xheaders);
+    hdr.get_headers(xheaders);
 
-    // Stale x-header should be cleared even if header has no x-headers
+    // Stale entry should be cleared even if header has no custom headers
     // Note: Response_header may have default options that pass XHeaders::validate(),
     // so we only verify that our specific stale entry was removed
     BOOST_CHECK(xheaders.find("x-stale") == xheaders.end());

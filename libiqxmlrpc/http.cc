@@ -487,7 +487,7 @@ std::string Request_header::agent() const
   return get_string(names::user_agent);
 }
 
-void Header::get_xheaders(iqxmlrpc::XHeaders& xheaders) const
+void Header::get_headers(iqxmlrpc::XHeaders& xheaders) const
 {
   // Clear first to prevent stale headers from persisting when object is reused
   xheaders = std::map<std::string, std::string>();
@@ -497,7 +497,7 @@ void Header::get_xheaders(iqxmlrpc::XHeaders& xheaders) const
   }
 }
 
-void Header::set_xheaders(const iqxmlrpc::XHeaders& xheaders)
+void Header::set_headers(const iqxmlrpc::XHeaders& xheaders)
 {
   for (const auto& header : xheaders) {
     set_option(header.first, header.second);

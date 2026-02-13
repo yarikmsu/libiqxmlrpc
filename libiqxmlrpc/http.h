@@ -88,8 +88,8 @@ public:
   void set_conn_keep_alive( bool );
   void set_option(const std::string& name, const std::string& value);
 
-  void get_xheaders(iqxmlrpc::XHeaders& xheaders) const;
-  void set_xheaders(const iqxmlrpc::XHeaders& xheaders);
+  void get_headers(iqxmlrpc::XHeaders& xheaders) const;
+  void set_headers(const iqxmlrpc::XHeaders& xheaders);
 
   //! Return text representation of header including final CRLF.
   std::string dump() const;

@@ -290,7 +290,7 @@ void Server::schedule_execute( http::Packet* pkt, Server_connection* conn )
     if (authname)
       meth->authname(*authname);
 
-    pkt->header()->get_xheaders(meth->xheaders());
+    pkt->header()->get_headers(meth->xheaders());
 
     executor = impl->exec_factory->create( meth, this, conn );
     executor->set_interceptors(impl->interceptors.get());

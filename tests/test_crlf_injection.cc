@@ -37,7 +37,7 @@ BOOST_AUTO_TEST_CASE(header_injection_via_xheaders_rejected)
     xheaders["X-Legitimate"] = "normal-value\r\nX-Injected: malicious-payload";
 
     // VERIFY: Exception is thrown when setting xheaders
-    BOOST_CHECK_THROW(hdr.set_xheaders(xheaders), Http_header_error);
+    BOOST_CHECK_THROW(hdr.set_headers(xheaders), Http_header_error);
 }
 
 /**
@@ -53,7 +53,7 @@ BOOST_AUTO_TEST_CASE(session_fixation_via_cookie_injection_rejected)
     // ATTACK ATTEMPT: Inject a Set-Cookie header to fix session
     xheaders["X-Tracking"] = "id123\r\nSet-Cookie: session=attacker-controlled; Path=/";
 
-    BOOST_CHECK_THROW(hdr.set_xheaders(xheaders), Http_header_error);
+    BOOST_CHECK_THROW(hdr.set_headers(xheaders), Http_header_error);
 }
 
 /**
@@ -69,7 +69,7 @@ BOOST_AUTO_TEST_CASE(cache_poisoning_rejected)
     // ATTACK ATTEMPT: Inject cache-control to poison intermediate caches
     xheaders["X-Request-Id"] = "abc\r\nCache-Control: public, max-age=31536000\r\nX-Poison: true";
 
-    BOOST_CHECK_THROW(hdr.set_xheaders(xheaders), Http_header_error);
+    BOOST_CHECK_THROW(hdr.set_headers(xheaders), Http_header_error);
 }
 
 /**
@@ -86,7 +86,7 @@ BOOST_AUTO_TEST_CASE(response_splitting_rejected)
     // Double CRLF ends headers, then inject fake content
     xheaders["X-Debug"] = "value\r\n\r\n<html><script>alert('XSS')</script></html>";
 
-    BOOST_CHECK_THROW(hdr.set_xheaders(xheaders), Http_header_error);
+    BOOST_CHECK_THROW(hdr.set_headers(xheaders), Http_header_error);
 }
 
 /**
@@ -102,7 +102,7 @@ BOOST_AUTO_TEST_CASE(cr_only_injection_rejected)
     // ATTACK ATTEMPT: Use only \r (some servers/proxies may treat this as newline)
     xheaders["X-Test"] = "value\rX-Injected-CR: via-carriage-return";
 
-    BOOST_CHECK_THROW(hdr.set_xheaders(xheaders), Http_header_error);
+    BOOST_CHECK_THROW(hdr.set_headers(xheaders), Http_header_error);
 }
 
 /**
@@ -118,7 +118,7 @@ BOOST_AUTO_TEST_CASE(lf_only_injection_rejected)
     // ATTACK ATTEMPT: Use only \n (HTTP/1.1 allows LF-only line endings)
     xheaders["X-Test"] = "value\nX-Injected-LF: via-line-feed";
 
-    BOOST_CHECK_THROW(hdr.set_xheaders(xheaders), Http_header_error);
+    BOOST_CHECK_THROW(hdr.set_headers(xheaders), Http_header_error);
 }
 
 /**
@@ -170,7 +170,7 @@ BOOST_AUTO_TEST_CASE(legitimate_headers_work)
     xheaders["X-Numeric"] = "12345";
 
     // Should NOT throw
-    BOOST_CHECK_NO_THROW(hdr.set_xheaders(xheaders));
+    BOOST_CHECK_NO_THROW(hdr.set_headers(xheaders));
 
     // Verify headers are actually set by checking dump
     // Note: XHeaders converts names to lowercase (x-request-id not X-Request-Id)

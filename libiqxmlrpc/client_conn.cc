@@ -32,8 +32,8 @@ Response Client_connection::process_session( const Request& req, const XHeaders&
   if (opts().has_authinfo())
     req_h->set_authinfo( opts().auth_user(), opts().auth_passwd() );
 
-  req_h->set_xheaders( opts().xheaders() );
-  req_h->set_xheaders( xheaders );
+  req_h->set_headers( opts().xheaders() );
+  req_h->set_headers( xheaders );
 
   Packet req_p( req_h.release(), req_xml_str );
   req_p.set_keep_alive( opts().keep_alive() );

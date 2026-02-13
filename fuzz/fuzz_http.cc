@@ -29,9 +29,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       std::string user, password;
       req_hdr.get_authinfo(user, password);
     }
-    // Exercise X-headers parsing
+    // Exercise custom header parsing
     iqxmlrpc::XHeaders xhdrs;
-    req_hdr.get_xheaders(xhdrs);
+    req_hdr.get_headers(xhdrs);
   } catch (...) {
     // Exceptions are expected for malformed input
   }
