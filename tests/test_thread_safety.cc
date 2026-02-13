@@ -535,9 +535,9 @@ BOOST_FIXTURE_TEST_CASE(shutdown_with_inflight_work, ThreadSafetyFixture)
   stop_server();
 }
 
-// Exercise all three catch paths in Pool_executor::process_actual_execution().
-// Validates: Fault, std::exception, and unknown exceptions produce correct fault
-// responses when processed by pool threads. Also exercises Drain_guard indirectly.
+// Exercise all four catch paths in Pool_executor::process_actual_execution().
+// Validates: Fault, iqxmlrpc::Exception, std::exception, and unknown exceptions
+// produce correct fault responses when processed by pool threads.
 BOOST_FIXTURE_TEST_CASE(pool_exception_handling, ThreadSafetyFixture)
 {
   start_server(2, port_offset::POOL_EXCEPTIONS);
@@ -546,31 +546,45 @@ BOOST_FIXTURE_TEST_CASE(pool_exception_handling, ThreadSafetyFixture)
   BOOST_REQUIRE(dynamic_cast<Pool_executor_factory*>(executor_factory()) != nullptr);
 
   // 1. iqxmlrpc::Fault exception (process_actual_execution catch #1)
+  //    Fault messages are application-controlled and must NOT be sanitized.
   {
     auto client = create_client();
     Response resp = client->execute("error_method", Value(0));
     BOOST_CHECK(resp.is_fault());
     BOOST_CHECK_EQUAL(resp.fault_code(), 123);
+    BOOST_CHECK(resp.fault_string().find("My fault") != std::string::npos);
   }
 
-  // 2. std::exception (process_actual_execution catch #2)
+  // 2. iqxmlrpc::Exception (process_actual_execution catch #2)
+  //    Library exceptions preserve XML-RPC interop fault codes.
+  {
+    auto client = create_client();
+    Response resp = client->execute("library_exception_method", Value(0));
+    BOOST_CHECK(resp.is_fault());
+    BOOST_CHECK_EQUAL(resp.fault_code(), -32602);
+    BOOST_CHECK_EQUAL(resp.fault_string(), "Server error. Invalid method parameters.");
+  }
+
+  // 3. std::exception (process_actual_execution catch #3)
   {
     auto client = create_client();
     Response resp = client->execute("std_exception_method", Value(0));
     BOOST_CHECK(resp.is_fault());
     BOOST_CHECK_EQUAL(resp.fault_code(), -1);
+    BOOST_CHECK_EQUAL(resp.fault_string(), "Internal server error");
   }
 
-  // 3. Unknown exception — throw 42 (process_actual_execution catch #3)
+  // 4. Unknown exception — throw 42 (process_actual_execution catch #4)
   {
     auto client = create_client();
     Response resp = client->execute("unknown_exception_method", Value(0));
     BOOST_CHECK(resp.is_fault());
     BOOST_CHECK_EQUAL(resp.fault_code(), -1);
+    BOOST_CHECK_EQUAL(resp.fault_string(), "Internal server error");
   }
 
   stop_server();
-  THREAD_SAFE_TEST_MESSAGE("Pool exception handling: all 3 catch paths verified");
+  THREAD_SAFE_TEST_MESSAGE("Pool exception handling: all 4 catch paths verified");
 }
 
 // Exercise drain() warning path by setting a very short warning interval.
