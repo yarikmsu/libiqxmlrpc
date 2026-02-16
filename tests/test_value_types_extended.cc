@@ -954,6 +954,80 @@ BOOST_AUTO_TEST_CASE(has_field_on_array_throws)
     BOOST_CHECK_THROW(v.has_field("key"), Value::Bad_cast);
 }
 
+BOOST_AUTO_TEST_CASE(value_type_name_after_move_throws_bad_cast)
+{
+    Value a(42);
+    Value b(std::move(a));
+
+    // NOLINTBEGIN(bugprone-use-after-move) - moved-from state under test
+    BOOST_CHECK_THROW(a.type_name(), Value::Bad_cast);
+    // NOLINTEND(bugprone-use-after-move)
+}
+
+BOOST_AUTO_TEST_CASE(value_apply_visitor_after_move_throws_bad_cast)
+{
+    Value a(42);
+    Value b(std::move(a));
+
+    std::ostringstream oss;
+    Print_value_visitor visitor(oss);
+
+    // NOLINTBEGIN(bugprone-use-after-move) - moved-from state under test
+    BOOST_CHECK_THROW(a.apply_visitor(visitor), Value::Bad_cast);
+    // NOLINTEND(bugprone-use-after-move)
+}
+
+BOOST_AUTO_TEST_CASE(value_copy_after_move_throws_bad_cast)
+{
+    Value a(42);
+    Value b(std::move(a));
+
+    // NOLINTBEGIN(bugprone-use-after-move) - moved-from state under test
+    BOOST_CHECK_THROW(Value copy(a), Value::Bad_cast);
+    // NOLINTEND(bugprone-use-after-move)
+}
+
+BOOST_AUTO_TEST_CASE(value_copy_assign_from_moved_throws_bad_cast)
+{
+    Value a(42);
+    Value b(std::move(a));
+    Value c(99);
+
+    // Copy-assignment delegates to copy constructor via copy-and-swap
+    // NOLINTBEGIN(bugprone-use-after-move) - moved-from state under test
+    BOOST_CHECK_THROW(c = a, Value::Bad_cast);
+    // NOLINTEND(bugprone-use-after-move)
+}
+
+BOOST_AUTO_TEST_CASE(value_guards_after_move_assignment)
+{
+    Value a(42);
+    Value b(99);
+    b = std::move(a);
+
+    std::ostringstream oss;
+    Print_value_visitor visitor(oss);
+
+    // Move-assignment nulls value via a different path than move-construction
+    // NOLINTBEGIN(bugprone-use-after-move) - moved-from state under test
+    BOOST_CHECK_THROW(a.type_name(), Value::Bad_cast);
+    BOOST_CHECK_THROW(a.apply_visitor(visitor), Value::Bad_cast);
+    BOOST_CHECK_THROW(Value copy(a), Value::Bad_cast);
+    // NOLINTEND(bugprone-use-after-move)
+}
+
+BOOST_AUTO_TEST_CASE(value_reassign_after_move_recovers)
+{
+    Value a(42);
+    Value b(std::move(a));
+
+    // NOLINTBEGIN(bugprone-use-after-move) - recovery from moved-from state
+    a = Value(99);
+    BOOST_CHECK(a.is_int());
+    BOOST_CHECK_EQUAL(a.get_int(), 99);
+    // NOLINTEND(bugprone-use-after-move)
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE(datetime_parsing_tests)

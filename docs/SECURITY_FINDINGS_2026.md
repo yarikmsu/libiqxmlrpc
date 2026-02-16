@@ -120,21 +120,21 @@
 - **Impact:** Amplifies the impact of Finding #8 (memory exhaustion); a single `<string>` element can consume gigabytes.
 - **Recommendation:** Remove `XML_PARSE_HUGE` flag unless explicitly needed; or add application-level per-value size limits.
 
-### #13: Null Dereference on Moved-From `Value::type_name()`
+### #13: Null Dereference on Moved-From `Value::type_name()` — FIXED
 
 - **Category:** Memory Safety — Null Pointer Dereference (CWE-476)
-- **Affected:** `libiqxmlrpc/value.cc:228-231`
-- **Description:** `Value::type_name()` dereferences `value` without a null check. After a move operation (`Value(Value&&)` at line 76-80 sets `v.value = nullptr`), calling `type_name()` on the moved-from object is undefined behavior. Unlike the `is_*()` methods (lines 179-227) which check for null, and unlike `cast<T>()` which throws `Bad_cast`, `type_name()` has no guard.
+- **Affected:** `libiqxmlrpc/value.cc` — `Value::type_name()` (line 228 at time of discovery)
+- **Description:** `Value::type_name()` dereferences `value` without a null check. After a move operation (`Value(Value&&)` sets `v.value = nullptr`), calling `type_name()` on the moved-from object is undefined behavior. Unlike the `is_*()` methods which check for null, and unlike `cast<T>()` which throws `Bad_cast`, `type_name()` had no guard.
 - **Impact:** Crash if user code calls `type_name()` on a moved-from `Value`. Caller error, but the API is inconsistent with the null-safe `is_*()` methods.
-- **Recommendation:** Add null check in `type_name()` (throw or return sentinel string).
+- **Resolution:** Added `if (!value) throw Bad_cast();` guard, consistent with `cast<T>()`. Also guarded the copy constructor (`Value(const Value&)`) which had the same null dereference via `v.value->clone()`.
 
-### #14: Null Dereference on Moved-From `Value::apply_visitor()`
+### #14: Null Dereference on Moved-From `Value::apply_visitor()` — FIXED
 
 - **Category:** Memory Safety — Null Pointer Dereference (CWE-476)
-- **Affected:** `libiqxmlrpc/value.cc:384-387`
-- **Description:** Same as #13 — `Value::apply_visitor()` dereferences `value` without null check. Called from `value_to_xml()` (line 393-397) and `print_value()` (line 399-403) which are public API entry points.
+- **Affected:** `libiqxmlrpc/value.cc` — `Value::apply_visitor()` (line 384 at time of discovery)
+- **Description:** Same as #13 — `Value::apply_visitor()` dereferences `value` without null check. Called from `value_to_xml()` and `print_value()` which are public API entry points.
 - **Impact:** Crash if applied to moved-from Value.
-- **Recommendation:** Add null check in `apply_visitor()`.
+- **Resolution:** Added `if (!value) throw Bad_cast();` guard, consistent with `cast<T>()`. Combined with #13 copy constructor fix, all `Value` methods that dereference the internal pointer now handle moved-from state consistently.
 
 ### #15: Pipelined HTTP Data Silently Discarded
 
