@@ -35,7 +35,11 @@ Project-specific C++ patterns for libiqxmlrpc development.
 
 ### Simple flags/pointers shared across threads
 - Use `std::atomic<bool>` for flags (e.g., `exit_flag`)
-- Use `std::atomic<T*>` for pointers set from one thread, read from another
+- Use `std::atomic<T*>` only for pointers with static or externally-guaranteed lifetime
+- Use `std::shared_ptr<T>` with `std::atomic_load`/`std::atomic_store` when the
+  pointed-to object may be replaced or deleted during concurrent access (see firewall
+  pattern in `acceptor.cc`). Migrate to `std::atomic<std::shared_ptr<T>>` in C++20
+  (free-function overloads deprecated in C++20, removed in C++26).
 
 ### Lazy initialization
 - Use `std::call_once` with `std::once_flag` for thread-safe one-time init

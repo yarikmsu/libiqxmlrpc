@@ -890,14 +890,11 @@ BOOST_AUTO_TEST_CASE(http_client_connection_closed_during_read)
 }
 
 //-----------------------------------------------------------------------------
-// Firewall Rejection Tests (acceptor.cc lines 57-68)
+// Firewall Rejection Tests (Acceptor::accept() rejection paths)
 //-----------------------------------------------------------------------------
 
-// Test firewall rejecting connection with empty message (shutdown only)
-// Covers acceptor.cc lines 57-58, 64-68: Firewall rejection without message
-// Note: Firewall must be set BEFORE starting the server because the firewall
-// is propagated to the acceptor once at the start of work()
-BOOST_AUTO_TEST_CASE(firewall_blocks_with_empty_message)
+// Test firewall rejecting connection with default 403 message (send_shutdown path)
+BOOST_AUTO_TEST_CASE(firewall_blocks_with_default_message)
 {
     const int port = INTEGRATION_TEST_PORT + 230;
 
@@ -906,9 +903,7 @@ BOOST_AUTO_TEST_CASE(firewall_blocks_with_empty_message)
     Http_server server(Inet_addr("127.0.0.1", port), &exec_factory);
     register_user_methods(server);
 
-    // Set firewall BEFORE starting server (critical!)
-    BlockAllFirewall fw;
-    server.set_firewall(&fw);
+    server.set_firewall(new BlockAllFirewall());
 
     // Start server in thread
     std::atomic<bool> server_running(true);
@@ -943,8 +938,7 @@ BOOST_AUTO_TEST_CASE(firewall_blocks_with_empty_message)
     BOOST_CHECK(connection_failed);
 }
 
-// Test firewall rejecting connection with custom message
-// Covers acceptor.cc lines 57-63, 68: Firewall rejection with message
+// Test firewall rejecting connection with custom 403 message (send_shutdown path)
 BOOST_AUTO_TEST_CASE(firewall_blocks_with_custom_message)
 {
     const int port = INTEGRATION_TEST_PORT + 231;
@@ -954,9 +948,7 @@ BOOST_AUTO_TEST_CASE(firewall_blocks_with_custom_message)
     Http_server server(Inet_addr("127.0.0.1", port), &exec_factory);
     register_user_methods(server);
 
-    // Set firewall BEFORE starting server (critical!)
-    CustomMessageFirewall fw;
-    server.set_firewall(&fw);
+    server.set_firewall(new CustomMessageFirewall());
 
     // Start server in thread
     std::atomic<bool> server_running(true);
@@ -989,6 +981,41 @@ BOOST_AUTO_TEST_CASE(firewall_blocks_with_custom_message)
     server_thread.join();
 
     BOOST_CHECK(got_error);
+}
+
+// Test firewall rejecting connection with empty message (shutdown-only path)
+BOOST_AUTO_TEST_CASE(firewall_blocks_with_silent_shutdown)
+{
+    const int port = INTEGRATION_TEST_PORT + 233;
+
+    Serial_executor_factory exec_factory;
+    Http_server server(Inet_addr("127.0.0.1", port), &exec_factory);
+    register_user_methods(server);
+
+    server.set_firewall(new SilentFirewall());
+
+    std::thread server_thread([&]() { server.work(); });
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    bool connection_failed = false;
+    try {
+        auto client = std::make_unique<Client<Http_client_connection>>(
+            Inet_addr("127.0.0.1", port));
+        client->set_timeout(2);
+        client->execute("echo", Value("should fail"));
+    } catch (const iqnet::network_error&) {
+        connection_failed = true;
+    } catch (const Client_timeout&) {
+        connection_failed = true;
+    } catch (...) {
+        connection_failed = true;
+    }
+
+    server.set_exit_flag();
+    server.interrupt();
+    server_thread.join();
+
+    BOOST_CHECK(connection_failed);
 }
 
 //-----------------------------------------------------------------------------

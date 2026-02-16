@@ -87,6 +87,22 @@ public:
   std::string message() override { return "HTTP/1.0 403 Custom Forbidden\r\n\r\n"; }
 };
 
+// Firewall that blocks silently (empty message — exercises shutdown-only path)
+class SilentFirewall : public iqnet::Firewall_base {
+public:
+  bool grant(const iqnet::Inet_addr&) override { return false; }
+  std::string message() override { return ""; }
+};
+
+// Firewall whose release() throws (exercises error path in unregister_connection)
+class ThrowingReleaseFirewall : public iqnet::Firewall_base {
+public:
+  bool grant(const iqnet::Inet_addr&) override { return true; }
+  void release(const iqnet::Inet_addr&) override {
+    throw std::runtime_error("release failed on purpose");
+  }
+};
+
 // Firewall that allows all connections
 class AllowAllFirewall : public iqnet::Firewall_base {
 public:
