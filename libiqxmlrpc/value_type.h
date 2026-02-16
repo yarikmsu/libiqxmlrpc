@@ -275,7 +275,7 @@ inline Array::const_iterator Array::end() const
 
 //! XML-RPC struct type. Operates with objects of type Value, not Value_type.
 //!
-//! NOTE: Since 0.14, the internal storage changed from std::map to
+//! \note Since 0.14.0, the internal storage changed from std::map to
 //! std::unordered_map.  Iteration order over begin()/end() is no longer
 //! sorted by key name.  Code that relied on alphabetical iteration order
 //! must sort externally if needed.
