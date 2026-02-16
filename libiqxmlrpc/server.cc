@@ -35,7 +35,7 @@ public:
   std::unique_ptr<iqnet::Reactor_interrupter>   interrupter;
   std::unique_ptr<iqnet::Accepted_conn_factory> conn_factory;
   std::unique_ptr<iqnet::Acceptor>              acceptor;
-  std::atomic<iqnet::Firewall_base*> firewall;
+  std::shared_ptr<iqnet::Firewall_base> firewall;
 
   std::atomic<bool> exit_flag;
   std::ostream* log;
@@ -69,7 +69,7 @@ public:
       interrupter(new iqnet::Reactor_interrupter(reactor.get())),
       conn_factory(cf),
       acceptor(nullptr),
-      firewall(nullptr),
+      firewall(),
       exit_flag(false),
       log(nullptr),
       max_req_sz(0),
@@ -213,10 +213,16 @@ void Server::register_connection(Server_connection* conn)
 
 void Server::unregister_connection(Server_connection* conn)
 {
-  // SECURITY: Notify firewall that connection is closing for accurate tracking
-  iqnet::Firewall_base* fw = impl->firewall.load();
+  // SECURITY: Notify firewall that connection is closing for accurate tracking.
+  auto fw = std::atomic_load(&impl->firewall);
   if (fw) {
-    fw->release(conn->get_peer_addr());
+    try {
+      fw->release(conn->get_peer_addr());
+    } catch (const std::exception& e) {
+      log_err_msg(std::string("Firewall release failed: ") + e.what());
+    } catch (...) {
+      log_err_msg("Firewall release failed: unknown exception");
+    }
   }
 
   // SAFETY: Always remove from connections set to prevent dangling pointers.
@@ -350,12 +356,13 @@ void Server::schedule_response(
 
 void Server::set_firewall( iqnet::Firewall_base* _firewall )
 {
-  impl->firewall = _firewall;
-  // Propagate to existing acceptor if server is already running
-  // Lock to prevent race with work() creating/destroying acceptor
+  auto fw = std::shared_ptr<iqnet::Firewall_base>(_firewall);
+  // Lock ensures store + acceptor propagation are atomic.
+  // atomic_store still needed because readers use lock-free atomic_load.
   std::lock_guard<std::mutex> lock(impl->acceptor_mutex);
+  std::atomic_store(&impl->firewall, fw);
   if (impl->acceptor)
-    impl->acceptor->set_firewall(_firewall);
+    impl->acceptor->set_firewall(fw);
 }
 
 void Server::check_idle_timeouts()
@@ -399,7 +406,7 @@ void Server::work()
     if( !impl->acceptor )
     {
       impl->acceptor = std::make_unique<iqnet::Acceptor>( impl->bind_addr, get_conn_factory(), get_reactor());
-      impl->acceptor->set_firewall( impl->firewall );
+      impl->acceptor->set_firewall( std::atomic_load(&impl->firewall) );
     }
   }
 

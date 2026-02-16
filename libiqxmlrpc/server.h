@@ -71,6 +71,8 @@ public:
   size_t get_max_request_sz() const;
 
   //! Set optional firewall object.
+  //! Takes ownership of the pointer. Must be heap-allocated via new.
+  //! Pass nullptr to remove the firewall.
   void set_firewall( iqnet::Firewall_base* );
 
   void set_verification_level(http::Verification_level);

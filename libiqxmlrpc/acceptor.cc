@@ -16,7 +16,7 @@ Acceptor::Acceptor( const iqnet::Inet_addr& bind_addr, Accepted_conn_factory* fa
   sock(),
   factory(factory_),
   reactor(reactor_),
-  firewall(nullptr)
+  firewall()
 {
   sock.bind( bind_addr );
   listen();
@@ -31,11 +31,9 @@ Acceptor::~Acceptor()
 }
 
 
-void Acceptor::set_firewall( iqnet::Firewall_base* fw )
+void Acceptor::set_firewall( std::shared_ptr<Firewall_base> fw )
 {
-  // Atomically swap to new firewall and delete the old one
-  Firewall_base* old = firewall.exchange(fw);
-  delete old;
+  std::atomic_store(&firewall, std::move(fw));
 }
 
 
@@ -55,8 +53,8 @@ void Acceptor::accept()
 {
   Socket new_sock( sock.accept() );
 
-  // Load firewall pointer atomically for thread-safe access
-  Firewall_base* fw = firewall.load();
+  // Local shared_ptr copy keeps firewall alive: set_firewall() may replace it concurrently.
+  auto fw = std::atomic_load(&firewall);
   if( fw && !fw->grant( new_sock.get_peer_addr() ) )
   {
     std::string msg = fw->message();
