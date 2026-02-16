@@ -182,4 +182,24 @@ BOOST_FIXTURE_TEST_CASE(max_response_size_keepalive_recovery, IntegrationFixture
   BOOST_CHECK_EQUAL(r.value().get_string(), "hello");
 }
 
+BOOST_FIXTURE_TEST_CASE(max_response_size_keepalive_success_reuses_connection, IntegrationFixture)
+{
+  // Verify that successful keep-alive requests reuse the connection,
+  // and the response size limit does not interfere with normal reuse.
+  start_server(1, 66);
+  auto client = create_client();
+  client->set_keep_alive(true);
+  client->set_max_response_sz(4096);
+
+  // First request
+  Response r1 = client->execute("echo", Value("first"));
+  BOOST_CHECK(!r1.is_fault());
+  BOOST_CHECK_EQUAL(r1.value().get_string(), "first");
+
+  // Second request on the same kept-alive connection
+  Response r2 = client->execute("echo", Value("second"));
+  BOOST_CHECK(!r2.is_fault());
+  BOOST_CHECK_EQUAL(r2.value().get_string(), "second");
+}
+
 BOOST_AUTO_TEST_SUITE_END()

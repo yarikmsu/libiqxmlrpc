@@ -1234,12 +1234,12 @@ BOOST_AUTO_TEST_CASE(response_single_chunk_exceeds_cumulative_limit)
 
 BOOST_AUTO_TEST_CASE(response_oversized_header_throws_response_too_large)
 {
-    // Verify read_header() header-size branches throw Response_too_large
+    // Covers read_header() separator-found branch (http.cc:793-796)
+    // Separator \r\n\r\n is present, but sep_pos > header_max_sz
     Packet_reader reader;
     reader.set_max_response_size(1000000);  // Large packet limit
     reader.set_max_header_size(50);         // Tiny header limit
 
-    // Header line exceeding header_max_sz (no separator found yet)
     std::string raw = "HTTP/1.1 200 OK\r\n" + std::string(100, 'x') + ": val\r\n\r\n";
     BOOST_CHECK_THROW(reader.read_response(raw, false), Response_too_large);
 }
@@ -1276,6 +1276,42 @@ BOOST_AUTO_TEST_CASE(response_size_reapplied_on_incremental_reads)
     // Re-apply same limit (as client_conn.cc does on each read chunk)
     reader.set_max_response_size(200);
     pkt.reset(reader.read_response("content-length: 4\r\n\r\ntest", false));
+    BOOST_REQUIRE(pkt != nullptr);
+    BOOST_CHECK_EQUAL(pkt->content(), "test");
+}
+
+BOOST_AUTO_TEST_CASE(response_oversized_header_no_separator_throws)
+{
+    // Covers read_header() no-separator branch (http.cc:788-791)
+    // Data exceeds header_max_sz but contains no \r\n\r\n separator
+    Packet_reader reader;
+    reader.set_max_response_size(1000000);
+    reader.set_max_header_size(50);
+
+    std::string raw = "HTTP/1.1 200 OK\r\n" + std::string(100, 'x') + ": val\r\n";
+    // No \r\n\r\n — header_cache grows beyond header_max_sz without a separator
+    BOOST_CHECK_THROW(reader.read_response(raw, false), Response_too_large);
+}
+
+BOOST_AUTO_TEST_CASE(request_oversized_header_no_separator_throws)
+{
+    // Same no-separator branch for request direction (reading_response_=false)
+    Packet_reader reader;
+    reader.set_max_size(1000000);
+    reader.set_max_header_size(50);
+
+    std::string raw = "POST /RPC2 HTTP/1.1\r\n" + std::string(100, 'x') + ": val\r\n";
+    BOOST_CHECK_THROW(reader.read_request(raw), Request_too_large);
+}
+
+BOOST_AUTO_TEST_CASE(response_size_limit_disabled_allows_unlimited)
+{
+    // When max_response_size is 0, no size check is performed
+    Packet_reader reader;
+    reader.set_max_response_size(0);
+
+    std::string raw = "HTTP/1.1 200 OK\r\ncontent-length: 4\r\n\r\ntest";
+    std::unique_ptr<Packet> pkt(reader.read_response(raw, false));
     BOOST_REQUIRE(pkt != nullptr);
     BOOST_CHECK_EQUAL(pkt->content(), "test");
 }
