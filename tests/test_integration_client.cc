@@ -8,6 +8,7 @@
 #include "libiqxmlrpc/libiqxmlrpc.h"
 #include "libiqxmlrpc/http_server.h"
 #include "libiqxmlrpc/http_client.h"
+#include "libiqxmlrpc/http_errors.h"
 
 #include "methods.h"
 #include "test_common.h"
@@ -77,6 +78,88 @@ BOOST_FIXTURE_TEST_CASE(client_array_value, IntegrationFixture)
   BOOST_CHECK(r.value().is_array());
   BOOST_CHECK_EQUAL(r.value().size(), 3u);
   BOOST_CHECK_EQUAL(r.value()[0].get_int(), 1);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+//=============================================================================
+// Client Response Size Limit Tests
+//=============================================================================
+BOOST_AUTO_TEST_SUITE(client_response_size_limit_tests)
+
+BOOST_FIXTURE_TEST_CASE(max_response_size_default_unlimited, IntegrationFixture)
+{
+  // Default behavior: no limit, large responses accepted
+  start_server(1, 60);
+  auto client = create_client();
+
+  BOOST_CHECK_EQUAL(client->get_max_response_sz(), 0u);
+
+  // Echo a reasonably large string - should work with default (unlimited)
+  std::string large_str(500, 'A');
+  Response r = client->execute("echo", Value(large_str));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), large_str);
+}
+
+BOOST_FIXTURE_TEST_CASE(max_response_size_enforcement, IntegrationFixture)
+{
+  // Set a tiny limit - the XML-RPC response envelope alone exceeds it
+  start_server(1, 61);
+  auto client = create_client();
+
+  client->set_max_response_sz(10);  // 10 bytes is way too small for any XML-RPC response
+  BOOST_CHECK_EQUAL(client->get_max_response_sz(), 10u);
+
+  BOOST_CHECK_THROW(
+      client->execute("echo", Value("hello")),
+      http::Response_too_large);
+}
+
+BOOST_FIXTURE_TEST_CASE(max_response_size_allows_small_responses, IntegrationFixture)
+{
+  // A generous limit should allow normal responses
+  start_server(1, 62);
+  auto client = create_client();
+
+  // XML-RPC response for "hello" is ~200 bytes. Set limit to 4KB.
+  client->set_max_response_sz(4096);
+
+  Response r = client->execute("echo", Value("hello"));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), "hello");
+}
+
+BOOST_FIXTURE_TEST_CASE(max_response_size_setter_getter, IntegrationFixture)
+{
+  start_server(1, 63);
+  auto client = create_client();
+
+  BOOST_CHECK_EQUAL(client->get_max_response_sz(), 0u);
+
+  client->set_max_response_sz(1024);
+  BOOST_CHECK_EQUAL(client->get_max_response_sz(), 1024u);
+
+  client->set_max_response_sz(0);
+  BOOST_CHECK_EQUAL(client->get_max_response_sz(), 0u);
+}
+
+BOOST_FIXTURE_TEST_CASE(max_response_size_recovery_after_error, IntegrationFixture)
+{
+  // After Response_too_large, a new request with a larger limit should succeed
+  start_server(1, 64);
+  auto client = create_client();
+
+  client->set_max_response_sz(10);
+  BOOST_CHECK_THROW(
+      client->execute("echo", Value("hello")),
+      http::Response_too_large);
+
+  // Increase limit and retry
+  client->set_max_response_sz(4096);
+  Response r = client->execute("echo", Value("hello"));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), "hello");
 }
 
 BOOST_AUTO_TEST_SUITE_END()

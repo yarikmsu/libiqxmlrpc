@@ -73,6 +73,17 @@ public:
   */
   void set_expected_hostname(const std::string& hostname);
 
+  //! Set maximum response size the client will accept.
+  /*! Limits the total HTTP response the client buffers from the server.
+      Throws http::Response_too_large if a response exceeds this limit.
+      \param sz Maximum response size in bytes. 0 means unlimited (default).
+  */
+  void set_max_response_sz(size_t sz);
+
+  //! Get the maximum response size the client will accept.
+  /*! \return Maximum response size in bytes. 0 means unlimited. */
+  size_t get_max_response_sz() const;
+
 protected:
   int timeout() const;
   const std::string& expected_hostname() const;

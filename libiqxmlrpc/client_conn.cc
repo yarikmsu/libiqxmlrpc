@@ -52,6 +52,7 @@ Response Client_connection::process_session( const Request& req, const XHeaders&
 
 http::Packet* Client_connection::read_response( const std::string& s, bool hdr_only )
 {
+  preader.set_max_response_size( opts().max_response_sz() );
   return preader.read_response( s, hdr_only );
 }
 

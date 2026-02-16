@@ -140,6 +140,16 @@ void Client_base::set_expected_hostname( const std::string& hostname )
   impl_->expected_hostname = hostname;
 }
 
+void Client_base::set_max_response_sz( size_t sz )
+{
+  impl_->opts.set_max_response_sz(sz);
+}
+
+size_t Client_base::get_max_response_sz() const
+{
+  return impl_->opts.max_response_sz();
+}
+
 const std::string& Client_base::expected_hostname() const
 {
   return impl_->expected_hostname;

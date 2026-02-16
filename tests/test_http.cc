@@ -1105,6 +1105,183 @@ BOOST_AUTO_TEST_CASE(request_header_host_port_low_port)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+// Client-side response size limit tests
+BOOST_AUTO_TEST_SUITE(response_size_limit_tests)
+
+BOOST_AUTO_TEST_CASE(response_too_large_error)
+{
+    Response_too_large err;
+    BOOST_CHECK_EQUAL(err.response_header()->code(), 413);
+}
+
+BOOST_AUTO_TEST_CASE(response_too_large_distinct_from_request_too_large)
+{
+    // Verify both exceptions are distinct types with meaningful messages
+    Response_too_large resp_err;
+    Request_too_large req_err;
+
+    std::string resp_what = resp_err.what();
+    std::string req_what = req_err.what();
+    BOOST_CHECK(resp_what.find("Response") != std::string::npos);
+    BOOST_CHECK(req_what.find("Request") != std::string::npos);
+    BOOST_CHECK(resp_what != req_what);
+}
+
+BOOST_AUTO_TEST_CASE(response_size_limit_enforcement)
+{
+    // Set a small response size limit and feed an oversized HTTP response
+    Packet_reader reader;
+    reader.set_max_response_size(50);
+
+    std::string raw = "HTTP/1.1 200 OK\r\ncontent-length: 1000\r\n\r\n";
+    raw += std::string(1000, 'x');
+
+    BOOST_CHECK_THROW(reader.read_response(raw, false), Response_too_large);
+}
+
+BOOST_AUTO_TEST_CASE(response_size_limit_cumulative)
+{
+    // Test incremental reads exceeding the limit
+    Packet_reader reader;
+    reader.set_max_response_size(40);
+
+    // First chunk under limit
+    std::unique_ptr<Packet> pkt(reader.read_response("HTTP/1.1 200 OK\r\n", false));
+    BOOST_CHECK(pkt == nullptr);
+
+    // Second chunk pushes over limit
+    BOOST_CHECK_THROW(
+        reader.read_response("content-length: 0\r\nsome-extra-long-header: value\r\n", false),
+        Response_too_large);
+}
+
+BOOST_AUTO_TEST_CASE(response_size_limit_disabled)
+{
+    // With max_response_size=0, large responses should be accepted
+    Packet_reader reader;
+    reader.set_max_response_size(0);
+
+    std::string content(1000, 'y');
+    std::string raw = "HTTP/1.1 200 OK\r\ncontent-length: 1000\r\n\r\n" + content;
+    std::unique_ptr<Packet> pkt(reader.read_response(raw, false));
+    BOOST_REQUIRE(pkt != nullptr);
+    BOOST_CHECK_EQUAL(pkt->content().length(), 1000u);
+}
+
+BOOST_AUTO_TEST_CASE(response_size_limit_does_not_affect_requests)
+{
+    // set_max_size (server-side) should still throw Request_too_large
+    Packet_reader reader;
+    reader.set_max_size(10);
+
+    std::string raw = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 1000\r\n\r\n";
+    BOOST_CHECK_THROW(reader.read_request(raw), Request_too_large);
+}
+
+BOOST_AUTO_TEST_CASE(response_size_limit_content_length_check)
+{
+    // After header is parsed, declared content-length + header size triggers limit
+    Packet_reader reader;
+    reader.set_max_response_size(100);
+
+    // Header that declares large content-length
+    std::unique_ptr<Packet> pkt(reader.read_response(
+        "HTTP/1.1 200 OK\r\ncontent-length: 500\r\n\r\n", false));
+    BOOST_CHECK(pkt == nullptr);  // Header parsed, waiting for content
+
+    // Next read triggers the content-length + header check
+    BOOST_CHECK_THROW(reader.read_response("x", false), Response_too_large);
+}
+
+BOOST_AUTO_TEST_CASE(response_flag_persists_across_clear)
+{
+    // The reading_response_ flag represents the reader's role (client vs server)
+    // and persists across packets. After set_max_response_size(), the reader
+    // continues throwing Response_too_large even after clear().
+    Packet_reader reader;
+    reader.set_max_response_size(200);
+
+    std::string raw = "HTTP/1.1 200 OK\r\ncontent-length: 4\r\n\r\ntest";
+    std::unique_ptr<Packet> pkt(reader.read_response(raw, false));
+    BOOST_REQUIRE(pkt != nullptr);
+
+    // Reader role persists — still throws Response_too_large
+    reader.set_max_size(10);
+    std::string raw2 = "HTTP/1.1 200 OK\r\ncontent-length: 1000\r\n\r\n";
+    BOOST_CHECK_THROW(reader.read_response(raw2, false), Response_too_large);
+}
+
+BOOST_AUTO_TEST_CASE(request_reader_throws_request_too_large)
+{
+    // A reader that was never configured for responses throws Request_too_large
+    Packet_reader reader;
+    reader.set_max_size(10);
+    std::string raw = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 1000\r\n\r\n";
+    BOOST_CHECK_THROW(reader.read_request(raw), Request_too_large);
+}
+
+BOOST_AUTO_TEST_CASE(response_single_chunk_exceeds_cumulative_limit)
+{
+    // A single chunk whose raw byte count exceeds pkt_max_sz triggers the
+    // cumulative total_sz check in check_sz() even on the first read.
+    Packet_reader reader;
+    reader.set_max_response_size(30);
+
+    // This raw data is ~50 bytes, exceeding the 30-byte limit
+    std::string raw = "HTTP/1.1 200 OK\r\ncontent-length: 4\r\n\r\ntest";
+    BOOST_CHECK_THROW(reader.read_response(raw, false), Response_too_large);
+}
+
+BOOST_AUTO_TEST_CASE(response_oversized_header_throws_response_too_large)
+{
+    // Verify read_header() header-size branches throw Response_too_large
+    Packet_reader reader;
+    reader.set_max_response_size(1000000);  // Large packet limit
+    reader.set_max_header_size(50);         // Tiny header limit
+
+    // Header line exceeding header_max_sz (no separator found yet)
+    std::string raw = "HTTP/1.1 200 OK\r\n" + std::string(100, 'x') + ": val\r\n\r\n";
+    BOOST_CHECK_THROW(reader.read_response(raw, false), Response_too_large);
+}
+
+BOOST_AUTO_TEST_CASE(response_size_limit_exact_boundary_rejected)
+{
+    // The check uses >= so a response at exactly the limit is rejected
+    Packet_reader reader;
+    std::string raw = "HTTP/1.1 200 OK\r\ncontent-length: 4\r\n\r\ntest";
+    reader.set_max_response_size(raw.length());
+    BOOST_CHECK_THROW(reader.read_response(raw, false), Response_too_large);
+}
+
+BOOST_AUTO_TEST_CASE(response_size_limit_one_above_boundary_accepted)
+{
+    // One byte above the total size should be accepted
+    Packet_reader reader;
+    std::string raw = "HTTP/1.1 200 OK\r\ncontent-length: 4\r\n\r\ntest";
+    reader.set_max_response_size(raw.length() + 1);
+    std::unique_ptr<Packet> pkt(reader.read_response(raw, false));
+    BOOST_REQUIRE(pkt != nullptr);
+    BOOST_CHECK_EQUAL(pkt->content(), "test");
+}
+
+BOOST_AUTO_TEST_CASE(response_size_reapplied_on_incremental_reads)
+{
+    // Simulates the client_conn.cc pattern: set_max_response_size per read
+    Packet_reader reader;
+    reader.set_max_response_size(200);
+
+    std::unique_ptr<Packet> pkt(reader.read_response("HTTP/1.1 200 OK\r\n", false));
+    BOOST_CHECK(pkt == nullptr);
+
+    // Re-apply same limit (as client_conn.cc does on each read chunk)
+    reader.set_max_response_size(200);
+    pkt.reset(reader.read_response("content-length: 4\r\n\r\ntest", false));
+    BOOST_REQUIRE(pkt != nullptr);
+    BOOST_CHECK_EQUAL(pkt->content(), "test");
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
 // SECURITY (CWE-444): Transfer-Encoding rejection tests
 // Prevents HTTP request smuggling by rejecting TE header unconditionally
 BOOST_AUTO_TEST_SUITE(transfer_encoding_rejection_tests)

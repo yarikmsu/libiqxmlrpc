@@ -57,6 +57,13 @@ public:
     Error_response( "Request Entity Too Large", 413 ) {}
 };
 
+//! Response exceeded client-side size limit
+class LIBIQXMLRPC_API Response_too_large: public Error_response {
+public:
+  Response_too_large():
+    Error_response( "Response Too Large", 413 ) {}
+};
+
 //! HTTP/1.1 415 Unsupported media type
 class LIBIQXMLRPC_API Unsupported_content_type: public Error_response {
 public:
