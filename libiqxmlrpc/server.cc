@@ -214,6 +214,7 @@ void Server::register_connection(Server_connection* conn)
 void Server::unregister_connection(Server_connection* conn)
 {
   // SECURITY: Notify firewall that connection is closing for accurate tracking.
+  // coverity[MISSING_LOCK : FALSE_POSITIVE] - std::atomic_load provides lock-free synchronization
   auto fw = std::atomic_load(&impl->firewall);
   if (fw) {
     try {
