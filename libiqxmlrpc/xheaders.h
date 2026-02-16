@@ -14,6 +14,16 @@
 
 namespace iqxmlrpc
 {
+//! Custom HTTP "X-" headers container.
+//!
+//! \note Since 0.14.1, the "X-" prefix validation (validate() static method)
+//! has been removed.  The caller is now responsible for ensuring header
+//! names follow the desired convention.  This also means operator[] and
+//! operator= no longer filter non-"X-" headers.
+//!
+//! \note Since 0.14.1, the internal storage changed from std::map to
+//! std::unordered_map.  Iteration order over begin()/end() is no longer
+//! sorted by key name.
 class LIBIQXMLRPC_API XHeaders {
 private:
   std::unordered_map<std::string, std::string> xheaders_;
