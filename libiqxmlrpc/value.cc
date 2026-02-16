@@ -90,8 +90,12 @@ Value::Value( Value_type* v ):
 }
 
 Value::Value( const Value& v ):
-  value( v.value->clone() )
+  value( nullptr )
 {
+  // Null check guards against copying a moved-from Value
+  if (!v.value)
+    throw Bad_cast();
+  value = v.value->clone();
 }
 
 Value::Value( Value&& v ) noexcept :
@@ -246,8 +250,12 @@ bool Value::is_struct() const
 {
   return value && value->type_tag() == ValueTypeTag::Struct;
 }
+
 const std::string& Value::type_name() const
 {
+  // Null check guards against use-after-move
+  if (!value)
+    throw Bad_cast();
   return value->type_name();
 }
 
@@ -404,6 +412,9 @@ void Value::insert( const std::string& n, const Value& v )
 
 void Value::apply_visitor(Value_type_visitor& v) const
 {
+  // Null check guards against use-after-move
+  if (!value)
+    throw Bad_cast();
   v.visit_value(*value);
 }
 
