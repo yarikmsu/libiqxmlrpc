@@ -362,7 +362,7 @@ void Server::set_firewall( iqnet::Firewall_base* _firewall )
   std::lock_guard<std::mutex> lock(impl->acceptor_mutex);
   std::atomic_store(&impl->firewall, fw);
   if (impl->acceptor)
-    impl->acceptor->set_firewall(fw);
+    impl->acceptor->set_firewall(std::move(fw));
 }
 
 void Server::check_idle_timeouts()
