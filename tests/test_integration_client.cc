@@ -162,4 +162,24 @@ BOOST_FIXTURE_TEST_CASE(max_response_size_recovery_after_error, IntegrationFixtu
   BOOST_CHECK_EQUAL(r.value().get_string(), "hello");
 }
 
+BOOST_FIXTURE_TEST_CASE(max_response_size_keepalive_recovery, IntegrationFixture)
+{
+  // With keep-alive, a Response_too_large must invalidate the cached
+  // connection so the next request starts on a clean socket/reader.
+  start_server(1, 65);
+  auto client = create_client();
+  client->set_keep_alive(true);
+
+  client->set_max_response_sz(10);
+  BOOST_CHECK_THROW(
+      client->execute("echo", Value("hello")),
+      http::Response_too_large);
+
+  // Increase limit and retry on the same client (keep-alive)
+  client->set_max_response_sz(4096);
+  Response r = client->execute("echo", Value("hello"));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), "hello");
+}
+
 BOOST_AUTO_TEST_SUITE_END()

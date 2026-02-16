@@ -5,6 +5,8 @@
 #include "client_conn.h"
 #include "client_opts.h"
 
+#include <exception>
+
 namespace iqxmlrpc {
 
 //
@@ -39,7 +41,8 @@ public:
   Auto_conn( Client_base::Impl& client_impl, Client_base& client ):
     client_impl_(client_impl),
     tmp_conn_(),
-    conn_ptr_(nullptr)
+    conn_ptr_(nullptr),
+    uncaught_on_entry_(std::uncaught_exceptions())
   {
     if (opts().keep_alive())
     {
@@ -56,7 +59,13 @@ public:
 
   ~Auto_conn()
   {
-    if (!cimpl().opts.keep_alive())
+    // Drop the cached connection if keep-alive is off, OR if we are
+    // unwinding due to an exception (e.g. Response_too_large).  A mid-
+    // response abort leaves Packet_reader and the socket in an
+    // indeterminate state; reusing the connection would corrupt the
+    // next request.
+    if (!cimpl().opts.keep_alive() ||
+        std::uncaught_exceptions() > uncaught_on_entry_)
       cimpl().conn_cache.reset();
   }
 
@@ -84,6 +93,7 @@ private:
   Client_base::Impl& client_impl_;
   std::unique_ptr<Client_connection> tmp_conn_;
   Client_connection* conn_ptr_;
+  int uncaught_on_entry_;
 };
 
 //
