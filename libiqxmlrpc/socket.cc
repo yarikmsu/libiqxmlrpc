@@ -20,6 +20,7 @@ Socket::Socket():
 {
   // cppcheck-suppress useInitializationList
   // Cannot use initializer list: need to check socket() return value for errors
+  // coverity[CTOR_DTOR_LEAK : FALSE_POSITIVE] - Socket uses explicit close() by design
   sock = socket( PF_INET, SOCK_STREAM, IPPROTO_TCP );
   if( sock == -1 )
     throw network_error( "Socket::Socket" );
