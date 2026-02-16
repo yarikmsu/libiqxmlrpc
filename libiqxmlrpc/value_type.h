@@ -273,7 +273,12 @@ inline Array::const_iterator Array::end() const
 }
 
 
-//! XML-RPC array type. Operates with objects of type Value, not Value_type.
+//! XML-RPC struct type. Operates with objects of type Value, not Value_type.
+//!
+//! NOTE: Since 0.14, the internal storage changed from std::map to
+//! std::unordered_map.  Iteration order over begin()/end() is no longer
+//! sorted by key name.  Code that relied on alphabetical iteration order
+//! must sort externally if needed.
 class LIBIQXMLRPC_API Struct: public Value_type {
 public:
   //! Exception which is being thrown when user tries
