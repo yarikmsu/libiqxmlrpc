@@ -17,6 +17,10 @@ using namespace iqxmlrpc;
 using namespace iqnet;
 using namespace iqxmlrpc_test;
 
+// Port allocation per test suite (each test gets a unique port):
+//   client_tests:                       50-53
+//   client_response_size_limit_tests:   60-67
+
 //=============================================================================
 // Client Tests
 //=============================================================================

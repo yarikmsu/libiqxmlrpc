@@ -271,6 +271,9 @@ public:
   //! Set maximum response size for client-side enforcement.
   /*! Configures the reader as a response reader, so that size limit
       violations throw Response_too_large instead of Request_too_large.
+      This flag is sticky — once set, the reader stays in response mode
+      for its lifetime (correct for client connections where one
+      Packet_reader is owned per Client_connection).
       \param m Maximum response size in bytes. 0 means unlimited.
   */
   void set_max_response_size( size_t m )
