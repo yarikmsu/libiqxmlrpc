@@ -7,6 +7,7 @@
 #include <boost/test/unit_test.hpp>
 #include "libiqxmlrpc/http.h"
 #include "libiqxmlrpc/http_errors.h"
+#include "libiqxmlrpc/client_opts.h"
 #include "libiqxmlrpc/value.h"
 
 using namespace boost::unit_test;
@@ -1314,6 +1315,35 @@ BOOST_AUTO_TEST_CASE(response_size_limit_disabled_allows_unlimited)
     std::unique_ptr<Packet> pkt(reader.read_response(raw, false));
     BOOST_REQUIRE(pkt != nullptr);
     BOOST_CHECK_EQUAL(pkt->content(), "test");
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+//=============================================================================
+// Client_options unit tests
+//=============================================================================
+BOOST_AUTO_TEST_SUITE(client_options_tests)
+
+BOOST_AUTO_TEST_CASE(max_response_sz_default_zero)
+{
+    iqxmlrpc::Client_options opts(
+        iqnet::Inet_addr("127.0.0.1", 8080), "/RPC", "");
+    BOOST_CHECK_EQUAL(opts.max_response_sz(), 0u);
+}
+
+BOOST_AUTO_TEST_CASE(max_response_sz_setter_getter)
+{
+    iqxmlrpc::Client_options opts(
+        iqnet::Inet_addr("127.0.0.1", 8080), "/RPC", "");
+
+    opts.set_max_response_sz(4096);
+    BOOST_CHECK_EQUAL(opts.max_response_sz(), 4096u);
+
+    opts.set_max_response_sz(0);
+    BOOST_CHECK_EQUAL(opts.max_response_sz(), 0u);
+
+    opts.set_max_response_sz(SIZE_MAX);
+    BOOST_CHECK_EQUAL(opts.max_response_sz(), SIZE_MAX);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

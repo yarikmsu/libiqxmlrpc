@@ -51,6 +51,8 @@ client->set_max_response_sz(10 * 1024 * 1024);  // 10 MB
 
 Throws `http::Response_too_large` if the response exceeds the limit. Set to 0 (default) for unlimited.
 
+**Proxy caveat:** When using an HTTPS proxy (`set_proxy()`), the response size limit also applies to the proxy CONNECT handshake response. Avoid setting the limit below ~1 KB when using proxies, as the CONNECT response headers alone may be several hundred bytes.
+
 ```cpp
 try {
     Response r = client->execute("my_method", params);

@@ -57,7 +57,12 @@ public:
     Error_response( "Request Entity Too Large", 413 ) {}
 };
 
-//! Response exceeded client-side size limit
+//! Response exceeded client-side size limit.
+/*! Thrown when the HTTP response from the server exceeds the client's
+    configured max_response_sz.  Uses 413 internally for consistency with
+    Request_too_large — this code is never sent over the wire since the
+    exception is raised on the client side.
+*/
 class LIBIQXMLRPC_API Response_too_large: public Error_response {
 public:
   Response_too_large():

@@ -182,6 +182,28 @@ BOOST_FIXTURE_TEST_CASE(max_response_size_keepalive_recovery, IntegrationFixture
   BOOST_CHECK_EQUAL(r.value().get_string(), "hello");
 }
 
+BOOST_FIXTURE_TEST_CASE(max_response_size_reset_to_unlimited, IntegrationFixture)
+{
+  // Transition from a restrictive limit to unlimited (0) and verify
+  // that large responses succeed again.
+  start_server(1, 67);
+  auto client = create_client();
+
+  client->set_max_response_sz(10);
+  BOOST_CHECK_THROW(
+      client->execute("echo", Value("hello")),
+      http::Response_too_large);
+
+  // Reset to unlimited
+  client->set_max_response_sz(0);
+  BOOST_CHECK_EQUAL(client->get_max_response_sz(), 0u);
+
+  std::string large_str(500, 'Z');
+  Response r = client->execute("echo", Value(large_str));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), large_str);
+}
+
 BOOST_FIXTURE_TEST_CASE(max_response_size_keepalive_success_reuses_connection, IntegrationFixture)
 {
   // Verify that successful keep-alive requests reuse the connection,
