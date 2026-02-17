@@ -1245,6 +1245,19 @@ BOOST_AUTO_TEST_CASE(response_oversized_header_throws_response_too_large)
     BOOST_CHECK_THROW(reader.read_response(raw, false), Response_too_large);
 }
 
+BOOST_AUTO_TEST_CASE(request_oversized_header_with_separator_throws)
+{
+    // Covers read_header() separator-found branch for request direction
+    // (http.cc:796 — reading_response_=false, sep_pos > header_max_sz)
+    Packet_reader reader;
+    reader.set_max_size(1000000);    // Large packet limit
+    reader.set_max_header_size(50);  // Tiny header limit
+
+    std::string raw = "POST /RPC2 HTTP/1.1\r\n"
+        + std::string(100, 'x') + ": val\r\n\r\n";
+    BOOST_CHECK_THROW(reader.read_request(raw), Request_too_large);
+}
+
 BOOST_AUTO_TEST_CASE(response_size_limit_exact_boundary_rejected)
 {
     // The check uses >= so a response at exactly the limit is rejected
