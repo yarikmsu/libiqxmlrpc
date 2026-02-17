@@ -46,7 +46,7 @@ Https_proxy_client_connection::Https_proxy_client_connection(
   Client_connection(),
   Connection( s ),
   reactor( new Reactor<Null_lock> ),
-  resp_packet(nullptr),
+  resp_packet(),
   non_blocking(nb),
   out_str(),
   out_str_offset(0),
@@ -138,7 +138,7 @@ Https_client_connection::Https_client_connection( const iqnet::Socket& s, bool n
   Client_connection(),
   iqnet::ssl::Reaction_connection( s ),
   reactor( new Reactor<Null_lock> ),
-  resp_packet(nullptr),
+  resp_packet(),
   out_str(),
   established(false)
 {

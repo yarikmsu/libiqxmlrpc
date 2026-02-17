@@ -18,7 +18,7 @@ Http_client_connection::Http_client_connection( const iqnet::Socket& s, bool nb 
   reactor( new Reactor<Null_lock> ),
   out_str(),
   out_str_offset(0),
-  resp_packet(nullptr)
+  resp_packet()
 {
   sock.set_non_blocking( nb );
 }
