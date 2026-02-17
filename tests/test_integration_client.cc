@@ -19,7 +19,7 @@ using namespace iqxmlrpc_test;
 
 // Port allocation per test suite (each test gets a unique port):
 //   client_tests:                       50-53
-//   client_response_size_limit_tests:   60-67
+//   client_response_size_limit_tests:   60-68
 
 //=============================================================================
 // Client Tests
@@ -206,6 +206,26 @@ BOOST_FIXTURE_TEST_CASE(max_response_size_reset_to_unlimited, IntegrationFixture
   Response r = client->execute("echo", Value(large_str));
   BOOST_CHECK(!r.is_fault());
   BOOST_CHECK_EQUAL(r.value().get_string(), large_str);
+}
+
+BOOST_FIXTURE_TEST_CASE(max_response_size_tightened_between_requests, IntegrationFixture)
+{
+  // Verify that reducing the limit between successful requests takes
+  // effect on the next request (confirms per-read re-application).
+  start_server(1, 68);
+  auto client = create_client();
+
+  // First request succeeds with generous limit
+  client->set_max_response_sz(4096);
+  Response r = client->execute("echo", Value("hello"));
+  BOOST_CHECK(!r.is_fault());
+  BOOST_CHECK_EQUAL(r.value().get_string(), "hello");
+
+  // Tighten limit — next request should fail
+  client->set_max_response_sz(10);
+  BOOST_CHECK_THROW(
+      client->execute("echo", Value("hello")),
+      http::Response_too_large);
 }
 
 BOOST_FIXTURE_TEST_CASE(max_response_size_keepalive_success_reuses_connection, IntegrationFixture)

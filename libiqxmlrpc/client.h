@@ -77,7 +77,8 @@ public:
   /*! Limits the total HTTP response (headers + body) the client buffers
       from the server.  Throws http::Response_too_large if a response
       exceeds this limit.  The check is enforced incrementally as data
-      arrives, so the client never buffers more than \p sz bytes.
+      arrives, so the client limits buffering to approximately \p sz
+      bytes (up to one 64 KB read-buffer chunk beyond the limit).
       \param sz Maximum response size in bytes. 0 means unlimited (default).
 
       \note When using an HTTPS proxy, this limit also applies to the

@@ -10,7 +10,7 @@ Out of the box, libiqxmlrpc defaults to permissive settings for backward compati
 - `max_request_sz` = 0 (unlimited request bodies)
 - `idle_timeout` = 0 (connections held forever)
 - `max_response_sz` = 0 (unlimited client-side response buffering)
-- Client TLS uses `client_only()` (no certificate verification)
+- The legacy `Ctx::client_only()` factory does not verify server certificates
 
 ---
 
