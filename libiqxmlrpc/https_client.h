@@ -73,7 +73,7 @@ class LIBIQXMLRPC_API Https_client_connection:
   public iqnet::ssl::Reaction_connection
 {
   std::unique_ptr<iqnet::Reactor_base> reactor;
-  http::Packet* resp_packet;
+  std::unique_ptr<http::Packet> resp_packet;
   std::string out_str;
   bool established;
 
