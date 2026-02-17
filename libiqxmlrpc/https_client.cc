@@ -155,7 +155,7 @@ inline void Https_client_connection::reg_send_request()
 http::Packet* Https_client_connection::do_process_session( const std::string& s )
 {
   out_str = s;
-  resp_packet = nullptr;
+  resp_packet.reset();
 
   if( established )
     reg_send_request();
@@ -167,7 +167,7 @@ http::Packet* Https_client_connection::do_process_session( const std::string& s 
   }
   while( !resp_packet );
 
-  return resp_packet;
+  return resp_packet.release();
 }
 
 
@@ -190,7 +190,7 @@ void Https_client_connection::recv_succeed( bool&, size_t, size_t sz )
     throw iqnet::network_error( "Connection closed by peer.", false );
 
   std::string s( read_buf(), sz );
-  resp_packet = read_response( s );
+  resp_packet.reset( read_response( s ) );
 
   if( !resp_packet )
   {

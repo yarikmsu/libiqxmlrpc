@@ -28,7 +28,7 @@ http::Packet* Http_client_connection::do_process_session( const std::string& s )
 {
   out_str = s;
   out_str_offset = 0;  // Reset offset for new request
-  resp_packet = nullptr;
+  resp_packet.reset();
   reactor->register_handler( this, Reactor_base::OUTPUT );
 
   do {
@@ -39,7 +39,7 @@ http::Packet* Http_client_connection::do_process_session( const std::string& s )
   // cppcheck-suppress knownConditionTrueFalse
   while( !resp_packet );
 
-  return resp_packet;
+  return resp_packet.release();
 }
 
 
@@ -69,7 +69,7 @@ void Http_client_connection::handle_input( bool& )
     if( sz == 0 )
       throw iqnet::network_error( "Connection closed by peer.", false );
 
-    resp_packet = read_response( std::string(read_buf(), sz) );
+    resp_packet.reset( read_response( std::string(read_buf(), sz) ) );
   }
 
   // cppcheck-suppress knownConditionTrueFalse
