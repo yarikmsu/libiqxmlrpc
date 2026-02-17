@@ -25,7 +25,8 @@ public:
     non_blocking_flag_(false),
     auth_user_(),
     auth_passwd_(),
-    xheaders_()
+    xheaders_(),
+    max_response_sz_(0)
   {
   }
 
@@ -64,6 +65,10 @@ public:
     xheaders_ = xheaders;
   }
 
+  size_t max_response_sz() const { return max_response_sz_; }
+
+  void set_max_response_sz( size_t sz ) { max_response_sz_ = sz; }
+
 private:
   iqnet::Inet_addr addr_;
   std::string      uri_;
@@ -77,6 +82,8 @@ private:
   std::string      auth_passwd_;
 
   XHeaders         xheaders_;
+
+  size_t           max_response_sz_;
 };
 
 } // namespace iqxmlrpc

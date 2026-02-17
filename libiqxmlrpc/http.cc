@@ -723,6 +723,8 @@ void Packet_reader::clear()
   header_cache.erase();
   constructed = false;
   total_sz = 0;
+  // reading_response_ intentionally NOT reset: it reflects the reader's role
+  // (client-side vs server-side), which persists across packets on a connection.
 }
 
 void Packet_reader::check_sz( size_t sz )
@@ -734,20 +736,26 @@ void Packet_reader::check_sz( size_t sz )
     // Use safe arithmetic to prevent integer overflow when summing sizes
     size_t total_expected;
     if (safe_math::would_overflow_add(header->content_length(), header_cache.length())) {
-      throw Request_too_large();
+      if (reading_response_) throw Response_too_large();
+      else throw Request_too_large();
     }
     total_expected = header->content_length() + header_cache.length();
-    if (total_expected >= pkt_max_sz)
-      throw Request_too_large();
+    if (total_expected >= pkt_max_sz) {
+      if (reading_response_) throw Response_too_large();
+      else throw Request_too_large();
+    }
   }
 
   // Use safe arithmetic for cumulative size tracking
   if (safe_math::would_overflow_add(total_sz, sz)) {
-    throw Request_too_large();
+    if (reading_response_) throw Response_too_large();
+    else throw Request_too_large();
   }
   total_sz += sz;
-  if( total_sz >= pkt_max_sz )
-    throw Request_too_large();
+  if( total_sz >= pkt_max_sz ) {
+    if (reading_response_) throw Response_too_large();
+    else throw Request_too_large();
+  }
 }
 
 bool Packet_reader::read_header( const std::string& s )
@@ -778,12 +786,14 @@ bool Packet_reader::read_header( const std::string& s )
       // No separator found yet - if accumulated data exceeds limit, reject
       // (headers alone shouldn't be this big)
       if (header_cache.length() > header_max_sz) {
-        throw Request_too_large();
+        if (reading_response_) throw Response_too_large();
+        else throw Request_too_large();
       }
     } else {
       // Separator found - check actual header size
       if (sep_pos > header_max_sz) {
-        throw Request_too_large();
+        if (reading_response_) throw Response_too_large();
+        else throw Request_too_large();
       }
     }
   }

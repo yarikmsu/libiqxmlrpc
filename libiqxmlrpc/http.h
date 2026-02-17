@@ -232,6 +232,7 @@ class Packet_reader {
   size_t header_max_sz;  // SECURITY: Limit header size independently
   size_t total_sz;
   bool continue_sent_;
+  bool reading_response_;
 
 public:
   Packet_reader(const Packet_reader&) = delete;
@@ -246,7 +247,8 @@ public:
     pkt_max_sz(0),
     header_max_sz(16384),  // SECURITY: Default 16KB header limit
     total_sz(0),
-    continue_sent_(false)
+    continue_sent_(false),
+    reading_response_(false)
   {
   }
 
@@ -264,6 +266,20 @@ public:
   void set_max_size( size_t m )
   {
     pkt_max_sz = m;
+  }
+
+  //! Set maximum response size for client-side enforcement.
+  /*! Configures the reader as a response reader, so that size limit
+      violations throw Response_too_large instead of Request_too_large.
+      This flag is sticky — once set, the reader stays in response mode
+      for its lifetime (correct for client connections where one
+      Packet_reader is owned per Client_connection).
+      \param m Maximum response size in bytes. 0 means unlimited.
+  */
+  void set_max_response_size( size_t m )
+  {
+    pkt_max_sz = m;
+    reading_response_ = true;
   }
 
   //! Set maximum header size to prevent header-based DoS attacks.

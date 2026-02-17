@@ -3,46 +3,47 @@
 **Date:** 2026-02-07
 **Scope:** Full codebase audit across 4 attack surfaces (XML parsing, HTTP layer, memory safety/concurrency, SSL/TLS/authentication)
 **Findings:** 18 total — 1 Critical, 4 High, 6 Medium, 7 Low
+**Status:** 10 fixed, 2 won't-fix (by design), 6 open (#8, #11, #12, #15, #17, #18)
 
 ---
 
 ## CRITICAL (1)
 
-### #1: Client-Side TLS Certificate Validation Disabled by Default
+### #1: Client-Side TLS Certificate Validation Disabled by Default — FIXED
 
 - **Category:** SSL/TLS — Improper Certificate Validation
 - **Affected:** `libiqxmlrpc/ssl_lib.cc:226-232` (constructor), `ssl_lib.cc:256-271` (`prepare_verify()`)
 - **Description:** The `Ctx::Ctx()` client-only constructor never loads CA certificates (`SSL_CTX_set_default_verify_paths()` is never called) and never enables peer verification. When no custom `server_verifier` is set (the default), `prepare_verify()` sets `SSL_VERIFY_NONE`, meaning the client accepts **any** certificate — self-signed, expired, wrong hostname. Although `hostname_verification` defaults to `true`, OpenSSL's hostname check is only enforced when `SSL_VERIFY_PEER` is active; with `VERIFY_NONE` it is a no-op.
 - **Impact:** A MITM attacker presents any certificate and intercepts all XML-RPC traffic including authentication credentials.
-- **Recommendation:** Load system CA store by default in `client_only()` constructor; set `SSL_VERIFY_PEER` as the default mode. Provide `set_verify_peer(false)` opt-out for legacy self-signed setups.
+- **Resolution:** Added `Ctx::client_verified()` factory that loads system CA store via `use_default_verify_paths()` and enables `SSL_VERIFY_PEER` by default. Added `set_verify_peer()`/`verify_peer_enabled()` API for existing contexts. `prepare_verify()` now respects the `verify_peer` flag for client connections even without a custom verifier. Legacy `client_only()` behavior unchanged for backward compatibility.
 
 ---
 
 ## HIGH (4)
 
-### #2: Use-After-Free — Pool_executor Accesses Connection After Deletion
+### #2: Use-After-Free — Pool_executor Accesses Connection After Deletion — FIXED
 
 - **Category:** Memory Safety — Use-After-Free (CWE-416)
 - **Affected:** `libiqxmlrpc/executor.cc:253-271`, `libiqxmlrpc/executor.h:57-58`
 - **Description:** `Pool_executor` stores raw `Server_connection* conn` and `Server* server` pointers. Between enqueue into the lock-free work queue and dequeue by the pool thread, the reactor thread can close and `delete` the connection (client disconnect triggers `finish()` → `delete this`). The pool thread then calls `schedule_response()` which dereferences the dangling pointer. The destructor path also has a related issue: `Pool_executor::~Pool_executor()` calls `interrupt_server()` which accesses `server` — if the server is destroyed before all queued executors finish, this is also use-after-free.
 - **Impact:** Crash or remote code execution via heap corruption from dangling pointer dereference.
-- **Recommendation:** Use `shared_ptr` or weak reference with validity check for connection lifetime management.
+- **Resolution:** Introduced `ConnectionGuard` — a mutex-protected `shared_ptr` proxy that outlives the connection. Pool threads call `guard->try_schedule_response()` which safely locks and checks validity; if the connection was deleted, the guard returns false (no dereference). For the server shutdown race, added `drain()` mechanism with atomic `outstanding_count` so `~Server()` waits for in-flight executors. RAII `Drain_guard` ensures correct count even on exceptions. Thread-safety tests validate concurrent invalidation and response scheduling.
 
-### #3: Race Condition on Global SSL Context Hostname
+### #3: Race Condition on Global SSL Context Hostname — FIXED
 
 - **Category:** Concurrency — TOCTOU Race (CWE-367)
 - **Affected:** `libiqxmlrpc/ssl_lib.cc:310-330`, `libiqxmlrpc/ssl_connection.cc:11-14`, `libiqxmlrpc/ssl_lib.cc:27` (global `ctx` pointer)
 - **Description:** The SSL context `iqnet::ssl::ctx` is a global singleton. All connections share it. `expected_hostname` is stored in the shared `Ctx::Impl`. Concurrent client connections to different hosts race on `set_expected_hostname()` / `prepare_hostname_verify()`, causing hostname verification against the wrong domain. Thread A sets "host-a.com", Thread B sets "host-b.com", Thread A verifies against "host-b.com".
 - **Impact:** MITM via hostname verification bypass in multi-threaded clients connecting to different hosts.
-- **Recommendation:** Move `expected_hostname` to per-connection state rather than shared global context.
+- **Resolution:** Moved `expected_hostname` to per-connection state (`ssl::Connection::expected_hostname_`). Each connection stores its hostname independently via `set_expected_hostname()`, applied once before handshake in `prepare_hostname_for_connect()`. SNI and X509_VERIFY_PARAM hostname checks use the per-connection value. Legacy Ctx-level fallback preserved for single-threaded backward compatibility. Concurrent hostname tests (4 threads x 3 requests, alternating correct/wrong hostnames) validate isolation.
 
-### #4: Race Condition on Global Mutable ValueOptions
+### #4: Race Condition on Global Mutable ValueOptions — FIXED
 
 - **Category:** Concurrency — Data Race (CWE-362)
 - **Affected:** `libiqxmlrpc/value.cc:20-24`
 - **Description:** Global non-atomic variables (`default_int`, `default_int64`, `omit_string_tag_in_responses`) are read/written from multiple threads without synchronization. Pool executor threads read these during serialization while any thread can write them via `Value::set_default_int()`, `Value::omit_string_tag_in_responses(bool)`, etc.
 - **Impact:** Undefined behavior per C++ standard (data race on non-atomic types). Practically: corrupted output or crash.
-- **Recommendation:** Make these `std::atomic` or protect with a mutex; alternatively, make them truly immutable after server startup.
+- **Resolution:** Replaced all three globals with `std::atomic<T>` using `seq_cst` memory ordering. Store-before-flag ordering prevents stale reads during initialization. Thread-safety tests (`test_value_options_thread_safety.cc`) validate concurrent access and are TSan-clean. Caller contract documented: set once at startup before server threads.
 
 ### #5: No Method-Level Authorization — WON'T FIX (by design)
 
@@ -56,33 +57,33 @@
 
 ## MEDIUM (6)
 
-### #6: HTTP Request Smuggling via Missing Transfer-Encoding Handling
+### #6: HTTP Request Smuggling via Missing Transfer-Encoding Handling — FIXED
 
 - **Category:** HTTP — Request Smuggling (CWE-444)
 - **Affected:** `libiqxmlrpc/http.cc:202-212`
 - **Description:** The server does not recognize `Transfer-Encoding: chunked`. No validator is registered for it. Behind a reverse proxy (nginx, HAProxy), an attacker sends both `Transfer-Encoding: chunked` and `Content-Length`. The proxy uses TE, the library uses CL, creating a classic CL.TE desynchronization. The fuzz corpus already contains test cases for this (`fuzz/corpus/http/smuggle_te_cl.txt`), confirming it is a known concern.
 - **Impact:** Request smuggling behind reverse proxy deployments.
-- **Recommendation:** Reject requests containing `Transfer-Encoding` header, or implement chunked transfer decoding.
+- **Resolution:** Registered `reject_transfer_encoding()` validator that throws `Http_header_error("Transfer-Encoding is not supported")` at parse time. Any request containing a Transfer-Encoding header is rejected before reaching the application layer, preventing CL.TE desynchronization. TE rejection events are logged for monitoring.
 
-### #7: Integer Truncation — `size_t` to `int` on XML Buffer
+### #7: Integer Truncation — `size_t` to `int` on XML Buffer — FIXED
 
 - **Category:** Integer Handling — Integer Truncation (CWE-197)
 - **Affected:** `libiqxmlrpc/parser2.cc:144`
 - **Description:** `static_cast<int>(str.size())` truncates 64-bit `size_t` to 32-bit `int`. With `max_req_sz` defaulting to 0 (unlimited), a >2GB payload reaches the parser. libxml2's `xmlReaderForMemory` receives a truncated (possibly negative) size, parsing only a fragment. An attacker crafts a payload where the first INT_MAX bytes are benign XML but malicious content lies after the truncation boundary.
 - **Impact:** Parser sees truncated input; trailing malicious content is silently ignored, or undefined behavior if truncated value is negative.
-- **Recommendation:** Add an explicit check that `str.size() <= INT_MAX` before casting; return error if exceeded.
+- **Resolution:** Added explicit `str.size() > std::numeric_limits<int>::max()` bounds check before the cast, throwing `Parse_error("XML payload exceeds maximum supported size")`. Payloads >2GB are now rejected cleanly before reaching libxml2.
 
-### #8: Memory Exhaustion — No Default Size Limits
+### #8: Memory Exhaustion — No Default Size Limits — PARTIALLY ADDRESSED
 
 - **Category:** Denial of Service — Resource Exhaustion (CWE-400)
 - **Affected:** `libiqxmlrpc/server.cc:71` (`max_req_sz=0`), `libiqxmlrpc/server.cc:76` (`idle_timeout_ms=0`), `libiqxmlrpc/client_conn.cc:12`
 - **Description:** Three related sub-issues:
   - **Server:** `max_req_sz` defaults to 0 — unlimited request body buffering. An attacker sends `Content-Length: 2147483647` and the server buffers it all.
-  - **Client:** No API to set max response size — unlimited response buffering from a malicious server.
+  - **Client:** ~~No API to set max response size — unlimited response buffering from a malicious server.~~ **ADDRESSED:** Added `Client_base::set_max_response_sz()` API. Throws `http::Response_too_large` when exceeded.
   - **Slow Loris:** `idle_timeout_ms` defaults to 0 — connections held indefinitely in header-reading state.
   - Combined with `XML_PARSE_HUGE` (parser2.cc:148) and 10M element limit, ~4-5x memory amplification is achievable (200MB wire → ~1GB heap).
 - **Impact:** OOM denial of service from a single connection.
-- **Recommendation:** Set secure defaults (`max_req_sz` = 10MB, `idle_timeout_ms` = 30000); add client-side `max_response_sz` API.
+- **Status:** All three limits are now configurable (`set_max_request_sz`, `set_idle_timeout`, `set_max_response_sz`). Finding remains open because **defaults are still unlimited** — applications must opt in. See `docs/HARDENING_GUIDE.md` for recommended values.
 
 ### #9: Firewall Use-After-Free via Atomic Swap — FIXED
 
@@ -92,13 +93,13 @@
 - **Impact:** Use-after-free crash if firewall is reconfigured while server is running.
 - **Resolution:** Replaced `std::atomic<Firewall_base*>` with `std::shared_ptr<Firewall_base>` using C++17 `std::atomic_load()`/`std::atomic_store()` free functions. Readers get a local `shared_ptr` copy that prevents deletion during use. Public API `Server::set_firewall(Firewall_base*)` unchanged — wraps raw pointer in `shared_ptr` at the boundary.
 
-### #10: SSL Error Messages Leaked to Clients
+### #10: SSL Error Messages Leaked to Clients — FIXED
 
 - **Category:** Information Disclosure (CWE-209)
 - **Affected:** `libiqxmlrpc/ssl_lib.cc:347-357`, `libiqxmlrpc/server.cc:299-316`
 - **Description:** OpenSSL error strings (`ERR_reason_error_string`) are captured in `ssl::exception::what()` and forwarded directly to clients in XML-RPC fault responses via the generic `catch(std::exception& e)` handler that passes `e.what()` into the response. Error messages like `"SSL: certificate verify failed"` or `"SSL: sslv3 alert handshake failure"` are sent to the client.
 - **Impact:** Fingerprinting of OpenSSL version and TLS configuration; aids reconnaissance for further attacks.
-- **Recommendation:** Return generic error messages to clients; log detailed SSL errors server-side only.
+- **Resolution:** Server catch handlers now return generic `"Internal server error"` (constant `GENERIC_FAULT_MSG`) to clients for all exception types. Full exception details including OpenSSL error strings are logged server-side only. Applies to both `std::exception` and unknown exception catch blocks.
 
 ### #11: Auth Credentials Over Plain HTTP
 
@@ -191,7 +192,7 @@
 
 ## Cross-Cutting Insight
 
-The most severe vulnerabilities (#1, #2, #3, #4) share a common root cause: **shared mutable global state** without synchronization. The global SSL context (`ssl::ctx`), global `ValueOptions`, and raw `Server_connection*` pointers all assume single-threaded access in a library that explicitly supports multi-threaded execution via `Pool_executor`.
+The most severe vulnerabilities (#1, #2, #3, #4) shared a common root cause: **shared mutable global state** without synchronization. The global SSL context (`ssl::ctx`), global `ValueOptions`, and raw `Server_connection*` pointers all assumed single-threaded access in a library that explicitly supports multi-threaded execution via `Pool_executor`. All four have since been fixed: #1 via `client_verified()` factory, #2 via `ConnectionGuard` + `drain()`, #3 via per-connection hostname, #4 via `std::atomic<T>`. Additionally #9 (Firewall UAF) was fixed via `shared_ptr` atomic swap.
 
 The "secure by default" gap (findings #7, #8, #11) stems from the server defaulting to insecure configuration (`max_req_sz=0`, `idle_timeout=0`, auth over HTTP). The library requires application developers to opt-in to safety rather than opt-out.
 
@@ -201,8 +202,8 @@ The "secure by default" gap (findings #7, #8, #11) stems from the server default
 
 | Priority | Findings | Rationale |
 |----------|----------|-----------|
-| **P0 — Immediate** | #1 | MITM on every client connection; simple fix |
-| **P1 — Next sprint** | #2, #3, #4 | Concurrency bugs exploitable under load |
-| **P2 — Near-term** | #6, #7, #8 | Requires API changes or new defaults |
-| **P3 — Backlog** | #9, #10, #11 | Moderate risk, workarounds exist |
-| **P4 — Low priority** | #12–#18 | Defense in depth, edge cases |
+| **P0 — Immediate** | ~~#1~~ | ~~MITM on every client connection; simple fix~~ All fixed |
+| **P1 — Next sprint** | ~~#2, #3, #4~~ | ~~Concurrency bugs exploitable under load~~ All fixed |
+| **P2 — Near-term** | ~~#6, #7~~, #8 | #8 remains: secure defaults for size limits |
+| **P3 — Backlog** | ~~#9, #10~~, #11 | #11 remains: auth credentials over plain HTTP |
+| **P4 — Low priority** | #12, #15, #17, #18 | Defense in depth, edge cases |

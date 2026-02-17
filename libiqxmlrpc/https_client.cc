@@ -67,6 +67,7 @@ http::Packet* Https_proxy_client_connection::do_process_session( const std::stri
 #endif
 
   Https_client_connection https_conn(sock, non_blocking);
+  https_conn.set_options(opts());
   if (!expected_hostname_.empty())
     https_conn.set_ssl_expected_hostname(expected_hostname_);
   https_conn.post_connect();

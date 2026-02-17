@@ -73,6 +73,30 @@ public:
   */
   void set_expected_hostname(const std::string& hostname);
 
+  //! Set maximum response size the client will accept.
+  /*! Limits the total HTTP response (headers + body) the client buffers
+      from the server.  Throws http::Response_too_large if a response
+      exceeds this limit.  The check is enforced incrementally as data
+      arrives, so the client limits buffering to approximately \p sz
+      bytes (up to one 64 KB read-buffer chunk beyond the limit).
+      \param sz Maximum response size in bytes. 0 means unlimited (default).
+
+      \note When using an HTTPS proxy, this limit also applies to the
+      proxy CONNECT handshake response.  Avoid setting the limit below
+      ~1 KB when using proxies.
+
+      \note On keep-alive connections, a Response_too_large exception
+      automatically invalidates the cached connection so the next
+      request starts on a clean socket.
+
+      \sa http::Response_too_large
+  */
+  void set_max_response_sz(size_t sz);
+
+  //! Get the maximum response size the client will accept.
+  /*! \return Maximum response size in bytes. 0 means unlimited. */
+  size_t get_max_response_sz() const;
+
 protected:
   int timeout() const;
   const std::string& expected_hostname() const;

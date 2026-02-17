@@ -40,9 +40,11 @@ env:
   RELAXED_BENCHMARKS: 'perf_lockfree_queue_p90_latency,perf_struct_access,perf_array_access,perf_array_iterate,perf_struct_iterate'
   # Very high variance benchmarks (tier 2)
   # perf_string_to_int_new: extreme variance on CI (~70%)
-  # Sub-nanosecond benchmarks: 1 clock cycle of jitter causes 30-100% swings
+  # Sub-nanosecond benchmarks (<1ns): at ~0.3ns/op we measure 1 CPU cycle;
+  # a single cycle of jitter causes 100% swings (1 cycle → 2 cycles).
+  # 120% threshold accommodates the physical measurement floor.
   # perf_ssl_result_return_code: ~0.3ns, SSL result code check
-  RELAXED_THRESHOLD_2: '70'
+  RELAXED_THRESHOLD_2: '120'
   RELAXED_BENCHMARKS_2: 'perf_string_to_int_new,perf_atomic_bool_write,perf_type_check_int_false,perf_type_check_int_true,perf_type_check_string_true,perf_ssl_result_return_code'
 
 jobs:
