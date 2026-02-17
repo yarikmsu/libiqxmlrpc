@@ -19,7 +19,7 @@ using namespace iqxmlrpc_test;
 
 // Port allocation per test suite (each test gets a unique port):
 //   client_tests:                       50-53
-//   client_response_size_limit_tests:   60-68
+//   client_response_size_limit_tests:   60-69
 
 //=============================================================================
 // Client Tests
@@ -243,6 +243,29 @@ BOOST_FIXTURE_TEST_CASE(max_response_size_keepalive_success_reuses_connection, I
   BOOST_CHECK_EQUAL(r1.value().get_string(), "first");
 
   // Second request on the same kept-alive connection
+  Response r2 = client->execute("echo", Value("second"));
+  BOOST_CHECK(!r2.is_fault());
+  BOOST_CHECK_EQUAL(r2.value().get_string(), "second");
+}
+
+BOOST_FIXTURE_TEST_CASE(set_keepalive_false_clears_cached_connection, IntegrationFixture)
+{
+  // Exercises client.cc:135 — set_keep_alive(false) must drop the
+  // cached connection immediately so the next request opens a fresh
+  // socket rather than reusing stale state.
+  start_server(1, 69);
+  auto client = create_client();
+  client->set_keep_alive(true);
+
+  // First request creates and caches a connection
+  Response r1 = client->execute("echo", Value("first"));
+  BOOST_CHECK(!r1.is_fault());
+  BOOST_CHECK_EQUAL(r1.value().get_string(), "first");
+
+  // Transition to non-keep-alive while cached connection exists
+  client->set_keep_alive(false);
+
+  // Second request should succeed on a fresh connection
   Response r2 = client->execute("echo", Value("second"));
   BOOST_CHECK(!r2.is_fault());
   BOOST_CHECK_EQUAL(r2.value().get_string(), "second");
