@@ -88,13 +88,13 @@ void Server_connection::invalidate_guard()
 }
 
 
-http::Packet* Server_connection::read_request( const std::string& s )
+std::unique_ptr<http::Packet> Server_connection::read_request( const std::string& s )
 {
   try
   {
     preader.set_verification_level( server->get_verification_level() );
     preader.set_max_size( server->get_max_request_sz() );
-    http::Packet* r = preader.read_request(s);
+    auto r = preader.read_request(s);
 
     if( r ) {
       keep_alive = r->header()->conn_keep_alive();

@@ -96,13 +96,13 @@ void Http_server_connection::handle_input( bool& terminate )
       return;
     }
 
-    http::Packet* packet = read_request( std::string(read_buf(), n) );
+    auto packet = read_request( std::string(read_buf(), n) );
     if( !packet )
       return;
 
     stop_idle();
     reactor->unregister_handler( this, Reactor_base::INPUT );
-    server->schedule_execute( packet, this );
+    server->schedule_execute( std::move(packet), this );
   }
   catch( const http::Error_response& e )
   {

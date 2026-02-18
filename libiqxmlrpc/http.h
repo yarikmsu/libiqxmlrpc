@@ -292,9 +292,9 @@ public:
   }
 
   bool expect_continue() const;
-  Packet* read_request( const std::string& );
-  Packet* read_response( const std::string&, bool read_header_only );
-  void set_continue_sent(); 
+  std::unique_ptr<Packet> read_request( const std::string& );
+  std::unique_ptr<Packet> read_response( const std::string&, bool read_header_only );
+  void set_continue_sent();
 
 private:
   void clear();
@@ -302,7 +302,7 @@ private:
   bool read_header( const std::string& );
 
   template <class Header_type>
-  Packet* read_packet( const std::string&, bool = false );
+  std::unique_ptr<Packet> read_packet( const std::string&, bool = false );
 };
 
 

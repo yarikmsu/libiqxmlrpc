@@ -99,7 +99,7 @@ void Https_server_connection::recv_succeed( bool&, size_t, size_t real_len )
   try
   {
     std::string s( read_buf(), real_len );
-    http::Packet* packet = read_request( s );
+    auto packet = read_request( s );
 
     if( !packet )
     {
@@ -109,7 +109,7 @@ void Https_server_connection::recv_succeed( bool&, size_t, size_t real_len )
     }
 
     stop_idle();
-    server->schedule_execute( packet, this );
+    server->schedule_execute( std::move(packet), this );
   }
   catch( const http::Error_response& e )
   {

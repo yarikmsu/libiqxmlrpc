@@ -103,7 +103,7 @@ public:
   virtual void terminate_idle() = 0;
 
 protected:
-  http::Packet* read_request( const std::string& );
+  std::unique_ptr<http::Packet> read_request( const std::string& );
 
   char* read_buf() { return &read_buf_[0]; }
   size_t read_buf_sz() const { return read_buf_.size(); }

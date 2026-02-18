@@ -32,7 +32,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   // This tests incremental/streaming packet construction
   try {
     auto reader = create_reader(iqxmlrpc::http::HTTP_CHECK_WEAK);
-    std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader->read_request(input));
+    auto pkt = reader->read_request(input);
     if (pkt) {
       (void)pkt->header();
       (void)pkt->content();
@@ -49,7 +49,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   try {
     auto reader = create_reader(iqxmlrpc::http::HTTP_CHECK_WEAK);
     reader->set_continue_sent();  // Toggle continue_sent state before parsing
-    std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader->read_request(input));
+    auto pkt = reader->read_request(input);
     if (pkt) {
       (void)pkt->header();
       (void)pkt->content();
@@ -61,7 +61,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   // Fuzz Packet_reader for HTTP request parsing (strict verification)
   try {
     auto reader = create_reader(iqxmlrpc::http::HTTP_CHECK_STRICT);
-    std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader->read_request(input));
+    auto pkt = reader->read_request(input);
     if (pkt) {
       (void)pkt->header();
       (void)pkt->content();
@@ -73,7 +73,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   // Fuzz Packet_reader for HTTP response parsing (weak, full packet)
   try {
     auto reader = create_reader(iqxmlrpc::http::HTTP_CHECK_WEAK);
-    std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader->read_response(input, false));
+    auto pkt = reader->read_response(input, false);
     if (pkt) {
       (void)pkt->header();
       (void)pkt->content();
@@ -86,7 +86,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   // Fuzz Packet_reader for HTTP response parsing (weak, header only)
   try {
     auto reader = create_reader(iqxmlrpc::http::HTTP_CHECK_WEAK);
-    std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader->read_response(input, true));
+    auto pkt = reader->read_response(input, true);
     if (pkt) {
       (void)pkt->header();
     }
@@ -97,7 +97,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   // Fuzz Packet_reader for HTTP response parsing (strict verification)
   try {
     auto reader = create_reader(iqxmlrpc::http::HTTP_CHECK_STRICT);
-    std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader->read_response(input, false));
+    auto pkt = reader->read_response(input, false);
     if (pkt) {
       (void)pkt->header();
       (void)pkt->content();
@@ -114,7 +114,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       // Feed data incrementally (byte-by-byte)
       for (size_t i = 1; i <= size; ++i) {
         std::string partial(reinterpret_cast<const char*>(data), i);
-        std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader->read_request(partial));
+        auto pkt = reader->read_request(partial);
         if (pkt) {
           // Packet is complete
           (void)pkt->header();
@@ -141,7 +141,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         if (end > size) end = size;
 
         std::string partial(reinterpret_cast<const char*>(data), end);
-        std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader->read_request(partial));
+        auto pkt = reader->read_request(partial);
         if (pkt) {
           (void)pkt->header();
           (void)pkt->content();
@@ -165,7 +165,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     try {
       auto reader = create_reader(iqxmlrpc::http::HTTP_CHECK_WEAK);
       // First packet attempt
-      std::unique_ptr<iqxmlrpc::http::Packet> pkt1(reader->read_request(input));
+      auto pkt1 = reader->read_request(input);
       if (pkt1) {
         (void)pkt1->header();
         (void)pkt1->content();
@@ -174,7 +174,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       // Reuse reader for second packet (split input differently)
       size_t split = size / 2;
       std::string second_input(reinterpret_cast<const char*>(data + split), size - split);
-      std::unique_ptr<iqxmlrpc::http::Packet> pkt2(reader->read_request(second_input));
+      auto pkt2 = reader->read_request(second_input);
       if (pkt2) {
         (void)pkt2->header();
         (void)pkt2->content();
@@ -232,7 +232,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       }
 
       auto reader = create_reader(iqxmlrpc::http::HTTP_CHECK_WEAK, fuzz::MAX_INPUT_SIZE * 2);
-      std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader->read_request(chunked_request));
+      auto pkt = reader->read_request(chunked_request);
       if (pkt) {
         (void)pkt->header();
         (void)pkt->content();
@@ -255,7 +255,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
           "\r\n" + input;
 
       auto reader = create_reader(iqxmlrpc::http::HTTP_CHECK_WEAK, fuzz::MAX_INPUT_SIZE * 2);
-      std::unique_ptr<iqxmlrpc::http::Packet> pkt(reader->read_request(raw_chunked));
+      auto pkt = reader->read_request(raw_chunked);
       if (pkt) {
         (void)pkt->content();
       }

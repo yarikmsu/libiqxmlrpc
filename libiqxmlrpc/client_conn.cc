@@ -62,7 +62,7 @@ std::unique_ptr<http::Packet> Client_connection::read_response( const std::strin
   // The caller must supply subsequent data chunks via further calls until a non-null
   // packet is returned; this may happen within a read loop or across multiple
   // event-handler callbacks depending on the I/O model.
-  return std::unique_ptr<http::Packet>( preader.read_response( s, hdr_only ) );
+  return preader.read_response( s, hdr_only );
 }
 
 std::string Client_connection::decorate_uri() const
