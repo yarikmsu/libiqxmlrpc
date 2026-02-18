@@ -69,7 +69,7 @@ void Http_client_connection::handle_input( bool& )
     if( sz == 0 )
       throw iqnet::network_error( "Connection closed by peer.", false );
 
-    resp_packet.reset( read_response( std::string(read_buf(), sz) ) );
+    resp_packet = read_response( std::string(read_buf(), sz) );
   }
 
   // cppcheck-suppress knownConditionTrueFalse
