@@ -25,9 +25,9 @@ namespace {
 
 std::string get_host_name()
 {
-  char buf[1024];
-  buf[1023] = 0;
-  ::gethostname( buf, sizeof(buf) );
+  char buf[1024] = {};
+  if (::gethostname( buf, sizeof(buf) ) != 0)
+    throw network_error( "gethostname" );
 
   return buf;
 }

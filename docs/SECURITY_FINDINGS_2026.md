@@ -3,7 +3,7 @@
 **Date:** 2026-02-07
 **Scope:** Full codebase audit across 4 attack surfaces (XML parsing, HTTP layer, memory safety/concurrency, SSL/TLS/authentication)
 **Findings:** 18 total — 1 Critical, 4 High, 6 Medium, 7 Low
-**Status:** 10 fixed, 2 won't-fix (by design), 6 open (#8, #11, #12, #15, #17, #18)
+**Status:** 11 fixed, 2 won't-fix (by design), 5 open (#8, #11, #12, #15, #17)
 
 ---
 
@@ -161,13 +161,13 @@
 - **Impact:** Minor memory waste; bounded by HTTP layer if configured.
 - **Recommendation:** Add an explicit method name length limit (e.g., 256 bytes).
 
-### #18: `gethostname()` Return Value Unchecked
+### #18: `gethostname()` Return Value Unchecked — FIXED
 
 - **Category:** Error Handling — Unchecked Return Value (CWE-252)
 - **Affected:** `libiqxmlrpc/inet_addr.cc:26-33`
 - **Description:** The return value of `gethostname()` is not checked. If it fails (returns -1), `buf` may contain uninitialized data. The manual null termination at `buf[1023] = 0` prevents buffer overrun, but the returned string would contain garbage. If the hostname is exactly 1024 bytes, `gethostname()` may not null-terminate on some platforms (implementation-defined per POSIX). The uninitialized content between the last written byte and position 1023 would become part of the returned string.
 - **Impact:** Garbage hostname returned on failure; information leak of uninitialized stack memory in edge cases.
-- **Recommendation:** Check `gethostname()` return value; zero-initialize `buf` or handle errors.
+- **Resolution:** Zero-initialized buffer and added return value check — throws `network_error("gethostname")` on failure, consistent with other system call error handling in the file.
 
 ---
 
@@ -206,4 +206,4 @@ The "secure by default" gap (findings #7, #8, #11) stems from the server default
 | **P1 — Next sprint** | ~~#2, #3, #4~~ | ~~Concurrency bugs exploitable under load~~ All fixed |
 | **P2 — Near-term** | ~~#6, #7~~, #8 | #8 remains: secure defaults for size limits |
 | **P3 — Backlog** | ~~#9, #10~~, #11 | #11 remains: auth credentials over plain HTTP |
-| **P4 — Low priority** | #12, #15, #17, #18 | Defense in depth, edge cases |
+| **P4 — Low priority** | #12, #15, #17, ~~#18~~ | Defense in depth, edge cases |
