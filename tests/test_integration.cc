@@ -1725,7 +1725,7 @@ BOOST_AUTO_TEST_CASE(https_proxy_ssl_factory_success)
     conn.set_options(opts);
 
     // Inject mock SSL factory that returns a fake response
-    conn.set_ssl_factory([&factory_called](const Socket&, bool, const std::string&) -> http::Packet* {
+    conn.set_ssl_factory([&factory_called](const Socket&, bool, const std::string&) -> std::unique_ptr<http::Packet> {
       factory_called = true;
       // Create a mock XML-RPC response packet
       auto* header = new http::Response_header(200, "OK");
@@ -1733,7 +1733,7 @@ BOOST_AUTO_TEST_CASE(https_proxy_ssl_factory_success)
         "<?xml version=\"1.0\"?>\r\n"
         "<methodResponse><params><param><value>"
         "<string>mock_ssl_response</string></value></param></params></methodResponse>";
-      return new http::Packet(header, body);
+      return std::make_unique<http::Packet>(header, body);
     });
 
     Request req("test_method", Param_list());
@@ -1790,7 +1790,7 @@ BOOST_AUTO_TEST_CASE(https_proxy_ssl_factory_parameters)
     conn.set_options(opts);
 
     conn.set_ssl_factory([&non_blocking_param, &request_param](
-        const Socket&, bool nb, const std::string& req) -> http::Packet* {
+        const Socket&, bool nb, const std::string& req) -> std::unique_ptr<http::Packet> {
       non_blocking_param = nb;
       request_param = req;
       auto* header = new http::Response_header(200, "OK");
@@ -1798,7 +1798,7 @@ BOOST_AUTO_TEST_CASE(https_proxy_ssl_factory_parameters)
         "<?xml version=\"1.0\"?>\r\n"
         "<methodResponse><params><param><value>"
         "<string>ok</string></value></param></params></methodResponse>";
-      return new http::Packet(header, body);
+      return std::make_unique<http::Packet>(header, body);
     });
 
     Request req("my_test_method", Param_list());
@@ -1850,7 +1850,7 @@ BOOST_AUTO_TEST_CASE(https_proxy_ssl_factory_exception)
     conn.set_options(opts);
 
     // Factory that throws SSL-like error
-    conn.set_ssl_factory([](const Socket&, bool, const std::string&) -> http::Packet* {
+    conn.set_ssl_factory([](const Socket&, bool, const std::string&) -> std::unique_ptr<http::Packet> {
       throw iqnet::network_error("SSL handshake failed", false);
     });
 

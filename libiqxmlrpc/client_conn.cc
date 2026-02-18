@@ -38,8 +38,7 @@ Response Client_connection::process_session( const Request& req, const XHeaders&
   Packet req_p( req_h.release(), req_xml_str );
   req_p.set_keep_alive( opts().keep_alive() );
 
-  // Received packet
-  std::unique_ptr<Packet> res_p( do_process_session(req_p.dump()) );
+  auto res_p = do_process_session(req_p.dump());
 
   const auto* res_h =
     static_cast<const Response_header*>(res_p->header());

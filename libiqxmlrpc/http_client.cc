@@ -24,7 +24,7 @@ Http_client_connection::Http_client_connection( const iqnet::Socket& s, bool nb 
 }
 
 
-http::Packet* Http_client_connection::do_process_session( const std::string& s )
+std::unique_ptr<http::Packet> Http_client_connection::do_process_session( const std::string& s )
 {
   out_str = s;
   out_str_offset = 0;  // Reset offset for new request
@@ -39,7 +39,7 @@ http::Packet* Http_client_connection::do_process_session( const std::string& s )
   // cppcheck-suppress knownConditionTrueFalse
   while( !resp_packet );
 
-  return resp_packet.release();
+  return std::move(resp_packet);
 }
 
 

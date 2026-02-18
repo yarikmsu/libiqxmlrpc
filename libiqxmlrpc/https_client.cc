@@ -55,9 +55,10 @@ Https_proxy_client_connection::Https_proxy_client_connection(
   sock.set_non_blocking( nb );
 }
 
-http::Packet* Https_proxy_client_connection::do_process_session( const std::string& s )
+std::unique_ptr<http::Packet> Https_proxy_client_connection::do_process_session( const std::string& s )
 {
   setup_tunnel();
+  resp_packet.reset();  // Tunnel response no longer needed
 
 #ifdef IQXMLRPC_TESTING
   // Use factory if provided (for testing), otherwise create real SSL connection
@@ -152,7 +153,7 @@ inline void Https_client_connection::reg_send_request()
 }
 
 
-http::Packet* Https_client_connection::do_process_session( const std::string& s )
+std::unique_ptr<http::Packet> Https_client_connection::do_process_session( const std::string& s )
 {
   out_str = s;
   resp_packet.reset();
@@ -167,7 +168,7 @@ http::Packet* Https_client_connection::do_process_session( const std::string& s 
   }
   while( !resp_packet );
 
-  return resp_packet.release();
+  return std::move(resp_packet);
 }
 
 
