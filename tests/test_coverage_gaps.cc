@@ -568,7 +568,7 @@ BOOST_AUTO_TEST_SUITE_END()
 BOOST_AUTO_TEST_SUITE(error_response_coverage)
 
 // Test sending malformed HTTP to HTTPS server
-// Covers https_server.cc recv_succeed error path (lines 119-121)
+// Covers https_server.cc recv_succeed error path (lines 114-119: Error_response catch)
 BOOST_FIXTURE_TEST_CASE(https_server_recv_error_response, HttpsIntegrationFixture)
 {
   BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
@@ -576,15 +576,56 @@ BOOST_FIXTURE_TEST_CASE(https_server_recv_error_response, HttpsIntegrationFixtur
 
   start_server(570);
 
-  // Make a normal request first
-  auto client = create_client();
-  Response r = client->execute("echo", Value("normal"));
-  BOOST_CHECK(!r.is_fault());
+  // Establish a real SSL connection and send a GET request.
+  // GET triggers Method_not_allowed (Error_response) inside recv_succeed(),
+  // exercising the catch block that was previously unreachable in tests.
+  {
+    iqnet::Socket sock;
+    sock.connect(iqnet::Inet_addr("127.0.0.1", port_));
 
-  // Server should still work after any error
-  auto client2 = create_client();
-  Response r2 = client2->execute("echo", Value("after"));
-  BOOST_CHECK(!r2.is_fault());
+    SSL* ssl = SSL_new(iqnet::ssl::ctx->context());
+    BOOST_REQUIRE(ssl);
+    SSL_set_verify(ssl, SSL_VERIFY_NONE, nullptr);
+    SSL_set_fd(ssl, sock.get_handler());
+
+    if (SSL_connect(ssl) != 1) {
+      SSL_free(ssl);
+      sock.close();
+      BOOST_FAIL("SSL handshake failed");
+    }
+
+    // GET /RPC2 triggers Method_not_allowed thrown from Request_header ctor
+    const char get_req[] = "GET /RPC2 HTTP/1.1\r\nHost: localhost\r\n\r\n";
+    int written = SSL_write(ssl, get_req, static_cast<int>(sizeof(get_req) - 1));
+    if (written <= 0) {
+      SSL_free(ssl);
+      sock.close();
+      BOOST_FAIL("SSL_write failed with return code " + std::to_string(written));
+    }
+
+    // Read the error response (server sends 405 Method Not Allowed)
+    char buf[1024] = {};
+    int bytes_read = SSL_read(ssl, buf, static_cast<int>(sizeof(buf) - 1));
+    if (bytes_read <= 0) {
+      SSL_free(ssl);
+      sock.close();
+      BOOST_FAIL("SSL_read failed with return code " + std::to_string(bytes_read));
+    }
+    std::string response_str(buf, static_cast<size_t>(bytes_read));
+    BOOST_CHECK_MESSAGE(response_str.find("405") != std::string::npos,
+      "Expected 405 response, got: " + response_str.substr(0, 80));
+
+    SSL_shutdown(ssl);
+    SSL_free(ssl);
+    sock.close();
+  }
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+  // Server must still function correctly after handling the error
+  auto client = create_client();
+  Response r = client->execute("echo", Value("after error"));
+  BOOST_CHECK(!r.is_fault());
 }
 
 BOOST_AUTO_TEST_SUITE_END()
@@ -811,12 +852,12 @@ BOOST_AUTO_TEST_CASE(packet_reader_clear_nullptr)
 
   // Read a complete packet
   std::string raw = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 4\r\n\r\ntest";
-  std::unique_ptr<http::Packet> pkt(reader.read_request(raw));
+  auto pkt = reader.read_request(raw);
   BOOST_REQUIRE(pkt != nullptr);
 
   // Read another packet - this triggers clear() which sets header = nullptr
   std::string raw2 = "POST /other HTTP/1.1\r\nhost: localhost\r\ncontent-length: 5\r\n\r\nhello";
-  std::unique_ptr<http::Packet> pkt2(reader.read_request(raw2));
+  auto pkt2 = reader.read_request(raw2);
   BOOST_REQUIRE(pkt2 != nullptr);
   BOOST_CHECK_EQUAL(pkt2->content(), "hello");
 }
@@ -862,15 +903,15 @@ BOOST_AUTO_TEST_CASE(packet_reader_return_nullptr)
   http::Packet_reader reader;
 
   // Incomplete packet - should return nullptr
-  std::unique_ptr<http::Packet> pkt(reader.read_response("HTTP/1.1 200 OK\r\n", false));
+  auto pkt = reader.read_response("HTTP/1.1 200 OK\r\n", false);
   BOOST_CHECK(pkt == nullptr);
 
   // Still incomplete
-  pkt.reset(reader.read_response("content-length: 100\r\n\r\n", false));
+  pkt = reader.read_response("content-length: 100\r\n\r\n", false);
   BOOST_CHECK(pkt == nullptr);
 
   // Still waiting for content
-  pkt.reset(reader.read_response("partial", false));
+  pkt = reader.read_response("partial", false);
   BOOST_CHECK(pkt == nullptr);
 }
 

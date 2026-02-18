@@ -236,7 +236,7 @@ BOOST_AUTO_TEST_CASE(packet_reader_read_response)
 {
     Packet_reader reader;
     std::string raw = "HTTP/1.1 200 OK\r\ncontent-length: 4\r\n\r\ntest";
-    std::unique_ptr<Packet> pkt(reader.read_response(raw, false));
+    auto pkt = reader.read_response(raw, false);
     BOOST_REQUIRE(pkt != nullptr);
     BOOST_CHECK_EQUAL(pkt->content(), "test");
 }
@@ -245,7 +245,7 @@ BOOST_AUTO_TEST_CASE(packet_reader_read_response_header_only)
 {
     Packet_reader reader;
     std::string raw = "HTTP/1.1 200 OK\r\ncontent-length: 100\r\n\r\npartial";
-    std::unique_ptr<Packet> pkt(reader.read_response(raw, true));
+    auto pkt = reader.read_response(raw, true);
     BOOST_REQUIRE(pkt != nullptr);
     BOOST_CHECK(pkt->content().empty());
 }
@@ -254,7 +254,7 @@ BOOST_AUTO_TEST_CASE(packet_reader_read_request)
 {
     Packet_reader reader;
     std::string raw = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 4\r\n\r\ntest";
-    std::unique_ptr<Packet> pkt(reader.read_request(raw));
+    auto pkt = reader.read_request(raw);
     BOOST_REQUIRE(pkt != nullptr);
     BOOST_CHECK_EQUAL(pkt->content(), "test");
 }
@@ -262,11 +262,11 @@ BOOST_AUTO_TEST_CASE(packet_reader_read_request)
 BOOST_AUTO_TEST_CASE(packet_reader_incremental_read)
 {
     Packet_reader reader;
-    std::unique_ptr<Packet> pkt(reader.read_response("HTTP/1.1 200 OK\r\n", false));
+    auto pkt = reader.read_response("HTTP/1.1 200 OK\r\n", false);
     BOOST_CHECK(pkt == nullptr);
-    pkt.reset(reader.read_response("content-length: 4\r\n\r\n", false));
+    pkt = reader.read_response("content-length: 4\r\n\r\n", false);
     BOOST_CHECK(pkt == nullptr);
-    pkt.reset(reader.read_response("test", false));
+    pkt = reader.read_response("test", false);
     BOOST_REQUIRE(pkt != nullptr);
     BOOST_CHECK_EQUAL(pkt->content(), "test");
 }
@@ -450,7 +450,7 @@ BOOST_AUTO_TEST_CASE(packet_reader_expect_continue)
 {
     Packet_reader reader;
     std::string raw = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 4\r\nexpect: 100-continue\r\n\r\n";
-    std::unique_ptr<Packet> pkt(reader.read_request(raw));
+    auto pkt = reader.read_request(raw);
     BOOST_CHECK(pkt == nullptr);  // Waiting for continue
     BOOST_CHECK(reader.expect_continue());
 }
@@ -469,7 +469,7 @@ BOOST_AUTO_TEST_CASE(packet_reader_zero_content_length)
 {
     Packet_reader reader;
     std::string raw = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 0\r\n\r\n";
-    std::unique_ptr<Packet> pkt(reader.read_request(raw));
+    auto pkt = reader.read_request(raw);
     BOOST_REQUIRE(pkt != nullptr);
     BOOST_CHECK(pkt->content().empty());
 }
@@ -478,7 +478,7 @@ BOOST_AUTO_TEST_CASE(packet_reader_lf_line_ending)
 {
     Packet_reader reader;
     std::string raw = "POST /RPC2 HTTP/1.1\nhost: localhost\ncontent-length: 4\n\ntest";
-    std::unique_ptr<Packet> pkt(reader.read_request(raw));
+    auto pkt = reader.read_request(raw);
     BOOST_REQUIRE(pkt != nullptr);
     BOOST_CHECK_EQUAL(pkt->content(), "test");
 }
@@ -488,7 +488,7 @@ BOOST_AUTO_TEST_CASE(packet_reader_mixed_crlf_lf_separator)
     // Test mixed line ending: headers use CRLF, but separator is CRLF+LF (\r\n\n)
     Packet_reader reader;
     std::string raw = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 4\r\n\ntest";
-    std::unique_ptr<Packet> pkt(reader.read_request(raw));
+    auto pkt = reader.read_request(raw);
     BOOST_REQUIRE(pkt != nullptr);
     BOOST_CHECK_EQUAL(pkt->content(), "test");
 }
@@ -498,7 +498,7 @@ BOOST_AUTO_TEST_CASE(packet_reader_response_mixed_crlf_lf_separator)
     // Test response parsing with mixed line ending (\r\n\n)
     Packet_reader reader;
     std::string raw = "HTTP/1.1 200 OK\r\ncontent-length: 4\r\n\ntest";
-    std::unique_ptr<Packet> pkt(reader.read_response(raw, false));
+    auto pkt = reader.read_response(raw, false);
     BOOST_REQUIRE(pkt != nullptr);
     BOOST_CHECK_EQUAL(pkt->content(), "test");
 }
@@ -510,7 +510,7 @@ BOOST_AUTO_TEST_CASE(packet_reader_no_separator_incomplete)
 
     // Only single \r - should not find separator (returns null, incomplete)
     std::string raw1 = "POST /RPC2 HTTP/1.1\rhost: localhost\rcontent-length: 4\rtest";
-    std::unique_ptr<Packet> pkt1(reader.read_request(raw1));
+    auto pkt1 = reader.read_request(raw1);
     BOOST_CHECK(pkt1 == nullptr);  // No valid separator found
 }
 
@@ -520,7 +520,7 @@ BOOST_AUTO_TEST_CASE(packet_reader_first_separator_wins)
     // Content contains what looks like another separator, but first one should win
     Packet_reader reader;
     std::string raw = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 8\r\n\r\naa\r\n\r\nbb";
-    std::unique_ptr<Packet> pkt(reader.read_request(raw));
+    auto pkt = reader.read_request(raw);
     BOOST_REQUIRE(pkt != nullptr);
     // Content should be "aa\r\n\r\nbb" (8 bytes) - the embedded separator is part of content
     BOOST_CHECK_EQUAL(pkt->content(), "aa\r\n\r\nbb");
@@ -530,11 +530,11 @@ BOOST_AUTO_TEST_CASE(packet_reader_multiple_reads_resets)
 {
     Packet_reader reader;
     std::string raw1 = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 4\r\n\r\ntest";
-    std::unique_ptr<Packet> pkt1(reader.read_request(raw1));
+    auto pkt1 = reader.read_request(raw1);
     BOOST_REQUIRE(pkt1 != nullptr);
 
     std::string raw2 = "POST /other HTTP/1.1\r\nhost: example.com\r\ncontent-length: 5\r\n\r\nhello";
-    std::unique_ptr<Packet> pkt2(reader.read_request(raw2));
+    auto pkt2 = reader.read_request(raw2);
     BOOST_REQUIRE(pkt2 != nullptr);
     BOOST_CHECK_EQUAL(pkt2->content(), "hello");
 }
@@ -841,7 +841,7 @@ BOOST_AUTO_TEST_CASE(packet_reader_incremental_size_check)
     reader.set_max_size(50);  // Small limit
 
     // First read under limit
-    std::unique_ptr<Packet> pkt(reader.read_response("HTTP/1.1 200 OK\r\n", false));
+    auto pkt = reader.read_response("HTTP/1.1 200 OK\r\n", false);
     BOOST_CHECK(pkt == nullptr);
 
     // Second read should push over limit
@@ -854,7 +854,7 @@ BOOST_AUTO_TEST_CASE(packet_reader_content_length_check_after_header)
     reader.set_max_size(100);
 
     // First, read header that declares large content-length
-    std::unique_ptr<Packet> pkt(reader.read_request("POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 150\r\n\r\n"));
+    auto pkt = reader.read_request("POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 150\r\n\r\n");
     BOOST_CHECK(pkt == nullptr);  // Header parsed, waiting for content
 
     // Now try to read more data - this triggers the content-length + header check
@@ -867,12 +867,12 @@ BOOST_AUTO_TEST_CASE(packet_reader_clear_and_reuse)
 
     // Read a complete packet
     std::string raw1 = "POST /RPC2 HTTP/1.1\r\nhost: localhost\r\ncontent-length: 4\r\n\r\ntest";
-    std::unique_ptr<Packet> pkt1(reader.read_request(raw1));
+    auto pkt1 = reader.read_request(raw1);
     BOOST_REQUIRE(pkt1 != nullptr);
 
     // Reader should auto-clear for next read
     std::string raw2 = "POST /other HTTP/1.1\r\nhost: example.com\r\ncontent-length: 5\r\n\r\nhello";
-    std::unique_ptr<Packet> pkt2(reader.read_request(raw2));
+    auto pkt2 = reader.read_request(raw2);
     BOOST_REQUIRE(pkt2 != nullptr);
     BOOST_CHECK_EQUAL(pkt2->content(), "hello");
 }
@@ -882,11 +882,11 @@ BOOST_AUTO_TEST_CASE(packet_reader_partial_content_completion)
     Packet_reader reader;
 
     // Send header with content-length
-    std::unique_ptr<Packet> pkt(reader.read_response("HTTP/1.1 200 OK\r\ncontent-length: 10\r\n\r\npartial", false));
+    auto pkt = reader.read_response("HTTP/1.1 200 OK\r\ncontent-length: 10\r\n\r\npartial", false);
     BOOST_CHECK(pkt == nullptr);  // Only 7 chars, need 10
 
     // Complete the content
-    pkt.reset(reader.read_response("end", false));  // Now have "partialend" = 10 chars
+    pkt = reader.read_response("end", false);  // Now have "partialend" = 10 chars
     BOOST_REQUIRE(pkt != nullptr);
     BOOST_CHECK_EQUAL(pkt->content(), "partialend");  // Exactly 10 chars
 }
@@ -897,7 +897,7 @@ BOOST_AUTO_TEST_CASE(packet_reader_excess_content_truncated)
 
     // Content exceeds declared content-length
     std::string raw = "HTTP/1.1 200 OK\r\ncontent-length: 4\r\n\r\ntestextra";
-    std::unique_ptr<Packet> pkt(reader.read_response(raw, false));
+    auto pkt = reader.read_response(raw, false);
     BOOST_REQUIRE(pkt != nullptr);
     BOOST_CHECK_EQUAL(pkt->content(), "test");  // Truncated to 4
 }
@@ -1147,7 +1147,7 @@ BOOST_AUTO_TEST_CASE(response_size_limit_cumulative)
     reader.set_max_response_size(40);
 
     // First chunk under limit
-    std::unique_ptr<Packet> pkt(reader.read_response("HTTP/1.1 200 OK\r\n", false));
+    auto pkt = reader.read_response("HTTP/1.1 200 OK\r\n", false);
     BOOST_CHECK(pkt == nullptr);
 
     // Second chunk pushes over limit
@@ -1164,7 +1164,7 @@ BOOST_AUTO_TEST_CASE(response_size_limit_disabled)
 
     std::string content(1000, 'y');
     std::string raw = "HTTP/1.1 200 OK\r\ncontent-length: 1000\r\n\r\n" + content;
-    std::unique_ptr<Packet> pkt(reader.read_response(raw, false));
+    auto pkt = reader.read_response(raw, false);
     BOOST_REQUIRE(pkt != nullptr);
     BOOST_CHECK_EQUAL(pkt->content().length(), 1000u);
 }
@@ -1186,8 +1186,8 @@ BOOST_AUTO_TEST_CASE(response_size_limit_content_length_check)
     reader.set_max_response_size(100);
 
     // Header that declares large content-length
-    std::unique_ptr<Packet> pkt(reader.read_response(
-        "HTTP/1.1 200 OK\r\ncontent-length: 500\r\n\r\n", false));
+    auto pkt = reader.read_response(
+        "HTTP/1.1 200 OK\r\ncontent-length: 500\r\n\r\n", false);
     BOOST_CHECK(pkt == nullptr);  // Header parsed, waiting for content
 
     // Next read triggers the content-length + header check
@@ -1203,7 +1203,7 @@ BOOST_AUTO_TEST_CASE(response_flag_persists_across_clear)
     reader.set_max_response_size(200);
 
     std::string raw = "HTTP/1.1 200 OK\r\ncontent-length: 4\r\n\r\ntest";
-    std::unique_ptr<Packet> pkt(reader.read_response(raw, false));
+    auto pkt = reader.read_response(raw, false);
     BOOST_REQUIRE(pkt != nullptr);
 
     // Reader role persists — still throws Response_too_large
@@ -1273,7 +1273,7 @@ BOOST_AUTO_TEST_CASE(response_size_limit_one_above_boundary_accepted)
     Packet_reader reader;
     std::string raw = "HTTP/1.1 200 OK\r\ncontent-length: 4\r\n\r\ntest";
     reader.set_max_response_size(raw.length() + 1);
-    std::unique_ptr<Packet> pkt(reader.read_response(raw, false));
+    auto pkt = reader.read_response(raw, false);
     BOOST_REQUIRE(pkt != nullptr);
     BOOST_CHECK_EQUAL(pkt->content(), "test");
 }
@@ -1284,12 +1284,12 @@ BOOST_AUTO_TEST_CASE(response_size_reapplied_on_incremental_reads)
     Packet_reader reader;
     reader.set_max_response_size(200);
 
-    std::unique_ptr<Packet> pkt(reader.read_response("HTTP/1.1 200 OK\r\n", false));
+    auto pkt = reader.read_response("HTTP/1.1 200 OK\r\n", false);
     BOOST_CHECK(pkt == nullptr);
 
     // Re-apply same limit (as client_conn.cc does on each read chunk)
     reader.set_max_response_size(200);
-    pkt.reset(reader.read_response("content-length: 4\r\n\r\ntest", false));
+    pkt = reader.read_response("content-length: 4\r\n\r\ntest", false);
     BOOST_REQUIRE(pkt != nullptr);
     BOOST_CHECK_EQUAL(pkt->content(), "test");
 }
@@ -1325,7 +1325,7 @@ BOOST_AUTO_TEST_CASE(response_size_limit_disabled_allows_unlimited)
     reader.set_max_response_size(0);
 
     std::string raw = "HTTP/1.1 200 OK\r\ncontent-length: 4\r\n\r\ntest";
-    std::unique_ptr<Packet> pkt(reader.read_response(raw, false));
+    auto pkt = reader.read_response(raw, false);
     BOOST_REQUIRE(pkt != nullptr);
     BOOST_CHECK_EQUAL(pkt->content(), "test");
 }

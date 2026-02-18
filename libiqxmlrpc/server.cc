@@ -277,13 +277,12 @@ authenticate(const http::Packet& pkt, const Auth_Plugin_base* ap)
 
 } // anonymous namespace
 
-void Server::schedule_execute( http::Packet* pkt, Server_connection* conn )
+void Server::schedule_execute( std::unique_ptr<http::Packet> packet, Server_connection* conn )
 {
   Executor* executor = nullptr;
 
   try {
-    std::unique_ptr<http::Packet> packet(pkt);
-    std::optional<std::string> authname = authenticate(*pkt, impl->auth_plugin);
+    std::optional<std::string> authname = authenticate(*packet, impl->auth_plugin);
     std::unique_ptr<Request> req( parse_request(packet->content()) );
 
     Method::Data mdata = {
@@ -297,7 +296,7 @@ void Server::schedule_execute( http::Packet* pkt, Server_connection* conn )
     if (authname)
       meth->authname(*authname);
 
-    pkt->header()->get_xheaders(meth->xheaders());
+    packet->header()->get_xheaders(meth->xheaders());
 
     executor = impl->exec_factory->create( meth, this, conn );
     executor->set_interceptors(impl->interceptors.get());

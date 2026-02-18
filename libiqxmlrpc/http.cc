@@ -809,7 +809,7 @@ bool Packet_reader::read_header( const std::string& s )
 }
 
 template <class Header_type>
-Packet* Packet_reader::read_packet( const std::string& s, bool hdr_only )
+std::unique_ptr<Packet> Packet_reader::read_packet( const std::string& s, bool hdr_only )
 {
   if( constructed )
     clear();
@@ -832,7 +832,7 @@ Packet* Packet_reader::read_packet( const std::string& s, bool hdr_only )
     if ( hdr_only )
     {
       constructed = true;
-      return new Packet( header, std::string() );
+      return std::make_unique<Packet>( header, std::string() );
     }
 
     bool ready = (header->content_length() == 0 && s.empty()) ||
@@ -841,7 +841,7 @@ Packet* Packet_reader::read_packet( const std::string& s, bool hdr_only )
     if( ready )
     {
       content_cache.erase( header->content_length(), std::string::npos );
-      auto* packet = new Packet( header, content_cache );
+      auto packet = std::make_unique<Packet>( header, content_cache );
       constructed = true;
       return packet;
     }
@@ -860,12 +860,12 @@ void Packet_reader::set_continue_sent()
   continue_sent_ = true;
 }
 
-Packet* Packet_reader::read_request( const std::string& s )
+std::unique_ptr<Packet> Packet_reader::read_request( const std::string& s )
 {
   return read_packet<Request_header>(s);
 }
 
-Packet* Packet_reader::read_response( const std::string& s, bool hdr_only )
+std::unique_ptr<Packet> Packet_reader::read_response( const std::string& s, bool hdr_only )
 {
   return read_packet<Response_header>(s, hdr_only);
 }
