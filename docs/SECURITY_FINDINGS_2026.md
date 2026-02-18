@@ -3,7 +3,7 @@
 **Date:** 2026-02-07
 **Scope:** Full codebase audit across 4 attack surfaces (XML parsing, HTTP layer, memory safety/concurrency, SSL/TLS/authentication)
 **Findings:** 18 total — 1 Critical, 4 High, 6 Medium, 7 Low
-**Status:** 11 fixed, 2 won't-fix (by design), 5 open (#8, #11, #12, #15, #17)
+**Status:** 12 fixed, 2 won't-fix (by design), 4 open (#8, #11, #12, #15)
 
 ---
 
@@ -153,13 +153,13 @@
 - **Impact:** Negligible. Header total size is bounded by `header_max_sz` (16KB default), CRLF injection is blocked by `validate_header_crlf()`, and the `XHeaders` map is a per-request copy.
 - **Resolution:** Won't fix. Forwarding all headers is by design — applications rely on non-`x-*` headers. The 16KB header size limit bounds both count and total size, making namespace pollution impractical. Renamed `Header::get_xheaders()`/`set_xheaders()` to `Header::get_headers()`/`set_headers()` to eliminate the naming mismatch that implied `x-*` filtering.
 
-### #17: Unbounded Method Name Length
+### #17: Unbounded Method Name Length — FIXED
 
 - **Category:** Input Validation — Unbounded Input (CWE-20)
 - **Affected:** `libiqxmlrpc/request_parser.cc:44`
 - **Description:** The method name read from `<methodName>` has no length limit applied. A multi-megabyte method name would be accepted and stored. The `Unknown_method` exception sanitizes the name (limiting to 128 characters in error output), but the name itself is stored at full size until the lookup fails. Bounded by HTTP layer `max_req_sz` if configured, and by `MAX_ELEMENT_COUNT`.
 - **Impact:** Minor memory waste; bounded by HTTP layer if configured.
-- **Recommendation:** Add an explicit method name length limit (e.g., 256 bytes).
+- **Resolution:** Added 256-byte method name length check at parse time in `RequestBuilder::do_visit_element()`, throwing `XML_RPC_violation` before the name is stored. This is defense-in-depth alongside the existing dispatcher-level check in `dispatcher_manager.cc`.
 
 ### #18: `gethostname()` Return Value Unchecked — FIXED
 
@@ -206,4 +206,4 @@ The "secure by default" gap (findings #7, #8, #11) stems from the server default
 | **P1 — Next sprint** | ~~#2, #3, #4~~ | ~~Concurrency bugs exploitable under load~~ All fixed |
 | **P2 — Near-term** | ~~#6, #7~~, #8 | #8 remains: secure defaults for size limits |
 | **P3 — Backlog** | ~~#9, #10~~, #11 | #11 remains: auth credentials over plain HTTP |
-| **P4 — Low priority** | #12, #15, #17, ~~#18~~ | Defense in depth, edge cases |
+| **P4 — Low priority** | #12, #15, ~~#17~~, ~~#18~~ | Defense in depth, edge cases |
