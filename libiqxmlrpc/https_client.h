@@ -28,7 +28,7 @@ public:
 #pragma message("WARNING: IQXMLRPC_TESTING enabled - SSL factory injection available. NOT FOR PRODUCTION!")
   //! Factory function type for creating SSL connections.
   //! @warning Testing only - bypasses SSL security! Not available in release builds.
-  using SslConnectionFactory = std::function<http::Packet*(
+  using SslConnectionFactory = std::function<std::unique_ptr<http::Packet>(
     const iqnet::Socket&, bool non_blocking, const std::string& request)>;
 
   //! Set custom SSL connection factory for testing.
@@ -50,7 +50,7 @@ public:
   void handle_output( bool& ) override;
 
 protected:
-  http::Packet* do_process_session( const std::string& ) override;
+  std::unique_ptr<http::Packet> do_process_session( const std::string& ) override;
 
   void setup_tunnel();
 
@@ -101,7 +101,7 @@ public:
 
 protected:
   friend class Https_proxy_client_connection;
-  http::Packet* do_process_session( const std::string& ) override;
+  std::unique_ptr<http::Packet> do_process_session( const std::string& ) override;
 
 private:
   void reg_send_request();

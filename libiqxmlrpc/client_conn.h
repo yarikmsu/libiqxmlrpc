@@ -4,6 +4,7 @@
 #ifndef IQXMLRPC_CLIENT_CONN_H
 #define IQXMLRPC_CLIENT_CONN_H
 
+#include <memory>
 #include <string>
 #include <vector>
 #include "connection.h"
@@ -33,7 +34,8 @@ public:
 
 protected:
   http::Packet* read_response( const std::string&, bool read_hdr_only = false );
-  virtual http::Packet* do_process_session( const std::string& ) = 0;
+  //! \note Since 0.14.2, return type changed from raw Packet* to unique_ptr.
+  virtual std::unique_ptr<http::Packet> do_process_session( const std::string& ) = 0;
 
   const Client_options& opts() const { return *options; }
 

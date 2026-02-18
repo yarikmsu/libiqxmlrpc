@@ -39,7 +39,7 @@ public:
   void handle_output( bool& ) override;
 
 protected:
-  http::Packet* do_process_session( const std::string& ) override;
+  std::unique_ptr<http::Packet> do_process_session( const std::string& ) override;
 };
 
 //! XML-RPC \b HTTP PROXY client connection.

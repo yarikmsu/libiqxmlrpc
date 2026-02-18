@@ -7,7 +7,7 @@ This is a performance-focused fork of Anton Dedov's libiqxmlrpc, actively mainta
 ⚡ **28 performance optimizations** delivering 1.2x to 12.5x speedups on critical operations
 🚀 **Modern C++17** with `string_view`, `to_chars`, and safe integer operations
 🔒 **Enhanced security** with TLS 1.2+, overflow protection, and fuzzing infrastructure
-📦 **Drop-in compatible** with upstream - no breaking API changes
+📦 **Drop-in compatible** with upstream for most use cases (see Doxygen `\note` tags for breaking changes since 0.14.0)
 
 ## Quick Start
 
