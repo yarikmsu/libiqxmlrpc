@@ -49,7 +49,7 @@ Response Client_connection::process_session( const Request& req, const XHeaders&
   return parse_response( res_p->content() );
 }
 
-http::Packet* Client_connection::read_response( const std::string& s, bool hdr_only )
+std::unique_ptr<http::Packet> Client_connection::read_response( const std::string& s, bool hdr_only )
 {
   // Re-apply the limit before each chunk so that any change to
   // max_response_sz() takes effect immediately.  Packet_reader
@@ -58,7 +58,7 @@ http::Packet* Client_connection::read_response( const std::string& s, bool hdr_o
   // the server pattern in server_conn.cc where set_max_size() precedes
   // each read_request().
   preader.set_max_response_size( opts().max_response_sz() );
-  return preader.read_response( s, hdr_only );
+  return std::unique_ptr<http::Packet>( preader.read_response( s, hdr_only ) );
 }
 
 std::string Client_connection::decorate_uri() const
