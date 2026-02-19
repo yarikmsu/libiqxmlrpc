@@ -3,7 +3,7 @@
 **Date:** 2026-02-07
 **Scope:** Full codebase audit across 4 attack surfaces (XML parsing, HTTP layer, memory safety/concurrency, SSL/TLS/authentication)
 **Findings:** 18 total — 1 Critical, 4 High, 6 Medium, 7 Low
-**Status:** 14 fixed, 3 won't-fix (by design), 1 open (#15)
+**Status:** 14 fixed, 4 won't-fix (by design), 0 open
 
 ---
 
@@ -154,13 +154,20 @@
 - **Impact:** Crash if applied to moved-from Value.
 - **Resolution:** Added `if (!value) throw Bad_cast();` guard, consistent with `cast<T>()`. Combined with #13 copy constructor fix, all `Value` methods that dereference the internal pointer now handle moved-from state consistently.
 
-### #15: Pipelined HTTP Data Silently Discarded
+### #15: Pipelined HTTP Data Silently Discarded — WON'T FIX (by design)
 
 - **Category:** HTTP — Data Loss (CWE-20)
 - **Affected:** `libiqxmlrpc/http.cc:708` (`clear()`), `libiqxmlrpc/http.cc:822` (`content_cache.erase()`)
 - **Description:** When reading a packet, excess data beyond `Content-Length` is erased at line 822. On keep-alive connections, if the client pipelines a second request in the same TCP segment, the `Packet_reader::clear()` discards any buffered data from the next request. The server does not support HTTP pipelining — once a packet is complete, it processes it and discards any remaining buffered data.
 - **Impact:** Data corruption/loss if clients attempt HTTP/1.1 pipelining. Could be chained with smuggling attacks.
-- **Recommendation:** Document that pipelining is not supported; optionally buffer excess data for the next request.
+- **Resolution:** Won't fix. XML-RPC is a request-response protocol where each
+  response informs the next request — pipelining has no practical benefit.
+  HTTP/1.1 pipelining is effectively deprecated (disabled in all major browsers,
+  replaced by HTTP/2 multiplexing). Discarding excess bytes beyond
+  `Content-Length` is the safer behavior: buffering and processing unsolicited
+  data would increase the attack surface for request smuggling. The existing
+  `Transfer-Encoding` rejection (Finding #6) already blocks CL.TE
+  desynchronization attacks.
 
 ### #16: All Headers Forwarded to Methods — WON'T FIX (by design)
 
@@ -223,4 +230,4 @@ The "secure by default" gap (findings #7, #8, #11) stems from the server default
 | **P1 — Next sprint** | ~~#2, #3, #4~~ | ~~Concurrency bugs exploitable under load~~ All fixed |
 | **P2 — Near-term** | ~~#6, #7~~, ~~#8~~ | All fixed |
 | **P3 — Backlog** | ~~#9, #10~~, ~~#11~~ | All fixed |
-| **P4 — Low priority** | ~~#12~~, #15, ~~#17~~, ~~#18~~ | #12 won't-fix; #15 open |
+| **P4 — Low priority** | ~~#12~~, ~~#15~~, ~~#17~~, ~~#18~~ | All resolved |
