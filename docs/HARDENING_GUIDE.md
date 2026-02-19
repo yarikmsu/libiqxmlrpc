@@ -135,6 +135,20 @@ server.set_auth_plugin(auth);
 
 **Warning:** HTTP Basic auth transmits credentials in Base64 (not encrypted). Always use HTTPS when authentication is enabled (Finding #11).
 
+### Enforce TLS for Authentication (Recommended)
+
+Call `require_tls_for_auth()` before `set_auth_plugin()` to ensure
+auth is never accidentally configured on a plain HTTP server:
+
+```cpp
+iqxmlrpc::Https_server server(addr, &ef);
+server.require_tls_for_auth();    // require TLS for set_auth_plugin()
+server.set_auth_plugin(my_auth);  // safe — server is HTTPS
+```
+
+Without this call, `set_auth_plugin()` works on any server type for
+backward compatibility.
+
 ### Client-Side Auth
 
 ```cpp
@@ -255,6 +269,7 @@ int main() {
         iqxmlrpc::http::HTTP_CHECK_STRICT);
 
     // --- Authentication ---
+    server.require_tls_for_auth();  // reject auth plugin on non-HTTPS
     // MyAuth auth;
     // server.set_auth_plugin(auth);
 

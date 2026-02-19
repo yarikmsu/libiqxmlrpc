@@ -45,6 +45,7 @@ public:
   Method_dispatcher_manager  disp_manager;
   std::unique_ptr<Interceptor> interceptors;
   const Auth_Plugin_base*    auth_plugin;
+  std::atomic<bool>          require_tls_for_auth_;
 
   std::atomic<int64_t> idle_timeout_ms{0};
 
@@ -77,6 +78,7 @@ public:
       disp_manager(),
       interceptors(nullptr),
       auth_plugin(nullptr),
+      require_tls_for_auth_(false),
       idle_timeout_ms(0),
       connections(),
       connections_mutex(),
@@ -177,8 +179,28 @@ http::Verification_level Server::get_verification_level() const
   return impl->ver_level;
 }
 
+bool Server::is_tls() const noexcept
+{
+  return false;
+}
+
+void Server::require_tls_for_auth()
+{
+  if (impl->auth_plugin && !is_tls()) {
+    throw std::logic_error(
+      "require_tls_for_auth() called after set_auth_plugin() on a non-TLS server. "
+      "Call require_tls_for_auth() before set_auth_plugin().");
+  }
+  impl->require_tls_for_auth_ = true;
+}
+
 void Server::set_auth_plugin( const Auth_Plugin_base& ap )
 {
+  if (impl->require_tls_for_auth_ && !is_tls()) {
+    throw std::logic_error(
+      "set_auth_plugin() called on non-TLS server with require_tls_for_auth() enabled. "
+      "Use Https_server or remove require_tls_for_auth() call.");
+  }
   impl->auth_plugin = &ap;
 }
 

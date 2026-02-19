@@ -78,6 +78,20 @@ public:
   void set_verification_level(http::Verification_level);
   http::Verification_level get_verification_level() const;
 
+  //! Returns true if this server uses TLS (HTTPS).
+  //! Override in subclasses that provide TLS transport.
+  //! Used as a trust boundary by require_tls_for_auth(); overrides
+  //! must return a value consistent with the actual transport.
+  virtual bool is_tls() const noexcept;
+
+  //! Opt-in: require TLS for authentication.
+  //! After calling this, set_auth_plugin() will throw std::logic_error
+  //! if the server is not TLS-capable.
+  //! Can be called before or after set_auth_plugin(). If called after
+  //! set_auth_plugin() on a non-TLS server, throws immediately.
+  //! Safe to call multiple times (idempotent).
+  void require_tls_for_auth();
+
   void set_auth_plugin(const Auth_Plugin_base&);
 
   //! Set idle timeout for keep-alive connections.
