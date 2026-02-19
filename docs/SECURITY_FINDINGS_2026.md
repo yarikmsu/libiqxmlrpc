@@ -3,7 +3,7 @@
 **Date:** 2026-02-07
 **Scope:** Full codebase audit across 4 attack surfaces (XML parsing, HTTP layer, memory safety/concurrency, SSL/TLS/authentication)
 **Findings:** 18 total — 1 Critical, 4 High, 6 Medium, 7 Low
-**Status:** 12 fixed, 2 won't-fix (by design), 4 open (#8, #11, #12, #15)
+**Status:** 13 fixed, 2 won't-fix (by design), 3 open (#11, #12, #15)
 
 ---
 
@@ -73,7 +73,7 @@
 - **Impact:** Parser sees truncated input; trailing malicious content is silently ignored, or undefined behavior if truncated value is negative.
 - **Resolution:** Added explicit `str.size() > std::numeric_limits<int>::max()` bounds check before the cast, throwing `Parse_error("XML payload exceeds maximum supported size")`. Payloads >2GB are now rejected cleanly before reaching libxml2.
 
-### #8: Memory Exhaustion — No Default Size Limits — PARTIALLY ADDRESSED
+### #8: Memory Exhaustion — No Default Size Limits — FIXED (documented)
 
 - **Category:** Denial of Service — Resource Exhaustion (CWE-400)
 - **Affected:** `libiqxmlrpc/server.cc:71` (`max_req_sz=0`), `libiqxmlrpc/server.cc:76` (`idle_timeout_ms=0`), `libiqxmlrpc/client_conn.cc:12`
@@ -83,7 +83,13 @@
   - **Slow Loris:** `idle_timeout_ms` defaults to 0 — connections held indefinitely in header-reading state.
   - Combined with `XML_PARSE_HUGE` (parser2.cc:148) and 10M element limit, ~4-5x memory amplification is achievable (200MB wire → ~1GB heap).
 - **Impact:** OOM denial of service from a single connection.
-- **Status:** All three limits are now configurable (`set_max_request_sz`, `set_idle_timeout`, `set_max_response_sz`). Finding remains open because **defaults are still unlimited** — applications must opt in. See `docs/HARDENING_GUIDE.md` for recommended values.
+- **Resolution:** All three limits are fully configurable via public API
+  (`set_max_request_sz`, `set_idle_timeout`, `set_max_response_sz`).
+  Defaults remain 0 (unlimited) for backward compatibility — changing
+  defaults would break existing applications. Recommended production
+  values documented in `docs/HARDENING_GUIDE.md` with complete code
+  examples. Sample programs in `doc/samples/` updated to demonstrate
+  all limits.
 
 ### #9: Firewall Use-After-Free via Atomic Swap — FIXED
 
@@ -204,6 +210,6 @@ The "secure by default" gap (findings #7, #8, #11) stems from the server default
 |----------|----------|-----------|
 | **P0 — Immediate** | ~~#1~~ | ~~MITM on every client connection; simple fix~~ All fixed |
 | **P1 — Next sprint** | ~~#2, #3, #4~~ | ~~Concurrency bugs exploitable under load~~ All fixed |
-| **P2 — Near-term** | ~~#6, #7~~, #8 | #8 remains: secure defaults for size limits |
+| **P2 — Near-term** | ~~#6, #7~~, ~~#8~~ | All fixed |
 | **P3 — Backlog** | ~~#9, #10~~, #11 | #11 remains: auth credentials over plain HTTP |
 | **P4 — Low priority** | #12, #15, ~~#17~~, ~~#18~~ | Defense in depth, edge cases |
