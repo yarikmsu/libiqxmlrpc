@@ -9,6 +9,9 @@
 
 namespace iqxmlrpc {
 
+// Must match MAX_METHOD_NAME_LEN in dispatcher_manager.cc
+constexpr size_t MAX_METHOD_NAME_LEN = 256;
+
 enum RequestBuilderState : std::uint8_t {
   NONE,
   METHOD_CALL,
@@ -41,8 +44,14 @@ RequestBuilder::do_visit_element(const std::string& tagname)
 {
   switch (state_.change(tagname)) {
   case METHOD_NAME:
-    method_name_ = parser_.get_data();
+  {
+    auto name = parser_.get_data();
+    if (name.length() > MAX_METHOD_NAME_LEN)
+      throw XML_RPC_violation(
+        "Method name exceeds " + std::to_string(MAX_METHOD_NAME_LEN) + "-byte limit");
+    method_name_ = std::move(name);
     break;
+  }
 
   case VALUE:
     params_.emplace_back(sub_build<Value_type*, ValueBuilder>(true));

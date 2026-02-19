@@ -1294,6 +1294,43 @@ BOOST_AUTO_TEST_CASE(request_complex_roundtrip)
     BOOST_CHECK(parsed->get_params()[5].is_array());
 }
 
+// Test that method names at the 256-byte limit are accepted at parse time
+BOOST_AUTO_TEST_CASE(parse_request_method_name_at_limit)
+{
+    std::string name(256, 'a');
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodCall>"
+        "<methodName>" + name + "</methodName>"
+        "<params></params>"
+        "</methodCall>";
+
+    std::unique_ptr<Request> req(parse_request(xml));
+    BOOST_REQUIRE(req != nullptr);
+    BOOST_CHECK_EQUAL(req->get_name(), name);
+}
+
+// Test that method names exceeding 256 bytes are rejected at parse time
+// Covers parse-time rejection in request_parser.cc;
+// dispatcher_manager.cc has a second check as defense-in-depth
+BOOST_AUTO_TEST_CASE(parse_request_method_name_over_limit)
+{
+    std::string name(257, 'a');
+    std::string xml =
+        "<?xml version=\"1.0\"?>"
+        "<methodCall>"
+        "<methodName>" + name + "</methodName>"
+        "<params></params>"
+        "</methodCall>";
+
+    BOOST_CHECK_EXCEPTION(
+        parse_request(xml),
+        XML_RPC_violation,
+        [](const XML_RPC_violation& e) {
+            return std::string(e.what()).find("256-byte limit") != std::string::npos;
+        });
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 //=============================================================================
