@@ -1,4 +1,5 @@
 #include <iostream>
+#include <chrono>
 #include <libiqxmlrpc/libiqxmlrpc.h>
 #include <libiqxmlrpc/http_server.h>
 
@@ -26,7 +27,11 @@ int main()
   // optional settings
   server.log_errors( &std::cerr );
   server.enable_introspection();
-  server.set_max_request_sz(1024*1024);
+
+  // Resource limits (recommended for production, see docs/HARDENING_GUIDE.md)
+  // Defaults are 0 (unlimited) for backward compatibility.
+  server.set_max_request_sz(10 * 1024 * 1024);            // 10 MB
+  server.set_idle_timeout(std::chrono::seconds(30));       // 30s
 
   // start server
   server.work();
