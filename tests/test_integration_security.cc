@@ -77,6 +77,90 @@ BOOST_FIXTURE_TEST_CASE(auth_anonymous_denied, IntegrationFixture)
 BOOST_AUTO_TEST_SUITE_END()
 
 //=============================================================================
+// TLS Auth Enforcement Tests
+//=============================================================================
+BOOST_AUTO_TEST_SUITE(tls_auth_enforcement_tests)
+
+BOOST_FIXTURE_TEST_CASE(require_tls_throws_on_http, IntegrationFixture)
+{
+  start_server(1, 24);
+  TestAuthPlugin auth(false);
+  server().require_tls_for_auth();
+  BOOST_CHECK_THROW(server().set_auth_plugin(auth), std::logic_error);
+}
+
+BOOST_FIXTURE_TEST_CASE(no_require_tls_allows_http, IntegrationFixture)
+{
+  start_server(1, 25);
+  TestAuthPlugin auth(false);
+  // Without require_tls_for_auth(), auth on HTTP works (backward compatible)
+  BOOST_CHECK_NO_THROW(server().set_auth_plugin(auth));
+}
+
+BOOST_FIXTURE_TEST_CASE(require_tls_succeeds_on_https, HttpsIntegrationFixture)
+{
+  if (!setup_ssl_context()) {
+    BOOST_TEST_MESSAGE("Skipping - SSL context setup failed");
+    return;
+  }
+  start_server(26);
+  TestAuthPlugin auth(false);
+  server_->require_tls_for_auth();
+  BOOST_CHECK_NO_THROW(server_->set_auth_plugin(auth));
+}
+
+BOOST_FIXTURE_TEST_CASE(require_tls_after_auth_throws_on_http, IntegrationFixture)
+{
+  start_server(1, 27);
+  TestAuthPlugin auth(false);
+  // Set auth plugin first (no guard yet — succeeds)
+  server().set_auth_plugin(auth);
+  // Now enabling the guard retroactively must throw on non-TLS
+  BOOST_CHECK_THROW(server().require_tls_for_auth(), std::logic_error);
+}
+
+BOOST_FIXTURE_TEST_CASE(require_tls_after_auth_succeeds_on_https, HttpsIntegrationFixture)
+{
+  if (!setup_ssl_context()) {
+    BOOST_TEST_MESSAGE("Skipping - SSL context setup failed");
+    return;
+  }
+  start_server(28);
+  TestAuthPlugin auth(false);
+  server_->set_auth_plugin(auth);
+  // Retroactive guard on HTTPS — must succeed (auth_plugin set, is_tls() true)
+  BOOST_CHECK_NO_THROW(server_->require_tls_for_auth());
+}
+
+BOOST_FIXTURE_TEST_CASE(require_tls_idempotent, IntegrationFixture)
+{
+  start_server(1, 29);
+  // Calling require_tls_for_auth() twice should be harmless
+  server().require_tls_for_auth();
+  BOOST_CHECK_NO_THROW(server().require_tls_for_auth());
+  // Guard is still enforced
+  TestAuthPlugin auth(false);
+  BOOST_CHECK_THROW(server().set_auth_plugin(auth), std::logic_error);
+}
+
+BOOST_FIXTURE_TEST_CASE(replace_auth_plugin_with_tls_guard, HttpsIntegrationFixture)
+{
+  if (!setup_ssl_context()) {
+    BOOST_TEST_MESSAGE("Skipping - SSL context setup failed");
+    return;
+  }
+  start_server(30);
+  server_->require_tls_for_auth();
+  TestAuthPlugin auth1(true);
+  TestAuthPlugin auth2(false);
+  // Auth plugin can be replaced after guard is set on HTTPS
+  BOOST_CHECK_NO_THROW(server_->set_auth_plugin(auth1));
+  BOOST_CHECK_NO_THROW(server_->set_auth_plugin(auth2));
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+//=============================================================================
 // Firewall Tests
 //=============================================================================
 BOOST_AUTO_TEST_SUITE(firewall_tests)

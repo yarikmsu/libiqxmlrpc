@@ -50,6 +50,11 @@ Https_server::Https_server(const iqnet::Inet_addr& bind_addr, Executor_factory_b
   static_cast<Https_conn_factory*>(get_conn_factory())->post_init(this, get_reactor());
 }
 
+bool Https_server::is_tls() const noexcept
+{
+  return true;
+}
+
 
 //
 // Https_server_connection

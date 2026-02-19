@@ -3,7 +3,7 @@
 **Date:** 2026-02-07
 **Scope:** Full codebase audit across 4 attack surfaces (XML parsing, HTTP layer, memory safety/concurrency, SSL/TLS/authentication)
 **Findings:** 18 total — 1 Critical, 4 High, 6 Medium, 7 Low
-**Status:** 13 fixed, 2 won't-fix (by design), 3 open (#11, #12, #15)
+**Status:** 14 fixed, 2 won't-fix (by design), 2 open (#12, #15)
 
 ---
 
@@ -107,13 +107,18 @@
 - **Impact:** Fingerprinting of OpenSSL version and TLS configuration; aids reconnaissance for further attacks.
 - **Resolution:** Server catch handlers now return generic `"Internal server error"` (constant `GENERIC_FAULT_MSG`) to clients for all exception types. Full exception details including OpenSSL error strings are logged server-side only. Applies to both `std::exception` and unknown exception catch blocks.
 
-### #11: Auth Credentials Over Plain HTTP
+### #11: Auth Credentials Over Plain HTTP — FIXED
 
 - **Category:** Credential Protection — Cleartext Transmission (CWE-319)
 - **Affected:** `libiqxmlrpc/server.cc:230-261`, `libiqxmlrpc/auth_plugin.h:40-42`
 - **Description:** `set_auth_plugin()` is available on the base `Server` class (parent of both `Http_server` and `Https_server`). No compile-time or runtime guard prevents setting an auth plugin on `Http_server`. HTTP Basic Authentication transmits Base64-encoded credentials (not encrypted) in the `Authorization` header. A comment in `auth_plugin.h:40-42` warns about this but there is no enforcement.
 - **Impact:** Passive network sniffing captures Base64-encoded credentials.
-- **Recommendation:** Emit a runtime warning (or refuse) when `set_auth_plugin()` is called on a non-TLS server; or require explicit opt-in for auth over HTTP.
+- **Resolution:** Added opt-in `require_tls_for_auth()` method to `Server`.
+  When called before `set_auth_plugin()`, throws `std::logic_error` if the
+  server is not TLS. Added `virtual is_tls()` to `Server` (false by default),
+  overridden to true in `Https_server`. Default behavior unchanged — existing
+  applications using auth over HTTP continue to work. Recommended usage
+  documented in `docs/HARDENING_GUIDE.md`.
 
 ---
 
@@ -211,5 +216,5 @@ The "secure by default" gap (findings #7, #8, #11) stems from the server default
 | **P0 — Immediate** | ~~#1~~ | ~~MITM on every client connection; simple fix~~ All fixed |
 | **P1 — Next sprint** | ~~#2, #3, #4~~ | ~~Concurrency bugs exploitable under load~~ All fixed |
 | **P2 — Near-term** | ~~#6, #7~~, ~~#8~~ | All fixed |
-| **P3 — Backlog** | ~~#9, #10~~, #11 | #11 remains: auth credentials over plain HTTP |
+| **P3 — Backlog** | ~~#9, #10~~, ~~#11~~ | All fixed |
 | **P4 — Low priority** | #12, #15, ~~#17~~, ~~#18~~ | Defense in depth, edge cases |

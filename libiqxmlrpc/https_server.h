@@ -14,6 +14,7 @@ namespace iqxmlrpc {
 class LIBIQXMLRPC_API Https_server: public Server {
 public:
   Https_server(const iqnet::Inet_addr& bind_addr, Executor_factory_base*);
+  bool is_tls() const noexcept override;
 };
 
 } // namespace iqxmlrpc
