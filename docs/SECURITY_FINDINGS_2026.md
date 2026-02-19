@@ -3,7 +3,7 @@
 **Date:** 2026-02-07
 **Scope:** Full codebase audit across 4 attack surfaces (XML parsing, HTTP layer, memory safety/concurrency, SSL/TLS/authentication)
 **Findings:** 18 total — 1 Critical, 4 High, 6 Medium, 7 Low
-**Status:** 14 fixed, 2 won't-fix (by design), 2 open (#12, #15)
+**Status:** 14 fixed, 3 won't-fix (by design), 1 open (#15)
 
 ---
 
@@ -124,13 +124,19 @@
 
 ## LOW (7)
 
-### #12: `XML_PARSE_HUGE` Removes libxml2 Internal Limits
+### #12: `XML_PARSE_HUGE` Removes libxml2 Internal Limits — WON'T FIX (by design)
 
 - **Category:** Defense in Depth — Removed Safety Limits
 - **Affected:** `libiqxmlrpc/parser2.cc:148`
 - **Description:** The `XML_PARSE_HUGE` flag disables libxml2's internal size limits for text nodes, attribute values, and other internal buffers (normally 10MB per text content). This allows an attacker to send XML with extremely large individual text nodes that would normally be rejected. The text gets copied into `std::string` (line 272) and again into a `String` value object, doubling memory usage for large values.
 - **Impact:** Amplifies the impact of Finding #8 (memory exhaustion); a single `<string>` element can consume gigabytes.
-- **Recommendation:** Remove `XML_PARSE_HUGE` flag unless explicitly needed; or add application-level per-value size limits.
+- **Resolution:** Won't fix. `XML_PARSE_HUGE` is required to support large
+  payload transfers (100 MB+ base64-encoded files). Removing it would impose
+  a hard 10 MB per-value limit that breaks production use cases. The existing
+  `set_max_request_sz()` API provides a configurable outer bound on total
+  request size, which effectively bounds individual value sizes since XML-RPC
+  requests typically carry one large parameter. Recommended production
+  configuration documented in `docs/HARDENING_GUIDE.md`.
 
 ### #13: Null Dereference on Moved-From `Value::type_name()` — FIXED
 
@@ -217,4 +223,4 @@ The "secure by default" gap (findings #7, #8, #11) stems from the server default
 | **P1 — Next sprint** | ~~#2, #3, #4~~ | ~~Concurrency bugs exploitable under load~~ All fixed |
 | **P2 — Near-term** | ~~#6, #7~~, ~~#8~~ | All fixed |
 | **P3 — Backlog** | ~~#9, #10~~, ~~#11~~ | All fixed |
-| **P4 — Low priority** | #12, #15, ~~#17~~, ~~#18~~ | Defense in depth, edge cases |
+| **P4 — Low priority** | ~~#12~~, #15, ~~#17~~, ~~#18~~ | #12 won't-fix; #15 open |
