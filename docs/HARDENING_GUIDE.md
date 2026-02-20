@@ -26,6 +26,11 @@ server.set_max_request_sz(10 * 1024 * 1024);  // 10 MB
 
 **Recommendation:** 10 MB covers most XML-RPC payloads. Set lower if your methods only accept small parameters.
 
+**Memory note:** XML parsing temporarily requires ~2x the value size in memory
+(libxml2 internal buffer + application string). A 100 MB request body may use
+~200 MB of heap during parsing. Factor this into your `max_request_sz` setting
+relative to available server memory.
+
 ### Idle Connection Timeout
 
 Prevents Slow Loris attacks — connections that send data slowly to hold server resources (Finding #8).
