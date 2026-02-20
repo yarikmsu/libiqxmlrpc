@@ -1,5 +1,42 @@
 Look into ChangeLog file for full list of changes.
 
+0.14.1 - 0.14.2
+  Security Fixes:
+    * Fix client-side TLS certificate validation disabled by default (CWE-295)
+    * Fix use-after-free in Pool_executor via ConnectionGuard (CWE-416)
+    * Fix TOCTOU race on global SSL context hostname (CWE-367)
+    * Fix data race on global mutable ValueOptions (CWE-362)
+    * Fix HTTP request smuggling via Transfer-Encoding (CWE-444)
+    * Fix integer truncation size_t to int on XML buffer (CWE-197)
+    * Fix firewall use-after-free via shared_ptr atomic swap (CWE-416)
+    * Fix SSL error messages leaked to clients (CWE-209)
+    * Add opt-in TLS enforcement for authentication (CWE-319)
+    * Fix null dereference on moved-from Value (CWE-476)
+    * Fix unchecked gethostname() return value (CWE-252)
+    * Fix memory leak via unique_ptr for resp_packet (CWE-401)
+    * Add method name length limit at parse time (CWE-20)
+
+  New Features:
+    * Client-side response size limit API (set_max_response_sz)
+    * Per-connection SSL hostname verification (thread-safe)
+    * TLS auth enforcement API (require_tls_for_auth)
+    * Comprehensive hardening guide (docs/HARDENING_GUIDE.md)
+
+  Performance Optimizations:
+    * Move semantics for parsed text in value builder (~17% RPS)
+    * Move semantics for request parameter passing
+    * Cache HTTP Date header to avoid redundant gmtime/strftime
+    * Use xmlTextReaderConst* to eliminate xmlStrdup per parse step
+    * Move shared_ptr instead of copying on last use
+
+  Refactoring:
+    * Return unique_ptr from Packet_reader, Client_connection, do_process_session
+    * Document breaking API changes since 0.13.8
+
+  Security Audit:
+    * Full codebase audit: 18 findings (14 fixed, 4 won't-fix by design)
+    * Documented in docs/SECURITY_FINDINGS_2026.md
+
 0.14.0 - 0.14.1
   New Features:
     * Allow arbitrary custom HTTP headers (RFC 6648 compliance, removes X- prefix restriction)
