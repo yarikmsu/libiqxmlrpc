@@ -1,5 +1,46 @@
 Look into ChangeLog file for full list of changes.
 
+0.14.2 - 0.14.3
+  Bug Fixes:
+    * Fix intermittent mid-response truncation on HTTPS caused by a stale
+      per-thread OpenSSL error queue misclassifying WANT_READ/WANT_WRITE
+      as SSL_ERROR_SSL (PR #258). Regression from the 0.14.x non-throwing
+      SSL I/O fast path (PR #62) which dropped the implicit queue-draining
+      side-effect of the 0.13.x exception-based path. Most observable on
+      OpenSSL 1.1.x; OpenSSL 3.0+ clears the queue internally inside
+      SSL_do_handshake / SSL_read / etc. and masked the defect at runtime.
+    * Fix connection stranding when the reactor SHUTDOWN state received
+      CONNECTION_CLOSE: switch_state() now terminates on both OK and
+      CONNECTION_CLOSE, matching reg_shutdown()'s "both flags set"
+      fixed-point.
+    * Fix silent partial-write drop in the non-blocking reactor WRITING
+      branch: switch_state() now advances send_buf / buf_len and
+      re-registers WANT_WRITE instead of coercing partial completions to
+      OK. Dormant by default (SSL_MODE_ENABLE_PARTIAL_WRITE is not set)
+      but defends against silent truncation if the mode is ever enabled.
+    * Surface real phase-2 SSL_shutdown errors via CONNECTION_CLOSE
+      instead of silently discarding the second SSL_shutdown's return
+      value.
+
+  Hardening:
+    * Add ERR_clear_error() before every SSL_* call in both the
+      non-throwing reactor-path wrappers (try_ssl_read / try_ssl_write /
+      try_ssl_accept_nonblock / try_ssl_connect_nonblock /
+      try_ssl_shutdown_nonblock) and the blocking wrappers (ssl_accept,
+      ssl_connect, shutdown, send, recv). Follows the explicit
+      SSL_get_error(3) contract that the thread's error queue must be
+      empty before a TLS I/O call.
+
+  Test Coverage:
+    * Deterministic unit-level reproducer for the stale-queue bug
+      (ssl_try_accept_survives_stale_error_queue) — AF_UNIX socketpair
+      with poisoned queue drives try_ssl_accept_nonblock.
+    * End-to-end poisoned-queue integration tests with a running HTTPS
+      server (keep-alive, large-response byte-wise integrity over
+      512 KiB, shutdown liveness guard).
+    * Shared make_indexed_payload helper in test_integration_common.h
+      for any future test that needs truncation-detecting payloads.
+
 0.14.1 - 0.14.2
   Security Fixes:
     * Fix client-side TLS certificate validation disabled by default (CWE-295)
