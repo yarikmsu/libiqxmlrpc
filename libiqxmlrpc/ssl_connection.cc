@@ -426,8 +426,9 @@ void ssl::Reaction_connection::switch_state( bool& terminate )
         if( bytes_written < buf_len ) {
           // SSL_write may return fewer bytes than requested; advance and
           // stay in WRITING so the next writable event flushes the tail.
-          // Dormant-by-design in libiqxmlrpc (SSL_MODE_ENABLE_PARTIAL_WRITE
-          // is never set) but defends against the silent-truncation trap.
+          // Typically dormant (this library does not currently enable
+          // SSL_MODE_ENABLE_PARTIAL_WRITE) but defends against silent
+          // truncation if that changes.
           send_buf += bytes_written;
           buf_len  -= bytes_written;
           result = SslIoResult::WANT_WRITE;
@@ -441,7 +442,14 @@ void ssl::Reaction_connection::switch_state( bool& terminate )
 
     case SHUTDOWN:
       result = try_ssl_shutdown_nonblock();
-      if( result == SslIoResult::OK ) {
+      // OK and CONNECTION_CLOSE are both terminal: the former means the
+      // handshake-level shutdown completed; the latter means the wrapper
+      // decided retrying is pointless (peer gone, phase-2 error, etc.).
+      // Without setting terminate here for CONNECTION_CLOSE, reg_shutdown()
+      // would take its "both flags already set" branch, free no handler,
+      // and orphan the connection.
+      if( result == SslIoResult::OK ||
+          result == SslIoResult::CONNECTION_CLOSE ) {
         terminate = true;
       }
       break;

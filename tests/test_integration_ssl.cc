@@ -666,25 +666,9 @@ void poison_and_echo_method(
   }
 }
 
-// Size chosen to exceed typical loopback send-buffer defaults while staying
-// cheap enough for CI. Modern kernels may still drain in one write (loopback
-// buffers auto-tune into MiB range); in that case this case becomes a
-// large-transfer smoke test rather than a back-pressure reproducer —
-// either way, mid-body corruption would surface via the content check.
+// Size exceeds typical loopback SO_SNDBUF defaults; under auto-tuned
+// buffers this degrades to a large-transfer smoke test.
 constexpr size_t kLargePayloadSize = 512 * 1024;  // 512 KiB
-
-// Fill with an index-dependent pattern so any mid-stream truncation or
-// duplication fails the byte-wise equality check at the call site. A
-// uniform fill (e.g. all 'x') would pass a truncate-then-repad scenario
-// — precisely the production corruption this test guards.
-inline std::string make_indexed_payload(size_t n)
-{
-  std::string s(n, '\0');
-  for (size_t i = 0; i < n; ++i) {
-    s[i] = static_cast<char>('a' + (i % 26));
-  }
-  return s;
-}
 
 void poison_and_bulk_echo_method(
   iqxmlrpc::Method*,
@@ -692,7 +676,7 @@ void poison_and_bulk_echo_method(
   iqxmlrpc::Value& retval)
 {
   ERR_put_error(ERR_LIB_USER, 0, 1, __FILE__, __LINE__);
-  retval = make_indexed_payload(kLargePayloadSize);
+  retval = iqxmlrpc_test::make_indexed_payload(kLargePayloadSize);
 }
 
 } // namespace
@@ -807,7 +791,8 @@ BOOST_FIXTURE_TEST_CASE(https_large_response_survives_poisoned_queue,
   BOOST_REQUIRE_MESSAGE(!r.is_fault(),
     "large-response call faulted; fault: " << r.fault_string());
 
-  const std::string expected = make_indexed_payload(kLargePayloadSize);
+  const std::string expected =
+    iqxmlrpc_test::make_indexed_payload(kLargePayloadSize);
   const std::string& actual = r.value().get_string();
   BOOST_REQUIRE_EQUAL(actual.size(), kLargePayloadSize);
   // Full byte-wise equality — catches mid-body corruption that a size-only

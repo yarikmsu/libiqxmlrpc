@@ -223,6 +223,17 @@ inline bool ssl_certs_available() {
   return cert.good() && key.good();
 }
 
+// Build a payload with index-dependent bytes. Intended for integrity tests
+// that must catch mid-stream truncation, duplication, or off-by-N corruption
+// — a uniform fill would pass a truncate-then-repad scenario.
+inline std::string make_indexed_payload(size_t n) {
+  std::string s(n, '\0');
+  for (size_t i = 0; i < n; ++i) {
+    s[i] = static_cast<char>('a' + (i % 26));
+  }
+  return s;
+}
+
 //=============================================================================
 // SSL Verification Helpers
 //=============================================================================
