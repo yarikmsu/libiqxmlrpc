@@ -62,8 +62,7 @@ void ssl::Connection::prepare_for_ssl_connect()
 void ssl::Connection::ssl_accept()
 {
   prepare_for_ssl_accept();
-  // Empty queue is a precondition of SSL_get_error() (consulted inside
-  // throw_io_exception() below).
+  // Clear stale entries before SSL_get_error() inspects the queue.
   ERR_clear_error();
   int ret = SSL_accept( ssl );
 
@@ -98,6 +97,7 @@ void ssl::Connection::prepare_hostname_for_connect()
 void ssl::Connection::ssl_connect()
 {
   prepare_for_ssl_connect();
+  // Clear stale entries before SSL_get_error() inspects the queue.
   ERR_clear_error();
   int ret = SSL_connect( ssl );
 
@@ -111,6 +111,7 @@ void ssl::Connection::shutdown()
   if( shutdown_recved() && shutdown_sent() )
     return;
 
+  // Clear stale entries before SSL_get_error() inspects the queue.
   ERR_clear_error();
   int ret = SSL_shutdown( ssl );
   switch( ret )
@@ -119,6 +120,7 @@ void ssl::Connection::shutdown()
       return;
 
     case 0:
+      // Clear stale entries before SSL_get_error() inspects the queue.
       ERR_clear_error();
       SSL_shutdown( ssl );
       SSL_set_shutdown( ssl, SSL_RECEIVED_SHUTDOWN );
@@ -147,6 +149,7 @@ size_t ssl::Connection::send( const char* data, size_t len )
 
   while( total_written < len )
   {
+    // Clear stale entries before SSL_get_error() inspects the queue.
     ERR_clear_error();
     int ret = SSL_write( ssl, data + total_written,
                          static_cast<int>(len - total_written) );
@@ -170,6 +173,7 @@ size_t ssl::Connection::recv( char* buf, size_t len )
     throw exception("SSL::recv: buffer size exceeds INT_MAX");
   }
 
+  // Clear stale entries before SSL_get_error() inspects the queue.
   ERR_clear_error();
   int ret = SSL_read( ssl, buf, static_cast<int>(len) );
 
@@ -294,10 +298,11 @@ ssl::SslIoResult ssl::Connection::try_ssl_shutdown_nonblock()
   }
 
   if( ret == 0 ) {
-    // Phase 1 complete (our close_notify sent). Try phase 2 to read peer's
-    // close_notify. Mark SSL_RECEIVED_SHUTDOWN regardless so we don't hang
-    // on peers that never ack (preserves the original tear-down semantics),
-    // but surface real protocol errors instead of swallowing them.
+    // Phase 1 done (our close_notify sent); try phase 2 to read peer's.
+    // Mark SSL_RECEIVED_SHUTDOWN unconditionally so non-ack'ing peers can't
+    // wedge us. A real phase-2 error becomes CONNECTION_CLOSE (graceful
+    // reactor tear-down) rather than a thrown ssl::exception from a
+    // teardown path that previously couldn't throw.
     ERR_clear_error();
     int ret2 = SSL_shutdown( ssl );
     SSL_set_shutdown( ssl, SSL_RECEIVED_SHUTDOWN );
@@ -306,9 +311,10 @@ ssl::SslIoResult ssl::Connection::try_ssl_shutdown_nonblock()
       SslIoResult phase2 = check_io_result( ssl, ret2, clean_close );
       if( phase2 == SslIoResult::ERROR ||
           phase2 == SslIoResult::CONNECTION_CLOSE ) {
-        return phase2;
+        return SslIoResult::CONNECTION_CLOSE;
       }
-      // WANT_READ / WANT_WRITE: peer hasn't ack'd, not worth polling.
+      // WANT_READ / WANT_WRITE: peer hasn't ack'd; cheaper to drop the
+      // connection than to re-poll indefinitely. Reactor tear-down follows.
     }
     return SslIoResult::OK;
   }
@@ -418,9 +424,10 @@ void ssl::Reaction_connection::switch_state( bool& terminate )
       result = try_ssl_write( send_buf, buf_len, bytes_written );
       if( result == SslIoResult::OK ) {
         if( bytes_written < buf_len ) {
-          // Partial write (possible if SSL_MODE_ENABLE_PARTIAL_WRITE is
-          // ever enabled). Advance and stay in WRITING so the next writable
-          // event flushes the tail instead of silently dropping it.
+          // SSL_write may return fewer bytes than requested; advance and
+          // stay in WRITING so the next writable event flushes the tail.
+          // Dormant-by-design in libiqxmlrpc (SSL_MODE_ENABLE_PARTIAL_WRITE
+          // is never set) but defends against the silent-truncation trap.
           send_buf += bytes_written;
           buf_len  -= bytes_written;
           result = SslIoResult::WANT_WRITE;

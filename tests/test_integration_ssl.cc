@@ -666,11 +666,25 @@ void poison_and_echo_method(
   }
 }
 
-// Returns a payload large enough that SSL_write over a freshly-connected
-// loopback socket is likely to hit kernel-send-buffer back-pressure at
-// least once, exercising the real WANT_WRITE path in try_ssl_write. Size
-// is chosen to exceed a typical default SO_SNDBUF on Linux/macOS.
+// Size chosen to exceed typical loopback send-buffer defaults while staying
+// cheap enough for CI. Modern kernels may still drain in one write (loopback
+// buffers auto-tune into MiB range); in that case this case becomes a
+// large-transfer smoke test rather than a back-pressure reproducer —
+// either way, mid-body corruption would surface via the content check.
 constexpr size_t kLargePayloadSize = 512 * 1024;  // 512 KiB
+
+// Fill with an index-dependent pattern so any mid-stream truncation or
+// duplication fails the byte-wise equality check at the call site. A
+// uniform fill (e.g. all 'x') would pass a truncate-then-repad scenario
+// — precisely the production corruption this test guards.
+inline std::string make_indexed_payload(size_t n)
+{
+  std::string s(n, '\0');
+  for (size_t i = 0; i < n; ++i) {
+    s[i] = static_cast<char>('a' + (i % 26));
+  }
+  return s;
+}
 
 void poison_and_bulk_echo_method(
   iqxmlrpc::Method*,
@@ -678,7 +692,7 @@ void poison_and_bulk_echo_method(
   iqxmlrpc::Value& retval)
 {
   ERR_put_error(ERR_LIB_USER, 0, 1, __FILE__, __LINE__);
-  retval = std::string(kLargePayloadSize, 'x');
+  retval = make_indexed_payload(kLargePayloadSize);
 }
 
 } // namespace
@@ -769,11 +783,10 @@ BOOST_FIXTURE_TEST_CASE(https_survives_method_polluting_error_queue,
   }
 }
 
-// Large-payload variant: exercises try_ssl_write under kernel-send-buffer
-// back-pressure, which is the production repro scenario (mid-body
-// truncation of ~hundreds-of-KB responses). With the queue poisoned by
-// the method handler, any real WANT_WRITE surfacing on the reactor's
-// subsequent write call must not be misclassified as fatal.
+// Large-payload variant: drives a 512 KiB response through the reactor's
+// write path under a poisoned queue. Any mid-stream truncation, padding,
+// or corruption surfaces via the byte-wise content check — the production
+// failure mode this test is designed to catch.
 BOOST_FIXTURE_TEST_CASE(https_large_response_survives_poisoned_queue,
                         HttpsIntegrationFixture)
 {
@@ -793,15 +806,22 @@ BOOST_FIXTURE_TEST_CASE(https_large_response_survives_poisoned_queue,
 
   BOOST_REQUIRE_MESSAGE(!r.is_fault(),
     "large-response call faulted; fault: " << r.fault_string());
-  BOOST_CHECK_EQUAL(r.value().get_string().size(), kLargePayloadSize);
+
+  const std::string expected = make_indexed_payload(kLargePayloadSize);
+  const std::string& actual = r.value().get_string();
+  BOOST_REQUIRE_EQUAL(actual.size(), kLargePayloadSize);
+  // Full byte-wise equality — catches mid-body corruption that a size-only
+  // check (or uniform-fill payload) would silently pass.
+  BOOST_CHECK(actual == expected);
 }
 
-// Shutdown-with-poisoned-queue: exercises try_ssl_shutdown_nonblock,
-// including the duplicated ERR_clear_error() before the second
-// SSL_shutdown in the ret==0 branch. Without the fix, the second
-// SSL_shutdown's SSL_get_error() call would see stale queue entries.
-// We drive the shutdown by letting the client drop the connection after
-// a poisoning call; the reactor's teardown then runs the shutdown wrapper.
+// Shutdown-with-poisoned-queue: liveness guard. A client teardown following
+// a poisoning call must not leave the server in a wedged state — a second
+// fresh client must still get through. This routes the server-side shutdown
+// wrapper while the queue is dirty; whether phase-2 (SSL_shutdown ret==0)
+// is reached depends on the client's close_notify timing and is not
+// guaranteed by this test, but any server-side throw from teardown would
+// cascade into the second client's failure.
 BOOST_FIXTURE_TEST_CASE(https_shutdown_survives_poisoned_queue,
                         HttpsIntegrationFixture)
 {
