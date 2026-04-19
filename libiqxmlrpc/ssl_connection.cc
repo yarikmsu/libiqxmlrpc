@@ -62,6 +62,8 @@ void ssl::Connection::prepare_for_ssl_connect()
 void ssl::Connection::ssl_accept()
 {
   prepare_for_ssl_accept();
+  // Clear stale entries before SSL_get_error() inspects the queue.
+  ERR_clear_error();
   int ret = SSL_accept( ssl );
 
   if( ret != 1 )
@@ -95,6 +97,8 @@ void ssl::Connection::prepare_hostname_for_connect()
 void ssl::Connection::ssl_connect()
 {
   prepare_for_ssl_connect();
+  // Clear stale entries before SSL_get_error() inspects the queue.
+  ERR_clear_error();
   int ret = SSL_connect( ssl );
 
   if( ret != 1 )
@@ -107,6 +111,8 @@ void ssl::Connection::shutdown()
   if( shutdown_recved() && shutdown_sent() )
     return;
 
+  // Clear stale entries before SSL_get_error() inspects the queue.
+  ERR_clear_error();
   int ret = SSL_shutdown( ssl );
   switch( ret )
   {
@@ -114,6 +120,8 @@ void ssl::Connection::shutdown()
       return;
 
     case 0:
+      // Clear stale entries before SSL_get_error() inspects the queue.
+      ERR_clear_error();
       SSL_shutdown( ssl );
       SSL_set_shutdown( ssl, SSL_RECEIVED_SHUTDOWN );
       break;
@@ -141,6 +149,8 @@ size_t ssl::Connection::send( const char* data, size_t len )
 
   while( total_written < len )
   {
+    // Clear stale entries before SSL_get_error() inspects the queue.
+    ERR_clear_error();
     int ret = SSL_write( ssl, data + total_written,
                          static_cast<int>(len - total_written) );
 
@@ -163,6 +173,8 @@ size_t ssl::Connection::recv( char* buf, size_t len )
     throw exception("SSL::recv: buffer size exceeds INT_MAX");
   }
 
+  // Clear stale entries before SSL_get_error() inspects the queue.
+  ERR_clear_error();
   int ret = SSL_read( ssl, buf, static_cast<int>(len) );
 
   if( ret <= 0 )
@@ -200,6 +212,11 @@ ssl::SslIoResult ssl::Connection::try_ssl_read( char* buf, size_t len, size_t& b
   }
 
   bytes_read = 0;
+  // Clear stale entries before SSL_get_error() inspects the queue.
+  // A lingering entry from earlier unrelated OpenSSL work (verify callback,
+  // BIO helper, parallel teardown) would mask a benign WANT_READ as
+  // SSL_ERROR_SSL. Contract required by SSL_get_error(3).
+  ERR_clear_error();
   int ret = SSL_read( ssl, buf, static_cast<int>(len) );
 
   if( ret > 0 ) {
@@ -222,6 +239,8 @@ ssl::SslIoResult ssl::Connection::try_ssl_write( const char* buf, size_t len, si
   }
 
   bytes_written = 0;
+  // Clear stale entries before SSL_get_error() inspects the queue.
+  ERR_clear_error();
   int ret = SSL_write( ssl, buf, static_cast<int>(len) );
 
   if( ret > 0 ) {
@@ -236,6 +255,8 @@ ssl::SslIoResult ssl::Connection::try_ssl_write( const char* buf, size_t len, si
 
 ssl::SslIoResult ssl::Connection::try_ssl_accept_nonblock()
 {
+  // Clear stale entries before SSL_get_error() inspects the queue.
+  ERR_clear_error();
   int ret = SSL_accept( ssl );
 
   if( ret == 1 ) {
@@ -249,6 +270,8 @@ ssl::SslIoResult ssl::Connection::try_ssl_accept_nonblock()
 
 ssl::SslIoResult ssl::Connection::try_ssl_connect_nonblock()
 {
+  // Clear stale entries before SSL_get_error() inspects the queue.
+  ERR_clear_error();
   int ret = SSL_connect( ssl );
 
   if( ret == 1 ) {
@@ -266,6 +289,8 @@ ssl::SslIoResult ssl::Connection::try_ssl_shutdown_nonblock()
     return SslIoResult::OK;
   }
 
+  // Clear stale entries before SSL_get_error() inspects the queue.
+  ERR_clear_error();
   int ret = SSL_shutdown( ssl );
 
   if( ret == 1 ) {
@@ -273,9 +298,24 @@ ssl::SslIoResult ssl::Connection::try_ssl_shutdown_nonblock()
   }
 
   if( ret == 0 ) {
-    // First phase of bidirectional shutdown complete, need to call again
-    SSL_shutdown( ssl );
+    // Phase 1 done (our close_notify sent); try phase 2 to read peer's.
+    // Mark SSL_RECEIVED_SHUTDOWN unconditionally so non-ack'ing peers can't
+    // wedge us. A real phase-2 error becomes CONNECTION_CLOSE (graceful
+    // reactor tear-down) rather than a thrown ssl::exception from a
+    // teardown path that previously couldn't throw.
+    ERR_clear_error();
+    int ret2 = SSL_shutdown( ssl );
     SSL_set_shutdown( ssl, SSL_RECEIVED_SHUTDOWN );
+    if( ret2 < 0 ) {
+      bool clean_close = false;
+      SslIoResult phase2 = check_io_result( ssl, ret2, clean_close );
+      if( phase2 == SslIoResult::ERROR ||
+          phase2 == SslIoResult::CONNECTION_CLOSE ) {
+        return SslIoResult::CONNECTION_CLOSE;
+      }
+      // WANT_READ / WANT_WRITE: peer hasn't ack'd; cheaper to drop the
+      // connection than to re-poll indefinitely. Reactor tear-down follows.
+    }
     return SslIoResult::OK;
   }
 
@@ -383,15 +423,33 @@ void ssl::Reaction_connection::switch_state( bool& terminate )
       size_t bytes_written = 0;
       result = try_ssl_write( send_buf, buf_len, bytes_written );
       if( result == SslIoResult::OK ) {
-        state = EMPTY;
-        send_succeed( terminate );
+        if( bytes_written < buf_len ) {
+          // SSL_write may return fewer bytes than requested; advance and
+          // stay in WRITING so the next writable event flushes the tail.
+          // Typically dormant (this library does not currently enable
+          // SSL_MODE_ENABLE_PARTIAL_WRITE) but defends against silent
+          // truncation if that changes.
+          send_buf += bytes_written;
+          buf_len  -= bytes_written;
+          result = SslIoResult::WANT_WRITE;
+        } else {
+          state = EMPTY;
+          send_succeed( terminate );
+        }
       }
       break;
     }
 
     case SHUTDOWN:
       result = try_ssl_shutdown_nonblock();
-      if( result == SslIoResult::OK ) {
+      // OK and CONNECTION_CLOSE are both terminal: the former means the
+      // handshake-level shutdown completed; the latter means the wrapper
+      // decided retrying is pointless (peer gone, phase-2 error, etc.).
+      // Without setting terminate here for CONNECTION_CLOSE, reg_shutdown()
+      // would take its "both flags already set" branch, free no handler,
+      // and orphan the connection.
+      if( result == SslIoResult::OK ||
+          result == SslIoResult::CONNECTION_CLOSE ) {
         terminate = true;
       }
       break;

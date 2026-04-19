@@ -12,6 +12,7 @@
 #include <cstdio>
 #include <fcntl.h>
 #include <fstream>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
@@ -222,6 +223,17 @@ inline bool ssl_certs_available() {
   return cert.good() && key.good();
 }
 
+// Build a payload with index-dependent bytes. Intended for integrity tests
+// that must catch mid-stream truncation, duplication, or off-by-N corruption
+// — a uniform fill would pass a truncate-then-repad scenario.
+inline std::string make_indexed_payload(size_t n) {
+  std::string s(n, '\0');
+  for (size_t i = 0; i < n; ++i) {
+    s[i] = static_cast<char>('a' + (i % 26));
+  }
+  return s;
+}
+
 //=============================================================================
 // SSL Verification Helpers
 //=============================================================================
@@ -322,6 +334,11 @@ protected:
   std::string temp_cert_path_;
   std::string temp_key_path_;
   std::string server_error_message_;
+  // Optional hook: runs synchronously inside start_server(), after the
+  // built-in user methods are registered but before the reactor thread
+  // begins work(). Tests use this to register additional methods safely
+  // (the dispatcher map is not thread-safe once work() starts).
+  std::function<void(iqxmlrpc::Server&)> extra_registration_hook_;
 
 public:
   HttpsIntegrationFixture(const HttpsIntegrationFixture&) = delete;
@@ -338,6 +355,7 @@ public:
     , temp_cert_path_()
     , temp_key_path_()
     , server_error_message_()
+    , extra_registration_hook_()
   {}
 
   ~HttpsIntegrationFixture() {
@@ -385,6 +403,10 @@ public:
       exec_factory_.get());
 
     register_user_methods(*server_);
+
+    if (extra_registration_hook_) {
+      extra_registration_hook_(*server_);
+    }
 
     server_running_ = true;
     server_thread_ = std::thread([this]() {
