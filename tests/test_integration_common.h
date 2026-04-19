@@ -12,6 +12,7 @@
 #include <cstdio>
 #include <fcntl.h>
 #include <fstream>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
@@ -322,6 +323,11 @@ protected:
   std::string temp_cert_path_;
   std::string temp_key_path_;
   std::string server_error_message_;
+  // Optional hook: runs synchronously inside start_server(), after the
+  // built-in user methods are registered but before the reactor thread
+  // begins work(). Tests use this to register additional methods safely
+  // (the dispatcher map is not thread-safe once work() starts).
+  std::function<void(iqxmlrpc::Server&)> extra_registration_hook_;
 
 public:
   HttpsIntegrationFixture(const HttpsIntegrationFixture&) = delete;
@@ -338,6 +344,7 @@ public:
     , temp_cert_path_()
     , temp_key_path_()
     , server_error_message_()
+    , extra_registration_hook_()
   {}
 
   ~HttpsIntegrationFixture() {
@@ -385,6 +392,10 @@ public:
       exec_factory_.get());
 
     register_user_methods(*server_);
+
+    if (extra_registration_hook_) {
+      extra_registration_hook_(*server_);
+    }
 
     server_running_ = true;
     server_thread_ = std::thread([this]() {

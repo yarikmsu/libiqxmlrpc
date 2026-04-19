@@ -200,6 +200,10 @@ ssl::SslIoResult ssl::Connection::try_ssl_read( char* buf, size_t len, size_t& b
   }
 
   bytes_read = 0;
+  // SSL_get_error() in check_io_result() inspects the per-thread OpenSSL
+  // error queue; a stale entry left by an earlier unrelated call would
+  // mask a benign WANT_READ as SSL_ERROR_SSL. Clear before every SSL_* call.
+  ERR_clear_error();
   int ret = SSL_read( ssl, buf, static_cast<int>(len) );
 
   if( ret > 0 ) {
@@ -222,6 +226,8 @@ ssl::SslIoResult ssl::Connection::try_ssl_write( const char* buf, size_t len, si
   }
 
   bytes_written = 0;
+  // See try_ssl_read() for rationale.
+  ERR_clear_error();
   int ret = SSL_write( ssl, buf, static_cast<int>(len) );
 
   if( ret > 0 ) {
@@ -236,6 +242,8 @@ ssl::SslIoResult ssl::Connection::try_ssl_write( const char* buf, size_t len, si
 
 ssl::SslIoResult ssl::Connection::try_ssl_accept_nonblock()
 {
+  // See try_ssl_read() for rationale.
+  ERR_clear_error();
   int ret = SSL_accept( ssl );
 
   if( ret == 1 ) {
@@ -249,6 +257,8 @@ ssl::SslIoResult ssl::Connection::try_ssl_accept_nonblock()
 
 ssl::SslIoResult ssl::Connection::try_ssl_connect_nonblock()
 {
+  // See try_ssl_read() for rationale.
+  ERR_clear_error();
   int ret = SSL_connect( ssl );
 
   if( ret == 1 ) {
@@ -266,6 +276,8 @@ ssl::SslIoResult ssl::Connection::try_ssl_shutdown_nonblock()
     return SslIoResult::OK;
   }
 
+  // See try_ssl_read() for rationale.
+  ERR_clear_error();
   int ret = SSL_shutdown( ssl );
 
   if( ret == 1 ) {
@@ -274,6 +286,7 @@ ssl::SslIoResult ssl::Connection::try_ssl_shutdown_nonblock()
 
   if( ret == 0 ) {
     // First phase of bidirectional shutdown complete, need to call again
+    ERR_clear_error();
     SSL_shutdown( ssl );
     SSL_set_shutdown( ssl, SSL_RECEIVED_SHUTDOWN );
     return SslIoResult::OK;
