@@ -62,6 +62,9 @@ void ssl::Connection::prepare_for_ssl_connect()
 void ssl::Connection::ssl_accept()
 {
   prepare_for_ssl_accept();
+  // Empty queue is a precondition of SSL_get_error() (consulted inside
+  // throw_io_exception() below).
+  ERR_clear_error();
   int ret = SSL_accept( ssl );
 
   if( ret != 1 )
@@ -95,6 +98,7 @@ void ssl::Connection::prepare_hostname_for_connect()
 void ssl::Connection::ssl_connect()
 {
   prepare_for_ssl_connect();
+  ERR_clear_error();
   int ret = SSL_connect( ssl );
 
   if( ret != 1 )
@@ -107,6 +111,7 @@ void ssl::Connection::shutdown()
   if( shutdown_recved() && shutdown_sent() )
     return;
 
+  ERR_clear_error();
   int ret = SSL_shutdown( ssl );
   switch( ret )
   {
@@ -114,6 +119,7 @@ void ssl::Connection::shutdown()
       return;
 
     case 0:
+      ERR_clear_error();
       SSL_shutdown( ssl );
       SSL_set_shutdown( ssl, SSL_RECEIVED_SHUTDOWN );
       break;
@@ -141,6 +147,7 @@ size_t ssl::Connection::send( const char* data, size_t len )
 
   while( total_written < len )
   {
+    ERR_clear_error();
     int ret = SSL_write( ssl, data + total_written,
                          static_cast<int>(len - total_written) );
 
@@ -163,6 +170,7 @@ size_t ssl::Connection::recv( char* buf, size_t len )
     throw exception("SSL::recv: buffer size exceeds INT_MAX");
   }
 
+  ERR_clear_error();
   int ret = SSL_read( ssl, buf, static_cast<int>(len) );
 
   if( ret <= 0 )
@@ -200,9 +208,10 @@ ssl::SslIoResult ssl::Connection::try_ssl_read( char* buf, size_t len, size_t& b
   }
 
   bytes_read = 0;
-  // SSL_get_error() in check_io_result() inspects the per-thread OpenSSL
-  // error queue; a stale entry left by an earlier unrelated call would
-  // mask a benign WANT_READ as SSL_ERROR_SSL. Clear before every SSL_* call.
+  // Clear stale entries before SSL_get_error() inspects the queue.
+  // A lingering entry from earlier unrelated OpenSSL work (verify callback,
+  // BIO helper, parallel teardown) would mask a benign WANT_READ as
+  // SSL_ERROR_SSL. Contract required by SSL_get_error(3).
   ERR_clear_error();
   int ret = SSL_read( ssl, buf, static_cast<int>(len) );
 
@@ -226,7 +235,7 @@ ssl::SslIoResult ssl::Connection::try_ssl_write( const char* buf, size_t len, si
   }
 
   bytes_written = 0;
-  // See try_ssl_read() for rationale.
+  // Clear stale entries before SSL_get_error() inspects the queue.
   ERR_clear_error();
   int ret = SSL_write( ssl, buf, static_cast<int>(len) );
 
@@ -242,7 +251,7 @@ ssl::SslIoResult ssl::Connection::try_ssl_write( const char* buf, size_t len, si
 
 ssl::SslIoResult ssl::Connection::try_ssl_accept_nonblock()
 {
-  // See try_ssl_read() for rationale.
+  // Clear stale entries before SSL_get_error() inspects the queue.
   ERR_clear_error();
   int ret = SSL_accept( ssl );
 
@@ -257,7 +266,7 @@ ssl::SslIoResult ssl::Connection::try_ssl_accept_nonblock()
 
 ssl::SslIoResult ssl::Connection::try_ssl_connect_nonblock()
 {
-  // See try_ssl_read() for rationale.
+  // Clear stale entries before SSL_get_error() inspects the queue.
   ERR_clear_error();
   int ret = SSL_connect( ssl );
 
@@ -276,7 +285,7 @@ ssl::SslIoResult ssl::Connection::try_ssl_shutdown_nonblock()
     return SslIoResult::OK;
   }
 
-  // See try_ssl_read() for rationale.
+  // Clear stale entries before SSL_get_error() inspects the queue.
   ERR_clear_error();
   int ret = SSL_shutdown( ssl );
 
@@ -285,10 +294,22 @@ ssl::SslIoResult ssl::Connection::try_ssl_shutdown_nonblock()
   }
 
   if( ret == 0 ) {
-    // First phase of bidirectional shutdown complete, need to call again
+    // Phase 1 complete (our close_notify sent). Try phase 2 to read peer's
+    // close_notify. Mark SSL_RECEIVED_SHUTDOWN regardless so we don't hang
+    // on peers that never ack (preserves the original tear-down semantics),
+    // but surface real protocol errors instead of swallowing them.
     ERR_clear_error();
-    SSL_shutdown( ssl );
+    int ret2 = SSL_shutdown( ssl );
     SSL_set_shutdown( ssl, SSL_RECEIVED_SHUTDOWN );
+    if( ret2 < 0 ) {
+      bool clean_close = false;
+      SslIoResult phase2 = check_io_result( ssl, ret2, clean_close );
+      if( phase2 == SslIoResult::ERROR ||
+          phase2 == SslIoResult::CONNECTION_CLOSE ) {
+        return phase2;
+      }
+      // WANT_READ / WANT_WRITE: peer hasn't ack'd, not worth polling.
+    }
     return SslIoResult::OK;
   }
 
@@ -396,8 +417,17 @@ void ssl::Reaction_connection::switch_state( bool& terminate )
       size_t bytes_written = 0;
       result = try_ssl_write( send_buf, buf_len, bytes_written );
       if( result == SslIoResult::OK ) {
-        state = EMPTY;
-        send_succeed( terminate );
+        if( bytes_written < buf_len ) {
+          // Partial write (possible if SSL_MODE_ENABLE_PARTIAL_WRITE is
+          // ever enabled). Advance and stay in WRITING so the next writable
+          // event flushes the tail instead of silently dropping it.
+          send_buf += bytes_written;
+          buf_len  -= bytes_written;
+          result = SslIoResult::WANT_WRITE;
+        } else {
+          state = EMPTY;
+          send_succeed( terminate );
+        }
       }
       break;
     }

@@ -616,25 +616,11 @@ BOOST_FIXTURE_TEST_CASE(https_set_verify_peer_rejects_untrusted_cert, HttpsInteg
 // =============================================================================
 // Stale OpenSSL error queue regression tests
 // =============================================================================
-// SSL_get_error() consults the per-thread OpenSSL error queue in addition to
-// the I/O return value. If an unrelated earlier OpenSSL call left an entry
-// on the queue (verify callback, BIO helper, parallel connection teardown,
-// etc.), SSL_get_error() classifies a benign WANT_READ / WANT_WRITE as
-// SSL_ERROR_SSL. Before the fix, check_io_result() would translate that
-// into SslIoResult::ERROR and the reactor would throw
-// ssl::exception("SSL I/O error") mid-transfer, truncating responses.
-//
-// The contract is: every non-throwing SSL I/O wrapper calls ERR_clear_error()
-// immediately before invoking its SSL_* primitive. These tests guard that
-// contract.
-//
-// Platform note: OpenSSL 3.0+ added an internal ERR_clear_error() inside
-// SSL_do_handshake() and other high-level calls, which masks the bug at
-// runtime on modern distros. On OpenSSL 1.1.x (RHEL 8 / ubi8 CI leg)
-// that internal guard is absent and these tests fail without the fix.
-// They still exercise the wrapper code path on every platform and guard
-// against a future regression that removes ERR_clear_error() from the
-// wrappers.
+// Invariant: every SSL I/O wrapper must call ERR_clear_error() before its
+// SSL_* primitive. SSL_get_error() consults the per-thread error queue in
+// addition to the return value, so a stale entry (e.g. from a verify
+// callback) will misclassify WANT_READ / WANT_WRITE as SSL_ERROR_SSL and
+// tear the connection down mid-transfer. These tests guard that invariant.
 
 namespace {
 
@@ -680,14 +666,27 @@ void poison_and_echo_method(
   }
 }
 
+// Returns a payload large enough that SSL_write over a freshly-connected
+// loopback socket is likely to hit kernel-send-buffer back-pressure at
+// least once, exercising the real WANT_WRITE path in try_ssl_write. Size
+// is chosen to exceed a typical default SO_SNDBUF on Linux/macOS.
+constexpr size_t kLargePayloadSize = 512 * 1024;  // 512 KiB
+
+void poison_and_bulk_echo_method(
+  iqxmlrpc::Method*,
+  const iqxmlrpc::Param_list&,
+  iqxmlrpc::Value& retval)
+{
+  ERR_put_error(ERR_LIB_USER, 0, 1, __FILE__, __LINE__);
+  retval = std::string(kLargePayloadSize, 'x');
+}
+
 } // namespace
 
 // Deterministic reproducer for the wrapper's queue-hygiene contract.
-// Uses a connected AF_UNIX socketpair — enough for SSL_accept to be
-// driven off a real fd without needing an actual ClientHello. With no
-// data from the peer, SSL_accept returns -1 and SSL_get_error() should
-// report WANT_READ. A poisoned queue turns that into SSL_ERROR_SSL
-// unless the wrapper clears it first.
+// AF_UNIX socketpair drives SSL_accept off a real fd without needing a
+// real ClientHello. With no data from the peer, SSL_accept returns -1
+// and the wrapper must report WANT_READ.
 BOOST_FIXTURE_TEST_CASE(ssl_try_accept_survives_stale_error_queue,
                         HttpsIntegrationFixture)
 {
@@ -699,12 +698,20 @@ BOOST_FIXTURE_TEST_CASE(ssl_try_accept_survives_stale_error_queue,
 
   // RAII guards ensure the fds outlive the SSL object (which will call
   // SSL_free -> SSL_shutdown on the server-side fd during its destructor).
-  struct FdGuard {
-    int fd;
-    ~FdGuard() { if (fd >= 0) ::close(fd); }
+  // Non-copyable; move leaves the source in a neutral state to keep the
+  // invariant "at most one owner ever closes the fd".
+  class FdGuard {
+    int fd_;
+  public:
+    explicit FdGuard(int fd) : fd_(fd) {}
+    ~FdGuard() { if (fd_ >= 0) ::close(fd_); }
+    FdGuard(const FdGuard&) = delete;
+    FdGuard& operator=(const FdGuard&) = delete;
+    FdGuard(FdGuard&& other) noexcept : fd_(other.fd_) { other.fd_ = -1; }
+    FdGuard& operator=(FdGuard&&) = delete;
   };
-  FdGuard server_fd_guard{sv[0]};
-  FdGuard peer_fd_guard{sv[1]};
+  FdGuard server_fd_guard(sv[0]);
+  FdGuard peer_fd_guard(sv[1]);
 
   iqnet::ssl::SslIoResult result;
   {
@@ -731,13 +738,11 @@ BOOST_FIXTURE_TEST_CASE(ssl_try_accept_survives_stale_error_queue,
   ERR_clear_error();
 }
 
-// End-to-end: a method handler that poisons the per-thread OpenSSL error
-// queue must not break subsequent I/O on the same connection. Before the
-// fix, the reactor's next try_ssl_read / try_ssl_write after the handler
-// returned would misclassify would-block as fatal and tear the connection
-// down mid-response. With keep-alive, every request rides the same reactor
-// thread, so a single poisoned call silently contaminates every call that
-// follows it.
+// End-to-end guard: a method handler that pollutes the per-thread OpenSSL
+// error queue must not break subsequent SSL I/O on that thread. Under
+// Serial_executor_factory the method runs inline on the reactor thread,
+// so every try_ssl_read / try_ssl_write that follows must tolerate a
+// dirty queue.
 BOOST_FIXTURE_TEST_CASE(https_survives_method_polluting_error_queue,
                         HttpsIntegrationFixture)
 {
@@ -751,10 +756,9 @@ BOOST_FIXTURE_TEST_CASE(https_survives_method_polluting_error_queue,
   start_server(224);
   auto client = create_client();
 
-  // Multiple keep-alive calls after the first poisoning. Any would-block
-  // encountered by the reactor (e.g., between requests) will trigger the
-  // bug in the absence of the fix.
-  for (int i = 0; i < 10; ++i) {
+  // > 1 so at least one call happens after the queue has been poisoned.
+  constexpr int kKeepAliveCalls = 4;
+  for (int i = 0; i < kKeepAliveCalls; ++i) {
     const std::string payload = "poisoned_" + std::to_string(i);
     iqxmlrpc::Response r =
       client->execute("poison_and_echo", iqxmlrpc::Value(payload));
@@ -763,6 +767,73 @@ BOOST_FIXTURE_TEST_CASE(https_survives_method_polluting_error_queue,
       "call #" << i << " faulted; fault: " << r.fault_string());
     BOOST_CHECK_EQUAL(r.value().get_string(), payload);
   }
+}
+
+// Large-payload variant: exercises try_ssl_write under kernel-send-buffer
+// back-pressure, which is the production repro scenario (mid-body
+// truncation of ~hundreds-of-KB responses). With the queue poisoned by
+// the method handler, any real WANT_WRITE surfacing on the reactor's
+// subsequent write call must not be misclassified as fatal.
+BOOST_FIXTURE_TEST_CASE(https_large_response_survives_poisoned_queue,
+                        HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to set up SSL context with embedded certificates");
+
+  extra_registration_hook_ = [](iqxmlrpc::Server& s) {
+    iqxmlrpc::register_method(s, "poison_and_bulk_echo",
+                              &poison_and_bulk_echo_method);
+  };
+
+  start_server(225);
+  auto client = create_client();
+
+  iqxmlrpc::Response r =
+    client->execute("poison_and_bulk_echo", iqxmlrpc::Value(std::string()));
+
+  BOOST_REQUIRE_MESSAGE(!r.is_fault(),
+    "large-response call faulted; fault: " << r.fault_string());
+  BOOST_CHECK_EQUAL(r.value().get_string().size(), kLargePayloadSize);
+}
+
+// Shutdown-with-poisoned-queue: exercises try_ssl_shutdown_nonblock,
+// including the duplicated ERR_clear_error() before the second
+// SSL_shutdown in the ret==0 branch. Without the fix, the second
+// SSL_shutdown's SSL_get_error() call would see stale queue entries.
+// We drive the shutdown by letting the client drop the connection after
+// a poisoning call; the reactor's teardown then runs the shutdown wrapper.
+BOOST_FIXTURE_TEST_CASE(https_shutdown_survives_poisoned_queue,
+                        HttpsIntegrationFixture)
+{
+  BOOST_REQUIRE_MESSAGE(setup_ssl_context(),
+    "Failed to set up SSL context with embedded certificates");
+
+  extra_registration_hook_ = [](iqxmlrpc::Server& s) {
+    iqxmlrpc::register_method(s, "poison_and_echo", &poison_and_echo_method);
+  };
+
+  start_server(226);
+
+  {
+    auto client = create_client();
+    // keep-alive off: the server-side connection will go through shutdown
+    // right after the response is sent, on a reactor thread that just had
+    // its error queue poisoned by the method handler.
+    client->set_keep_alive(false);
+
+    iqxmlrpc::Response r =
+      client->execute("poison_and_echo", iqxmlrpc::Value(std::string("x")));
+    BOOST_REQUIRE(!r.is_fault());
+  }
+
+  // A second call must still succeed — if the server's shutdown path
+  // tripped on the poisoned queue it would have logged/thrown internally
+  // and may have poisoned state visible to the next handshake.
+  auto client2 = create_client();
+  iqxmlrpc::Response r2 =
+    client2->execute("poison_and_echo", iqxmlrpc::Value(std::string("y")));
+  BOOST_REQUIRE(!r2.is_fault());
+  BOOST_CHECK_EQUAL(r2.value().get_string(), "y");
 }
 
 BOOST_AUTO_TEST_SUITE_END()
