@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 project(Libiqxmlrpc)
-set(Libiqxmlrpc_VERSION 0.14.2)
+set(Libiqxmlrpc_VERSION 0.14.3)
 
 # Require C++17 standard for entire project
 set(CMAKE_CXX_STANDARD 17)
